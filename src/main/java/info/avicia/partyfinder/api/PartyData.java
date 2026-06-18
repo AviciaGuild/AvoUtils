@@ -38,15 +38,15 @@ public class PartyData {
          */
         public String roleIcon() {
             if (isReserved && role == null) {
-                return "🔒";
+                return "\uD83D\uDD12"; // 🔒
             }
-            if (role == null) return "🧩";
+            if (role == null) return "\uD83E\uDDE9"; // 🧩
             return switch (role) {
-                case "dps" -> "⚔️";
-                case "healer" -> "❤️";
-                case "tank" -> "🛡️";
-                case "other" -> "🧩";
-                default -> "🧩";
+                case "dps" -> "\u2694"; // ⚔
+                case "healer" -> "\u2764"; // ❤
+                case "tank" -> "\uD83D\uDEE1"; // 🛡
+                case "other" -> "\uD83E\uDDE9"; // 🧩
+                default -> "\uD83E\uDDE9"; // 🧩
             };
         }
     }
