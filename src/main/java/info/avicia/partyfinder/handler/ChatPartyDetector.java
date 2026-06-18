@@ -1,0 +1,171 @@
+package info.avicia.partyfinder.handler;
+
+import info.avicia.partyfinder.PartyFinderMod;
+import info.avicia.partyfinder.api.PartyFinderClient;
+import info.avicia.partyfinder.gui.PartyListScreen;
+import net.minecraft.client.MinecraftClient;
+
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Listens to incoming chat messages to detect party events
+ */
+public class ChatPartyDetector {
+
+    private static final Pattern PARTY_JOIN_PATTERN = Pattern.compile(
+            "(?:\\[.+?\\] )?(.+?) has joined your party, say hello!", Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("§.");
+    private static final Pattern RANK_PREFIX_PATTERN = Pattern.compile("^\\[.+?\\]\\s*");
+    private static final Pattern NON_NAME_CHARS_PATTERN = Pattern.compile("[^A-Za-z0-9_]");
+
+    private static final String PARTY_MEMBERS_MARKER = "Party members:";
+    private static final String PARTY_JOIN_MARKER = "has joined your party";
+
+    private final PartyFinderClient apiClient;
+
+    // Tracked party ID set when the player is leading a party via the mod
+    private long trackedPartyId = -1;
+
+    // Set of known in-game party members
+    private final Set<String> knownInGameMembers = ConcurrentHashMap.newKeySet();
+
+    // Set of members from the last /party list parse
+    private final Set<String> lastPartyListMembers = ConcurrentHashMap.newKeySet();
+
+    public ChatPartyDetector(PartyFinderClient apiClient) {
+        this.apiClient = apiClient;
+    }
+
+    /**
+     * Registers this detector. Message interception is handled via the
+     * {@link info.avicia.partyfinder.mixin.ClientPlayNetworkHandlerMixin} packet-level
+     * mixin, so no Fabric event listeners need to be registered here
+     */
+    public void register() {
+        // No-op
+    }
+
+    /**
+     * Set the party ID to track for auto-reserving
+     */
+    public void setTrackedPartyId(long partyId) {
+        this.trackedPartyId = partyId;
+        knownInGameMembers.clear();
+    }
+
+    public long getTrackedPartyId() {
+        return trackedPartyId;
+    }
+
+    public void clearTracking() {
+        trackedPartyId = -1;
+        knownInGameMembers.clear();
+    }
+
+    /**
+     * Add names that are already known (e.g. from the Discord party list)
+     */
+    public void addKnownMembers(Iterable<String> names) {
+        for (String name : names) {
+            knownInGameMembers.add(name.toLowerCase());
+        }
+    }
+
+    public Set<String> getLastPartyListMembers() {
+        return Set.copyOf(lastPartyListMembers);
+    }
+
+
+    // ── Chat processing ──────────────────────────────────────────────────
+
+    private String cleanPlayerName(String rawName) {
+        if (rawName == null) return "";
+        String name = COLOR_CODE_PATTERN.matcher(rawName).replaceAll("").trim();
+        name = RANK_PREFIX_PATTERN.matcher(name).replaceFirst("").trim();
+        String[] tokens = name.split("\\s+");
+        if (tokens.length > 0) name = tokens[tokens.length - 1];
+        return NON_NAME_CHARS_PATTERN.matcher(name).replaceAll("").trim();
+    }
+
+    public void onChatMessage(String text) {
+        if (!text.contains(PARTY_MEMBERS_MARKER) && !text.contains(PARTY_JOIN_MARKER)) return;
+
+        String trimmed = COLOR_CODE_PATTERN.matcher(text).replaceAll("").trim();
+
+        // Handle /party list parsing
+        int index = trimmed.indexOf("Party members: ");
+        if (index != -1) {
+            lastPartyListMembers.clear();
+            String membersStr = trimmed.substring(index + "Party members: ".length()).trim();
+            String[] parts = membersStr.split(",");
+            for (String part : parts) {
+                String cleanPart = part.replace("and", "").trim();
+                String name = cleanPlayerName(cleanPart);
+                if (!name.isEmpty()) {
+                    lastPartyListMembers.add(name);
+                }
+            }
+            onPartyListParsed();
+            return;
+        }
+
+        // Party join detection
+        Matcher joinMatch = PARTY_JOIN_PATTERN.matcher(trimmed);
+        if (joinMatch.find()) {
+            String playerName = cleanPlayerName(joinMatch.group(1));
+            onPlayerJoined(playerName);
+        }
+    }
+
+    private void onPlayerJoined(String playerName) {
+        PartyFinderMod.LOGGER.info("Detected party join: {}", playerName);
+
+        if (trackedPartyId < 0) return;
+
+        // If this player is not in our known list, auto-reserve them
+        if (!knownInGameMembers.contains(playerName.toLowerCase())) {
+            PartyFinderMod.LOGGER.info("Auto-reserving unknown in-game player: {}", playerName);
+            apiClient.reserveIngame(trackedPartyId, playerName).thenAccept(resp -> {
+                if (resp.ok) {
+                    knownInGameMembers.add(playerName.toLowerCase());
+                    PartyFinderMod.LOGGER.info("Reserved slot for {} on Discord.", playerName);
+                } else {
+                    PartyFinderMod.LOGGER.warn("Failed to reserve for {}: {}", playerName, resp.error);
+                }
+            });
+        }
+
+        knownInGameMembers.add(playerName.toLowerCase());
+    }
+
+    private void onPartyListParsed() {
+        PartyFinderMod.LOGGER.info("Parsed /party list: {} members", lastPartyListMembers.size());
+
+        // Notify active screen to update UI if needed
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.execute(() -> {
+            if (mc.currentScreen instanceof PartyListScreen screen) {
+                screen.onPartyListUpdated();
+            }
+        });
+
+        if (trackedPartyId < 0) return;
+
+        // Auto-reserve any unknown members
+        for (String name : lastPartyListMembers) {
+            if (!knownInGameMembers.contains(name.toLowerCase())) {
+                PartyFinderMod.LOGGER.info("Auto-reserving from /party list: {}", name);
+                apiClient.reserveIngame(trackedPartyId, name).thenAccept(resp -> {
+                    if (resp.ok) {
+                        knownInGameMembers.add(name.toLowerCase());
+                    }
+                });
+            }
+            knownInGameMembers.add(name.toLowerCase());
+        }
+    }
+}

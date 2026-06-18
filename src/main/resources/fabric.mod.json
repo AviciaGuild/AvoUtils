@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "avicia-pfinder",
+  "version": "${version}",
+  "name": "Avicia Party Finder",
+  "description": "In-game party finder GUI that syncs with AvoBot's party system.",
+  "authors": ["Avicia"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/avicia-pfinder/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "info.avicia.partyfinder.PartyFinderMod"
+    ]
+  },
+  "mixins": [
+    "avicia-pfinder.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
