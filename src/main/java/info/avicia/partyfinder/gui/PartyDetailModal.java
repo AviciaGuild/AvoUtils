@@ -319,7 +319,7 @@ public class PartyDetailModal extends Screen {
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(line), textX + 4, textY, nameColor);
 
             // Kick button for leaders (not self)
-            if (isLeader && !member.name.equalsIgnoreCase(party.leaderName) && !member.isReserved) {
+            if (isLeader && !member.name.equalsIgnoreCase(party.leaderName)) {
                 int kickX = modalX + modalW - 40;
                 boolean kickHovered = mouseX >= kickX && mouseX <= kickX + 30
                         && mouseY >= textY - 1 && mouseY <= textY + 10;
@@ -352,7 +352,7 @@ public class PartyDetailModal extends Screen {
                 PartyData.MemberData member = party.members.get(row.memberKey);
                 if (member == null) continue;
                 int kickX = modalX + modalW - 40;
-                if (!member.name.equalsIgnoreCase(party.leaderName) && !member.isReserved
+                if (!member.name.equalsIgnoreCase(party.leaderName)
                         && mouseX >= kickX && mouseX <= kickX + 30
                         && mouseY >= row.y - 1 && mouseY <= row.y + 10) {
                     apiClient.kickMember(party.partyId, member.name).thenAccept(resp -> {
