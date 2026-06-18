@@ -34,7 +34,7 @@ public class PartyFinderMod implements ClientModInitializer {
 
         // Initialize handlers
         chatDetector = new ChatPartyDetector(apiClient);
-        inviteHandler = new InviteHandler();
+        inviteHandler = new InviteHandler(chatDetector);
 
         // Client tick events
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

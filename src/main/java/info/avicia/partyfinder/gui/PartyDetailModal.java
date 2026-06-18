@@ -153,8 +153,21 @@ public class PartyDetailModal extends Screen {
     private void inviteAll() {
         List<String> names = new ArrayList<>();
         for (PartyData.MemberData member : party.members.values()) {
-            if (!member.isReserved && !member.name.equalsIgnoreCase(playerName)) {
-                names.add(member.name);
+            if (member.name != null 
+                    && !member.name.isEmpty() 
+                    && !member.name.equalsIgnoreCase("<RESERVED>") 
+                    && !member.name.equalsIgnoreCase(playerName)) {
+
+                boolean alreadyInGame = false;
+                for (String inGameName : parent.getChatDetector().getLastPartyListMembers()) {
+                    if (inGameName.equalsIgnoreCase(member.name)) {
+                        alreadyInGame = true;
+                        break;
+                    }
+                }
+                if (!alreadyInGame) {
+                    names.add(member.name);
+                }
             }
         }
         inviteHandler.queueInvites(names);

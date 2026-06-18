@@ -14,15 +14,23 @@ public class InviteHandler {
 
     private static final int TICKS_BETWEEN_INVITES = 15;
 
+    private final ChatPartyDetector chatDetector;
     private final Queue<String> inviteQueue = new ArrayDeque<>();
     private int cooldownTicks = 0;
+
+    public InviteHandler(ChatPartyDetector chatDetector) {
+        this.chatDetector = chatDetector;
+    }
 
     /**
      * Queue a list of player names to invite via /party invite
      */
     public void queueInvites(List<String> playerNames) {
+        if (!chatDetector.isInParty() && !playerNames.isEmpty()) {
+            inviteQueue.add("__CREATE__");
+        }
         inviteQueue.addAll(playerNames);
-        PartyFinderMod.LOGGER.info("Queued {} party invites.", playerNames.size());
+        PartyFinderMod.LOGGER.info("Queued {} party invites. Need party creation: {}", playerNames.size(), !chatDetector.isInParty());
     }
 
     /**
@@ -37,9 +45,14 @@ public class InviteHandler {
             return;
         }
 
-        String playerName = inviteQueue.poll();
-        if (playerName != null) {
-            String command = "party invite " + playerName;
+        String action = inviteQueue.poll();
+        if (action != null) {
+            String command;
+            if (action.equals("__CREATE__")) {
+                command = "party create";
+            } else {
+                command = "party invite " + action;
+            }
             PartyFinderMod.LOGGER.info("Sending: /{}", command);
             client.player.networkHandler.sendChatCommand(command);
             cooldownTicks = TICKS_BETWEEN_INVITES;

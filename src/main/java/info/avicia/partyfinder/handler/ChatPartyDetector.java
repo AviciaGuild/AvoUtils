@@ -36,6 +36,9 @@ public class ChatPartyDetector {
     // Set of members from the last /party list parse
     private final Set<String> lastPartyListMembers = ConcurrentHashMap.newKeySet();
 
+    // Track if the player is currently in an in-game party
+    private boolean inParty = false;
+
     public ChatPartyDetector(PartyFinderClient apiClient) {
         this.apiClient = apiClient;
     }
@@ -79,6 +82,10 @@ public class ChatPartyDetector {
         return Set.copyOf(lastPartyListMembers);
     }
 
+    public boolean isInParty() {
+        return inParty;
+    }
+
 
     // ── Chat processing ──────────────────────────────────────────────────
 
@@ -92,9 +99,30 @@ public class ChatPartyDetector {
     }
 
     public void onChatMessage(String text) {
-        if (!text.contains(PARTY_MEMBERS_MARKER) && !text.contains(PARTY_JOIN_MARKER)) return;
+        String lower = text.toLowerCase();
+
+        // Check for leaving / not in party events (returned when not in a party)
+        boolean notInPartyMsg = lower.contains("you must be in a party");
+
+        // Check for joining / members list events
+        boolean inPartyMsg = text.contains(PARTY_MEMBERS_MARKER)
+                || text.contains(PARTY_JOIN_MARKER);
+
+        if (!notInPartyMsg && !inPartyMsg) return;
 
         String trimmed = COLOR_CODE_PATTERN.matcher(text).replaceAll("").trim();
+
+        if (notInPartyMsg) {
+            inParty = false;
+            lastPartyListMembers.clear();
+            knownInGameMembers.clear();
+            PartyFinderMod.LOGGER.info("Detected player is not in a party.");
+            return;
+        }
+
+        if (inPartyMsg) {
+            inParty = true;
+        }
 
         // Handle /party list parsing
         int index = trimmed.indexOf("Party members: ");
