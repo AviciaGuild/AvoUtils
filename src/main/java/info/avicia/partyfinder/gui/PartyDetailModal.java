@@ -46,6 +46,7 @@ public class PartyDetailModal extends Screen {
         this.apiClient = apiClient;
         this.inviteHandler = inviteHandler;
         this.party = party;
+        refreshPartyState();
     }
 
     public void initModal(MinecraftClient client, int width, int height) {
