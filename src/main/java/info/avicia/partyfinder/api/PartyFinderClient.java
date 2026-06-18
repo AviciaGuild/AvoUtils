@@ -28,7 +28,6 @@ public class PartyFinderClient {
 
     private final ModConfig config;
     private final HttpClient httpClient;
-    private final String playerUuid;
 
     private final Object authLock = new Object();
     private volatile String sessionToken = null;
@@ -39,10 +38,6 @@ public class PartyFinderClient {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
-        // Cache UUID
-        Session session = MinecraftClient.getInstance().getSession();
-        UUID uuid = session.getUuidOrNull();
-        this.playerUuid = uuid != null ? uuid.toString().replace("-", "") : "";
     }
 
     // ── Auth ──────────────────────────────────────────────────────────────
