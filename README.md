@@ -2,6 +2,13 @@
 
 A Minecraft Fabric client mod for integrating in-game Wynncraft party sessions with the AvoBot Party Finder backend. It enables leaders to automatically post, edit, invite, and reserve party slots on Discord directly from Minecraft.
 
+## Requirements
+
+- **Minecraft Version**: `1.21.11` (or compatible 1.21.x releases)
+- **Fabric Loader**: `0.16.14` or newer
+- **Fabric API**: `0.141.4` or newer
+- **Java**: Java 21 (to run and compile)
+
 ## Features
 
 - **Matchmaking UI**: Open the Party Finder screen with `/apf` or `/avo pf` to browse, create, join, leave, or edit active party listings.
@@ -32,4 +39,4 @@ The compiled mod jar will be located under `build/libs/`.
 
 ## License
 
-MIT: `LICENSE.txt`
+MIT: [LICENSE](file:///C:/Projects/AvoBot-PartyFinder-Mod/LICENSE)
