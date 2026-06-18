@@ -44,15 +44,6 @@ public class ChatPartyDetector {
     }
 
     /**
-     * Registers this detector. Message interception is handled via the
-     * {@link info.avicia.partyfinder.mixin.ClientPlayNetworkHandlerMixin} packet-level
-     * mixin, so no Fabric event listeners need to be registered here
-     */
-    public void register() {
-        // No-op
-    }
-
-    /**
      * Set the party ID to track for auto-reserving
      */
     public void setTrackedPartyId(long partyId) {

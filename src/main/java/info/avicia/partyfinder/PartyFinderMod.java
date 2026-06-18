@@ -40,7 +40,6 @@ public class PartyFinderMod implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             inviteHandler.tick(client);
         });
-        chatDetector.register();
 
         // Register /apf client command
         PartyCommand.register(apiClient, chatDetector, inviteHandler);

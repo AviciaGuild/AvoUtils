@@ -364,15 +364,12 @@ public class CreatePartyModal extends Screen {
             }
 
             // Highlight selected reserved count
+            int minReserved = countOtherInGameMembers();
             for (int i = 0; i < reservedButtons.size(); i++) {
                 ButtonWidget btn = reservedButtons.get(i);
-                String cleanNum = btn.getMessage().getString().replaceAll("§.", "").trim();
-                try {
-                    int val = Integer.parseInt(cleanNum);
-                    boolean selected = (val == reservedSlots);
-                    btn.setMessage(Text.literal((selected ? "§a§l" : "§7") + val));
-                } catch (Exception ignored) {
-                }
+                int val = minReserved + i;
+                boolean selected = (val == reservedSlots);
+                btn.setMessage(Text.literal((selected ? "§a§l" : "§7") + val));
             }
         }
 
