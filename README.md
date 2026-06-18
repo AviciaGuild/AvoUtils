@@ -39,4 +39,4 @@ The compiled mod jar will be located under `build/libs/`.
 
 ## License
 
-MIT: [LICENSE](file:///C:/Projects/AvoBot-PartyFinder-Mod/LICENSE)
+MIT: `LICENSE`
