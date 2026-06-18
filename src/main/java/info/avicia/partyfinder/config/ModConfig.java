@@ -47,7 +47,7 @@ public class ModConfig {
      * Validates mutable config fields, resetting any unsafe values to their defaults.
      */
     private void validate() {
-        if (apiBaseUrl == null || !apiBaseUrl.startsWith("https://")) {
+        if (apiBaseUrl == null || (!apiBaseUrl.startsWith("https://") && !apiBaseUrl.startsWith("http://localhost") && !apiBaseUrl.startsWith("http://127.0.0.1"))) {
             PartyFinderMod.LOGGER.warn(
                 "Config 'apiBaseUrl' is missing or does not use HTTPS (got '{}')."
                     + " Resetting to default: {}", apiBaseUrl, DEFAULT_API_BASE_URL);
