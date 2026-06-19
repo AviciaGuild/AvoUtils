@@ -181,9 +181,7 @@ public class CreatePartyModal extends Screen {
     // ── Form actions ─────────────────────────────────────────────────────
 
     private void toggleActivity(String activity) {
-        if (selectedActivities.contains(activity)) {
-            selectedActivities.remove(activity);
-        } else {
+        if (!selectedActivities.remove(activity)) {
             selectedActivities.add(activity);
         }
     }
@@ -193,9 +191,7 @@ public class CreatePartyModal extends Screen {
     }
 
     private void toggleRegion(String region) {
-        if (selectedRegions.contains(region)) {
-            selectedRegions.remove(region);
-        } else {
+        if (!selectedRegions.remove(region)) {
             selectedRegions.add(region);
         }
     }
