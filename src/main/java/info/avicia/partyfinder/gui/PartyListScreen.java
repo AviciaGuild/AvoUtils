@@ -75,9 +75,7 @@ public class PartyListScreen extends Screen {
         fetchParties();
 
         // Run `/party list` automatically to sync in-game party members
-        if (client != null && client.player != null) {
-            client.player.networkHandler.sendChatCommand("party list");
-        }
+        chatDetector.triggerPartyList();
     }
 
     // ── Data fetching ────────────────────────────────────────────────────

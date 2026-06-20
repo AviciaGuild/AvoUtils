@@ -25,13 +25,14 @@ public class ChatPartyDetector {
             "(?:\\[.+?\\] )?(.+?) has left the party!", Pattern.CASE_INSENSITIVE
     );
     private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("§.");
-    private static final Pattern RANK_PREFIX_PATTERN = Pattern.compile("^\\[.+?\\]\\s*");
     private static final Pattern NON_NAME_CHARS_PATTERN = Pattern.compile("[^A-Za-z0-9_]");
-
-    private static final String PARTY_MEMBERS_MARKER = "Party members:";
-    private static final String PARTY_JOIN_MARKER = "has joined your party";
-    private static final String PARTY_KICK_MARKER = "has been kicked from the party";
-    private static final String PARTY_LEAVE_MARKER = "has left the party";
+    private static final String[] EVENT_KEYWORDS = {
+            "party members:",
+            "has joined your party",
+            "has been kicked from the party",
+            "has left the party",
+            "you must be in a party"
+    };
 
     private final PartyFinderClient apiClient;
 
@@ -46,6 +47,8 @@ public class ChatPartyDetector {
 
     // Track if the player is currently in an in-game party
     private boolean inParty = false;
+
+    private volatile long hiddenPartyListExpireTime = 0;
 
     public ChatPartyDetector(PartyFinderClient apiClient) {
         this.apiClient = apiClient;
@@ -91,54 +94,67 @@ public class ChatPartyDetector {
     private String cleanPlayerName(String rawName) {
         if (rawName == null) return "";
         String name = COLOR_CODE_PATTERN.matcher(rawName).replaceAll("").trim();
-        name = RANK_PREFIX_PATTERN.matcher(name).replaceFirst("").trim();
-        String[] tokens = name.split("\\s+");
-        if (tokens.length > 0) name = tokens[tokens.length - 1];
         return NON_NAME_CHARS_PATTERN.matcher(name).replaceAll("").trim();
     }
 
-    private void triggerPartyList() {
+    public void triggerPartyList() {
         MinecraftClient mc = MinecraftClient.getInstance();
         mc.execute(() -> {
             if (mc.player != null && mc.player.networkHandler != null) {
+                hiddenPartyListExpireTime = System.currentTimeMillis() + 3000;
                 mc.player.networkHandler.sendChatCommand("party list");
             }
         });
     }
 
-    public void onChatMessage(String text) {
-        String lower = text.toLowerCase();
-
-        // Check for leaving / not in party events (returned when not in a party)
-        boolean notInPartyMsg = lower.contains("you must be in a party");
-
-        // Check for joining / members list / kick / leave events
-        boolean inPartyMsg = text.contains(PARTY_MEMBERS_MARKER)
-                || text.contains(PARTY_JOIN_MARKER)
-                || text.contains(PARTY_KICK_MARKER)
-                || text.contains(PARTY_LEAVE_MARKER);
-
-        if (!notInPartyMsg && !inPartyMsg) return;
-
+    public boolean onChatMessage(String text) {
         String trimmed = COLOR_CODE_PATTERN.matcher(text).replaceAll("").trim();
+        String lowerTrimmed = trimmed.toLowerCase();
+
+        String matchedKeyword = null;
+        int keywordIndex = -1;
+        for (String keyword : EVENT_KEYWORDS) {
+            int index = lowerTrimmed.indexOf(keyword);
+            if (index != -1) {
+                matchedKeyword = keyword;
+                keywordIndex = index;
+                break;
+            }
+        }
+
+        if (keywordIndex == -1) return false;
+
+        // Forgery prevention: if there's a colon before the keyword, it's a player message
+        int colonIndex = trimmed.indexOf(":");
+        if (colonIndex != -1 && colonIndex < keywordIndex) {
+            return false;
+        }
+
+        boolean notInPartyMsg = "you must be in a party".equals(matchedKeyword);
+
+        boolean shouldHide = false;
+        long now = System.currentTimeMillis();
+        if (now < hiddenPartyListExpireTime) {
+            if ("party members:".equals(matchedKeyword) || notInPartyMsg) {
+                shouldHide = true;
+                hiddenPartyListExpireTime = 0; // consume expectation
+            }
+        }
 
         if (notInPartyMsg) {
             inParty = false;
             lastPartyListMembers.clear();
             knownInGameMembers.clear();
             PartyFinderMod.LOGGER.info("Detected player is not in a party.");
-            return;
+            return shouldHide;
         }
 
-        if (inPartyMsg) {
-            inParty = true;
-        }
+        inParty = true;
 
         // Handle /party list parsing
-        int index = trimmed.indexOf("Party members: ");
-        if (index != -1) {
+        if ("party members:".equals(matchedKeyword)) {
             lastPartyListMembers.clear();
-            String membersStr = trimmed.substring(index + "Party members: ".length()).trim();
+            String membersStr = trimmed.substring(keywordIndex + "party members:".length()).trim();
             String[] parts = membersStr.split(",");
             for (String part : parts) {
                 String cleanPart = part.replace("and", "").trim();
@@ -148,32 +164,40 @@ public class ChatPartyDetector {
                 }
             }
             onPartyListParsed();
-            return;
+            return shouldHide;
         }
 
         // Party join detection
-        Matcher joinMatch = PARTY_JOIN_PATTERN.matcher(trimmed);
-        if (joinMatch.find()) {
-            PartyFinderMod.LOGGER.info("Detected party join message. Requesting /party list.");
-            triggerPartyList();
-            return;
+        if ("has joined your party".equals(matchedKeyword)) {
+            Matcher joinMatch = PARTY_JOIN_PATTERN.matcher(trimmed);
+            if (joinMatch.find()) {
+                PartyFinderMod.LOGGER.info("Detected party join message. Requesting /party list.");
+                triggerPartyList();
+                return shouldHide;
+            }
         }
 
         // Party kick detection
-        Matcher kickMatch = PARTY_KICK_PATTERN.matcher(trimmed);
-        if (kickMatch.find()) {
-            PartyFinderMod.LOGGER.info("Detected party kick message. Requesting /party list.");
-            triggerPartyList();
-            return;
+        if ("has been kicked from the party".equals(matchedKeyword)) {
+            Matcher kickMatch = PARTY_KICK_PATTERN.matcher(trimmed);
+            if (kickMatch.find()) {
+                PartyFinderMod.LOGGER.info("Detected party kick message. Requesting /party list.");
+                triggerPartyList();
+                return shouldHide;
+            }
         }
 
         // Party leave detection
-        Matcher leaveMatch = PARTY_LEAVE_PATTERN.matcher(trimmed);
-        if (leaveMatch.find()) {
-            PartyFinderMod.LOGGER.info("Detected party leave message. Requesting /party list.");
-            triggerPartyList();
-            return;
+        if ("has left the party".equals(matchedKeyword)) {
+            Matcher leaveMatch = PARTY_LEAVE_PATTERN.matcher(trimmed);
+            if (leaveMatch.find()) {
+                PartyFinderMod.LOGGER.info("Detected party leave message. Requesting /party list.");
+                triggerPartyList();
+                return shouldHide;
+            }
         }
+
+        return shouldHide;
     }
 
     private void onPartyListParsed() {
