@@ -238,32 +238,26 @@ public class PartyDetailModal extends Screen {
     }
 
     private void refreshPartyState() {
-        apiClient.listParties().thenAccept(list -> {
+        apiClient.getParty(party.partyId).thenAccept(p -> {
             MinecraftClient.getInstance().execute(() -> {
-                boolean found = false;
-                for (PartyData p : list) {
-                    if (p.partyId == party.partyId) {
-                        this.party.memberCount = p.memberCount;
-                        this.party.maxSize = p.maxSize;
-                        this.party.isFull = p.isFull;
-                        this.party.members.clear();
-                        this.party.members.putAll(p.members);
-                        this.party.region = p.region;
-                        this.party.note = p.note;
-                        this.party.activities = p.activities;
-                        this.party.leaderName = p.leaderName;
-                        this.party.leaderRole = p.leaderRole;
-                        this.party.creatorId = p.creatorId;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    parent.closeModal();
-                } else {
-                    this.clearAndInit();
-                }
+                this.party.memberCount = p.memberCount;
+                this.party.maxSize = p.maxSize;
+                this.party.isFull = p.isFull;
+                this.party.members.clear();
+                this.party.members.putAll(p.members);
+                this.party.region = p.region;
+                this.party.note = p.note;
+                this.party.activities = p.activities;
+                this.party.leaderName = p.leaderName;
+                this.party.leaderRole = p.leaderRole;
+                this.party.creatorId = p.creatorId;
+                this.clearAndInit();
             });
+        }).exceptionally(ex -> {
+            MinecraftClient.getInstance().execute(() -> {
+                parent.closeModal();
+            });
+            return null;
         });
     }
 

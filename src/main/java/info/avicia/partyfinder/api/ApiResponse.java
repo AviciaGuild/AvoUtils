@@ -11,6 +11,7 @@ public class ApiResponse {
     public String message;
     public String challenge;
     public String token;
+    public PartyData party;
     public List<PartyData> parties;
     public List<PartyData.MemberData> members;
     public ApiData data;

@@ -218,6 +218,31 @@ public class PartyFinderClient {
     }
 
     /**
+     * GET /api/parties/{id}
+     */
+    public CompletableFuture<PartyData> getParty(long partyId) {
+        return executeAuthenticated("/api/parties/" + partyId, "GET", null, response -> {
+            if (response.statusCode() != 200) {
+                PartyFinderMod.LOGGER.warn("getParty failed: HTTP {}", response.statusCode());
+                String errorMessage = "Failed to fetch party (HTTP " + response.statusCode() + ").";
+                try {
+                    ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
+                    if (apiResp != null && apiResp.error != null) {
+                        errorMessage = apiResp.error;
+                    }
+                } catch (Exception ignored) {
+                }
+                throw new RuntimeException(errorMessage);
+            }
+            ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
+            if (apiResp == null || apiResp.party == null) {
+                throw new RuntimeException("Party not found.");
+            }
+            return apiResp.party;
+        });
+    }
+
+    /**
      * POST /api/parties
      */
     public CompletableFuture<ApiResponse> createParty(String role, List<String> activities,

@@ -135,30 +135,14 @@ public class ChatPartyDetector {
         // Party join detection
         Matcher joinMatch = PARTY_JOIN_PATTERN.matcher(trimmed);
         if (joinMatch.find()) {
-            String playerName = cleanPlayerName(joinMatch.group(1));
-            onPlayerJoined(playerName);
-        }
-    }
-
-    private void onPlayerJoined(String playerName) {
-        PartyFinderMod.LOGGER.info("Detected party join: {}", playerName);
-
-        if (trackedPartyId < 0) return;
-
-        // If this player is not in our known list, auto-reserve them
-        if (!knownInGameMembers.contains(playerName.toLowerCase())) {
-            PartyFinderMod.LOGGER.info("Auto-reserving unknown in-game player: {}", playerName);
-            apiClient.reserveIngame(trackedPartyId, playerName).thenAccept(resp -> {
-                if (resp.ok) {
-                    knownInGameMembers.add(playerName.toLowerCase());
-                    PartyFinderMod.LOGGER.info("Reserved slot for {} on Discord.", playerName);
-                } else {
-                    PartyFinderMod.LOGGER.warn("Failed to reserve for {}: {}", playerName, resp.error);
+            PartyFinderMod.LOGGER.info("Detected party join message. Requesting /party list.");
+            MinecraftClient mc = MinecraftClient.getInstance();
+            mc.execute(() -> {
+                if (mc.player != null && mc.player.networkHandler != null) {
+                    mc.player.networkHandler.sendChatCommand("party list");
                 }
             });
         }
-
-        knownInGameMembers.add(playerName.toLowerCase());
     }
 
     private void onPartyListParsed() {
@@ -181,6 +165,8 @@ public class ChatPartyDetector {
                 apiClient.reserveIngame(trackedPartyId, name).thenAccept(resp -> {
                     if (resp.ok) {
                         knownInGameMembers.add(name.toLowerCase());
+                    } else {
+                        knownInGameMembers.remove(name.toLowerCase());
                     }
                 });
             }

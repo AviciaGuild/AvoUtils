@@ -96,6 +96,15 @@ public class PartyListScreen extends Screen {
                 for (PartyData p : result) {
                     if (p.leaderName != null && p.leaderName.equalsIgnoreCase(selfName)) {
                         chatDetector.setTrackedPartyId(p.partyId);
+                        if (p.members != null) {
+                            List<String> memberNames = new java.util.ArrayList<>();
+                            for (PartyData.MemberData m : p.members.values()) {
+                                if (m.name != null) {
+                                    memberNames.add(m.name);
+                                }
+                            }
+                            chatDetector.addKnownMembers(memberNames);
+                        }
                         isLeadingAny = true;
                         break;
                     }
