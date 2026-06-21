@@ -1,3 +1,11 @@
+# Set default behavior to automatic text conversion
 * text=auto
+
+# Ensure gradlew always uses LF line endings
 gradlew text eol=lf
+
+# Ensure Windows batch files always use CRLF line endings
 *.bat text eol=crlf
+
+# Ensure jar archives are handled as binary files to prevent corruption
+*.jar binary
