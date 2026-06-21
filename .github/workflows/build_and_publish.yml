@@ -1,0 +1,94 @@
+name: Build and Publish Mod
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Determine Version
+        id: determine_version
+        shell: bash
+        run: |
+          BASE_VERSION=$(grep "^mod_version=" gradle.properties | cut -d= -f2 | xargs)
+          
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+            TAG_NAME="${{ github.ref_name }}"
+            SHOULD_PUBLISH="true"
+            echo "Publishing release version: $VERSION from tag"
+          elif [[ "${{ github.ref }}" == refs/heads/main && "${{ github.event_name }}" == "push" ]]; then
+            VERSION="${BASE_VERSION}-build.${{ github.run_number }}"
+            TAG_NAME="v${VERSION}"
+            SHOULD_PUBLISH="true"
+            echo "Publishing build version: $VERSION from main push"
+          else
+            VERSION="${BASE_VERSION}-dev.${{ github.run_number }}"
+            TAG_NAME=""
+            SHOULD_PUBLISH="false"
+            echo "Building dev version: $VERSION (no publishing)"
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "should_publish=${SHOULD_PUBLISH}" >> $GITHUB_OUTPUT
+
+      - name: Build Mod with Gradle
+        run: |
+          chmod +x gradlew
+          ./gradlew build -Pmod_version="${{ steps.determine_version.outputs.version }}"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avicia-pfinder-mod
+          path: |
+            build/libs/avicia-pfinder-*.jar
+            !build/libs/avicia-pfinder-*-sources.jar
+            !build/libs/avicia-pfinder-*-dev.jar
+
+      - name: Create GitHub Release
+        if: steps.determine_version.outputs.should_publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.determine_version.outputs.tag_name }}
+          files: |
+            build/libs/avicia-pfinder-*.jar
+            !build/libs/avicia-pfinder-*-sources.jar
+            !build/libs/avicia-pfinder-*-dev.jar
+          draft: false
+          prerelease: ${{ contains(steps.determine_version.outputs.version, '-') }}
+          generate_release_notes: true
+
+      # - name: Publish to Modrinth
+      #   if: steps.determine_version.outputs.should_publish == 'true'
+      #   uses: Kir-Antipov/mc-publish@v3.3
+      #   with:
+      #     modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+      #     modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+      #     files: |
+      #       build/libs/avicia-pfinder-*.jar
+      #       !build/libs/avicia-pfinder-*-sources.jar
+      #       !build/libs/avicia-pfinder-*-dev.jar

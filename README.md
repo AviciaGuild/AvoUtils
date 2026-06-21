@@ -31,7 +31,6 @@ On first run, the mod generates a configuration file in your client's config fol
 To build the mod from source:
 
 ```bash
-cd AvoBot-PartyFinder-Mod
 ./gradlew build
 ```
 

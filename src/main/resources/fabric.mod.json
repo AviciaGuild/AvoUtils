@@ -5,7 +5,11 @@
   "name": "Avicia Party Finder",
   "description": "In-game party finder GUI that syncs with AvoBot's party system.",
   "authors": ["Avicia"],
-  "contact": {},
+  "contact": {
+    "homepage": "https://github.com/AviciaGuild/avicia-pfinder",
+    "sources": "https://github.com/AviciaGuild/avicia-pfinder",
+    "issues": "https://github.com/AviciaGuild/avicia-pfinder/issues"
+  },
   "license": "MIT",
   "icon": "assets/avicia-pfinder/icon.png",
   "environment": "client",
