@@ -14,6 +14,7 @@ public class PartyData {
     public int memberCount;
     public int maxSize;
     public boolean isFull;
+    public boolean ping = true;
     public Map<String, MemberData> members;
 
     public static class MemberData {

@@ -37,6 +37,8 @@ public class CreatePartyModal extends Screen {
     private int reservedSlots = 0;
     private final Set<String> selectedRegions = new HashSet<>();
     private TextFieldWidget noteField;
+    private boolean ping = true;
+    private ButtonWidget pingButton;
 
     private String statusMessage = null;
     private int statusColor = 0xFFFFFF;
@@ -69,6 +71,7 @@ public class CreatePartyModal extends Screen {
                     }
                 }
             }
+            this.ping = partyToEdit.ping;
         }
     }
 
@@ -81,7 +84,7 @@ public class CreatePartyModal extends Screen {
     @Override
     protected void init() {
         modalW = Math.min(320, width - 40);
-        modalH = Math.min(partyToEdit != null ? 220 : 340, height - 40);
+        modalH = Math.min(partyToEdit != null ? 250 : 370, height - 40);
         modalX = (width - modalW) / 2;
         modalY = (height - modalH) / 2;
 
@@ -168,6 +171,17 @@ public class CreatePartyModal extends Screen {
             y += 26;
         }
 
+        // ── Ping toggle ──────────────────────────────────────────────────
+        y += 14;
+        pingButton = ButtonWidget.builder(Text.literal(ping ? "§aON" : "§cOFF"), b -> {
+            ping = !ping;
+            b.setMessage(Text.literal(ping ? "§aON" : "§cOFF"));
+        })
+        .dimensions(contentX, y, 50, 18)
+        .build();
+        addDrawableChild(pingButton);
+        y += 26;
+
         // ── Submit / Cancel ──────────────────────────────────────────────
         addDrawableChild(ButtonWidget.builder(Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), btn -> submit())
                 .dimensions(modalX + modalW / 2 - 70, modalY + modalH - 30, 60, 20)
@@ -238,11 +252,15 @@ public class CreatePartyModal extends Screen {
                     partyToEdit.partyId,
                     new ArrayList<>(selectedActivities),
                     region,
-                    note
+                    note,
+                    ping
             ).thenAccept(resp -> {
                 MinecraftClient.getInstance().execute(() -> {
                     submitting = false;
                     if (resp.ok) {
+                        if (resp.data != null && resp.data.partyId != null) {
+                            parent.getChatDetector().setTrackedPartyId(resp.data.partyId);
+                        }
                         parent.closeModal();
                     } else {
                         setStatus(resp.error != null ? resp.error : "Failed to edit party.", 0xFFFF5555);
@@ -255,7 +273,8 @@ public class CreatePartyModal extends Screen {
                     new ArrayList<>(selectedActivities),
                     region,
                     note,
-                    reservedSlots
+                    reservedSlots,
+                    ping
             ).thenAccept(resp -> {
                 MinecraftClient.getInstance().execute(() -> {
                     submitting = false;
@@ -327,6 +346,8 @@ public class CreatePartyModal extends Screen {
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eRegion:"), contentX, y, 0xFFFFFFFF);
             y += 14 + 26;
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eNote:"), contentX, y, 0xFFFFFFFF);
+            y += 14 + 24;
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§ePing LFG Roles:"), contentX, y, 0xFFFFFFFF);
         } else {
             y += 14 + 26;
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eRole:"), contentX, y, 0xFFFFFFFF);
@@ -336,6 +357,8 @@ public class CreatePartyModal extends Screen {
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eNote:"), contentX, y, 0xFFFFFFFF);
             y += 14 + 24;
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eReserved Slots:"), contentX, y, 0xFFFFFFFF);
+            y += 14 + 26;
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§ePing LFG Roles:"), contentX, y, 0xFFFFFFFF);
         }
 
         // Highlight selected activities

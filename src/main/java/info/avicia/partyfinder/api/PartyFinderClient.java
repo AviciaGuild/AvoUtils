@@ -246,13 +246,14 @@ public class PartyFinderClient {
      * POST /api/parties
      */
     public CompletableFuture<ApiResponse> createParty(String role, List<String> activities,
-                                                       String region, String note, int reservedSlots) {
+                                                       String region, String note, int reservedSlots, boolean ping) {
         JsonObject body = new JsonObject();
         body.addProperty("role", role);
         body.add("activities", GSON.toJsonTree(activities));
         if (region != null) body.addProperty("region", region);
         if (note != null) body.addProperty("note", note);
         body.addProperty("reserved_slots", reservedSlots);
+        body.addProperty("ping", ping);
 
         return executeAuthenticated("/api/parties", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
     }
@@ -261,13 +262,14 @@ public class PartyFinderClient {
      * POST /api/parties/{id}/edit
      */
     public CompletableFuture<ApiResponse> editParty(long partyId, List<String> activities,
-                                                     String region, String note) {
+                                                     String region, String note, boolean ping) {
         JsonObject body = new JsonObject();
         body.add("activities", GSON.toJsonTree(activities));
         if (region != null) body.addProperty("region", region);
         else body.addProperty("region", "");
         if (note != null) body.addProperty("note", note);
         else body.addProperty("note", "");
+        body.addProperty("ping", ping);
 
         return executeAuthenticated("/api/parties/" + partyId + "/edit", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
     }
