@@ -7,7 +7,6 @@ import net.minecraft.client.MinecraftClient;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -39,8 +38,11 @@ public class ChatPartyDetector {
     // Tracked party ID set when the player is leading a party via the mod
     private long trackedPartyId = -1;
 
-    // Set of known in-game party members
-    private final Set<String> knownInGameMembers = ConcurrentHashMap.newKeySet();
+    // Set of known Discord party members
+    private final Set<String> knownDiscordMembers = ConcurrentHashMap.newKeySet();
+
+    // Set of members who have been seen in the in-game party
+    private final Set<String> inGameSeenMembers = ConcurrentHashMap.newKeySet();
 
     // Set of members from the last /party list parse
     private final Set<String> lastPartyListMembers = ConcurrentHashMap.newKeySet();
@@ -59,7 +61,8 @@ public class ChatPartyDetector {
      */
     public void setTrackedPartyId(long partyId) {
         this.trackedPartyId = partyId;
-        knownInGameMembers.clear();
+        knownDiscordMembers.clear();
+        inGameSeenMembers.clear();
     }
 
     public long getTrackedPartyId() {
@@ -68,7 +71,8 @@ public class ChatPartyDetector {
 
     public void clearTracking() {
         trackedPartyId = -1;
-        knownInGameMembers.clear();
+        knownDiscordMembers.clear();
+        inGameSeenMembers.clear();
     }
 
     /**
@@ -76,7 +80,7 @@ public class ChatPartyDetector {
      */
     public void addKnownMembers(Iterable<String> names) {
         for (String name : names) {
-            knownInGameMembers.add(name.toLowerCase());
+            knownDiscordMembers.add(name.toLowerCase());
         }
     }
 
@@ -108,6 +112,11 @@ public class ChatPartyDetector {
     }
 
     public boolean onChatMessage(String text) {
+        if (text == null) return false;
+        if (!text.toLowerCase(java.util.Locale.ROOT).contains("party")) {
+            return false;
+        }
+
         String trimmed = COLOR_CODE_PATTERN.matcher(text).replaceAll("").trim();
         String lowerTrimmed = trimmed.toLowerCase();
 
@@ -144,7 +153,8 @@ public class ChatPartyDetector {
         if (notInPartyMsg) {
             inParty = false;
             lastPartyListMembers.clear();
-            knownInGameMembers.clear();
+            inGameSeenMembers.clear();
+            knownDiscordMembers.clear();
             PartyFinderMod.LOGGER.info("Detected player is not in a party.");
             return shouldHide;
         }
@@ -167,34 +177,14 @@ public class ChatPartyDetector {
             return shouldHide;
         }
 
-        // Party join detection
-        if ("has joined your party".equals(matchedKeyword)) {
-            Matcher joinMatch = PARTY_JOIN_PATTERN.matcher(trimmed);
-            if (joinMatch.find()) {
-                PartyFinderMod.LOGGER.info("Detected party join message. Requesting /party list.");
-                triggerPartyList();
-                return shouldHide;
-            }
-        }
+        // Party event detection (join, kick, leave)
+        if (("has joined your party".equals(matchedKeyword) && PARTY_JOIN_PATTERN.matcher(trimmed).find()) ||
+            ("has been kicked from the party".equals(matchedKeyword) && PARTY_KICK_PATTERN.matcher(trimmed).find()) ||
+            ("has left the party".equals(matchedKeyword) && PARTY_LEAVE_PATTERN.matcher(trimmed).find())) {
 
-        // Party kick detection
-        if ("has been kicked from the party".equals(matchedKeyword)) {
-            Matcher kickMatch = PARTY_KICK_PATTERN.matcher(trimmed);
-            if (kickMatch.find()) {
-                PartyFinderMod.LOGGER.info("Detected party kick message. Requesting /party list.");
-                triggerPartyList();
-                return shouldHide;
-            }
-        }
-
-        // Party leave detection
-        if ("has left the party".equals(matchedKeyword)) {
-            Matcher leaveMatch = PARTY_LEAVE_PATTERN.matcher(trimmed);
-            if (leaveMatch.find()) {
-                PartyFinderMod.LOGGER.info("Detected party leave message. Requesting /party list.");
-                triggerPartyList();
-                return shouldHide;
-            }
+            PartyFinderMod.LOGGER.info("Detected party event ({}) message. Requesting /party list.", matchedKeyword);
+            triggerPartyList();
+            return shouldHide;
         }
 
         return shouldHide;
@@ -215,22 +205,37 @@ public class ChatPartyDetector {
 
         // Auto-reserve any unknown members
         for (String name : lastPartyListMembers) {
-            if (!knownInGameMembers.contains(name.toLowerCase())) {
+            String lowerName = name.toLowerCase();
+            if (mc.player != null && name.equalsIgnoreCase(mc.player.getName().getString())) {
+                continue; // Skip the leader (self) from auto-reserving
+            }
+
+            boolean isKnownDiscord = false;
+            for (String dm : knownDiscordMembers) {
+                if (dm.equalsIgnoreCase(name)) {
+                    isKnownDiscord = true;
+                    break;
+                }
+            }
+
+            if (!isKnownDiscord) {
                 PartyFinderMod.LOGGER.info("Auto-reserving from /party list: {}", name);
+                knownDiscordMembers.add(lowerName);
+                inGameSeenMembers.add(lowerName);
                 apiClient.reserveIngame(trackedPartyId, name).thenAccept(resp -> {
-                    if (resp.ok) {
-                        knownInGameMembers.add(name.toLowerCase());
-                    } else {
-                        knownInGameMembers.remove(name.toLowerCase());
+                    if (!resp.ok) {
+                        knownDiscordMembers.remove(lowerName);
+                        inGameSeenMembers.remove(lowerName);
                     }
                 });
+            } else {
+                inGameSeenMembers.add(lowerName);
             }
-            knownInGameMembers.add(name.toLowerCase());
         }
 
         // Auto-remove members who are no longer in the in-game party
         java.util.List<String> toRemove = new java.util.ArrayList<>();
-        for (String name : knownInGameMembers) {
+        for (String name : inGameSeenMembers) {
             boolean stillInParty = false;
             for (String m : lastPartyListMembers) {
                 if (m.equalsIgnoreCase(name)) {
@@ -238,11 +243,8 @@ public class ChatPartyDetector {
                     break;
                 }
             }
-            if (mc.player != null) {
-                String selfName = mc.player.getName().getString();
-                if (name.equalsIgnoreCase(selfName)) {
-                    stillInParty = true;
-                }
+            if (mc.player != null && name.equalsIgnoreCase(mc.player.getName().getString())) {
+                stillInParty = true;
             }
             if (!stillInParty) {
                 toRemove.add(name);
@@ -250,10 +252,13 @@ public class ChatPartyDetector {
         }
 
         for (String name : toRemove) {
+            String lowerName = name.toLowerCase();
             PartyFinderMod.LOGGER.info("Auto-kicking member no longer in party: {}", name);
+            inGameSeenMembers.remove(lowerName);
+            knownDiscordMembers.remove(lowerName);
             apiClient.kickMember(trackedPartyId, name).thenAccept(resp -> {
-                if (resp.ok) {
-                    knownInGameMembers.remove(name.toLowerCase());
+                if (!resp.ok) {
+                    knownDiscordMembers.add(lowerName);
                 }
             });
         }
