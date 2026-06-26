@@ -5,7 +5,6 @@ import info.avicia.partyfinder.api.PartyFinderClient;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
@@ -38,17 +37,17 @@ public class CreatePartyModal extends Screen {
     private final Set<String> selectedRegions = new HashSet<>();
     private TextFieldWidget noteField;
     private boolean ping = true;
-    private ButtonWidget pingButton;
+    private FlatButtonWidget pingButton;
 
     private String statusMessage = null;
     private int statusColor = 0xFFFFFF;
     private boolean submitting = false;
 
     // Button references for visual toggling
-    private final List<ButtonWidget> activityButtons = new ArrayList<>();
-    private final List<ButtonWidget> roleButtons = new ArrayList<>();
-    private final List<ButtonWidget> regionButtons = new ArrayList<>();
-    private final List<ButtonWidget> reservedButtons = new ArrayList<>();
+    private final List<FlatButtonWidget> activityButtons = new ArrayList<>();
+    private final List<FlatButtonWidget> roleButtons = new ArrayList<>();
+    private final List<FlatButtonWidget> regionButtons = new ArrayList<>();
+    private final List<FlatButtonWidget> reservedButtons = new ArrayList<>();
 
     public CreatePartyModal(PartyListScreen parent, PartyFinderClient apiClient) {
         this(parent, apiClient, null);
@@ -84,73 +83,68 @@ public class CreatePartyModal extends Screen {
     @Override
     protected void init() {
         modalW = Math.min(320, width - 40);
-        modalH = Math.min(partyToEdit != null ? 250 : 370, height - 40);
+        modalH = Math.min(partyToEdit != null ? 286 : 386, height - 40);
         modalX = (width - modalW) / 2;
         modalY = (height - modalH) / 2;
 
-        int contentX = modalX + 12;
-        int y = modalY + 28;
+        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Text.literal("✕"), () -> parent.closeModal());
+        closeBtn.setDanger(true);
+        closeBtn.setBorderless(true);
+        addDrawableChild(closeBtn);
 
-        // ── Activity selection ───────────────────────────────────────────
-        y += 14;
+        int contentX = modalX + 12;
+        int y = modalY + 38;
+
+        // Activity selection
         int btnX = contentX;
         activityButtons.clear();
         for (String activity : ACTIVITIES) {
-            ButtonWidget btn = ButtonWidget.builder(Text.literal(activity), b -> toggleActivity(activity))
-                    .dimensions(btnX, y, 50, 18)
-                    .build();
+            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 12, 50, 18, Text.literal(activity), () -> toggleActivity(activity));
             activityButtons.add(btn);
             addDrawableChild(btn);
             btnX += 55;
         }
-        y += 26;
+        y += 50;
 
+        // Role selection
         if (partyToEdit == null) {
-            // ── Role selection ───────────────────────────────────────────────
-            y += 14;
             btnX = contentX;
             roleButtons.clear();
             for (int i = 0; i < ROLES.length; i++) {
                 final String roleVal = ROLE_VALUES[i];
-                ButtonWidget btn = ButtonWidget.builder(Text.literal(ROLES[i]), b -> selectRole(roleVal))
-                        .dimensions(btnX, y, 55, 18)
-                        .build();
+                FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 12, 55, 18, Text.literal(ROLES[i]), () -> selectRole(roleVal));
                 roleButtons.add(btn);
                 addDrawableChild(btn);
                 btnX += 60;
             }
-            y += 26;
+            y += 50;
         }
 
-        // ── Region buttons ─────────────────────────────────────────────────
-        y += 14;
+        // Region buttons
         btnX = contentX;
         regionButtons.clear();
         for (String reg : REGIONS) {
             final String r = reg;
-            ButtonWidget btn = ButtonWidget.builder(Text.literal(reg), b -> toggleRegion(r))
-                    .dimensions(btnX, y, 50, 18)
-                    .build();
+            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 12, 50, 18, Text.literal(reg), () -> toggleRegion(r));
             regionButtons.add(btn);
             addDrawableChild(btn);
             btnX += 55;
         }
-        y += 26;
+        y += 50;
 
-        // ── Note field ───────────────────────────────────────────────────
-        y += 14;
-        noteField = new TextFieldWidget(textRenderer, contentX, y, modalW - 24, 16, Text.literal("Note"));
+        // Note field
+        noteField = new TextFieldWidget(textRenderer, contentX + 4, y + 12 + 5, modalW - 32, 10, Text.literal("Note"));
         noteField.setPlaceholder(Text.literal("Note (optional)"));
         noteField.setMaxLength(100);
+        noteField.setDrawsBackground(false);
         if (partyToEdit != null) {
             noteField.setText(partyToEdit.note != null ? partyToEdit.note : "");
         }
         addDrawableChild(noteField);
-        y += 24;
+        y += 50;
 
+        // Reserved slots
         if (partyToEdit == null) {
-            // ── Reserved slots ───────────────────────────────────────────────
-            y += 14;
             btnX = contentX;
             reservedButtons.clear();
 
@@ -161,35 +155,24 @@ public class CreatePartyModal extends Screen {
 
             for (int i = minReserved; i <= 3; i++) {
                 final int slots = i;
-                ButtonWidget btn = ButtonWidget.builder(Text.literal(String.valueOf(i)), b -> selectReserved(slots))
-                        .dimensions(btnX, y, 30, 18)
-                        .build();
+                FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 12, 30, 18, Text.literal(String.valueOf(i)), () -> selectReserved(slots));
                 reservedButtons.add(btn);
                 addDrawableChild(btn);
                 btnX += 35;
             }
-            y += 26;
+            y += 50;
         }
 
-        // ── Ping toggle ──────────────────────────────────────────────────
-        y += 14;
-        pingButton = ButtonWidget.builder(Text.literal(ping ? "§aON" : "§cOFF"), b -> {
+        // Ping toggle
+        pingButton = new FlatButtonWidget(contentX, y + 12, 50, 18, Text.literal(ping ? "§aON" : "§cOFF"), () -> {
             ping = !ping;
-            b.setMessage(Text.literal(ping ? "§aON" : "§cOFF"));
-        })
-        .dimensions(contentX, y, 50, 18)
-        .build();
+            pingButton.setMessage(Text.literal(ping ? "§aON" : "§cOFF"));
+        });
         addDrawableChild(pingButton);
-        y += 26;
 
-        // ── Submit / Cancel ──────────────────────────────────────────────
-        addDrawableChild(ButtonWidget.builder(Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), btn -> submit())
-                .dimensions(modalX + modalW / 2 - 70, modalY + modalH - 30, 60, 20)
-                .build());
-
-        addDrawableChild(ButtonWidget.builder(Text.literal("Cancel"), btn -> parent.closeModal())
-                .dimensions(modalX + modalW / 2 + 10, modalY + modalH - 30, 60, 20)
-                .build());
+        // Submit
+        FlatButtonWidget saveBtn = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
+        addDrawableChild(saveBtn);
     }
 
     // ── Form actions ─────────────────────────────────────────────────────
@@ -322,80 +305,75 @@ public class CreatePartyModal extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Modal background
-        context.fill(modalX, modalY, modalX + modalW, modalY + modalH, 0xEE1A1A2E);
-
-        // Border
-        int borderColor = 0xFF5555AA;
-        context.fill(modalX, modalY, modalX + modalW, modalY + 1, borderColor);
-        context.fill(modalX, modalY + modalH - 1, modalX + modalW, modalY + modalH, borderColor);
-        context.fill(modalX, modalY, modalX + 1, modalY + modalH, borderColor);
-        context.fill(modalX + modalW - 1, modalY, modalX + modalW, modalY + modalH, borderColor);
+        CompatibilityHelper.drawModalFrame(context, modalX, modalY, modalW, modalH);
 
         // Title
         context.drawCenteredTextWithShadow(textRenderer, Text.literal(partyToEdit != null ? "§b§lEdit Party" : "§b§lCreate Party"), width / 2, modalY + 8, 0xFFFFFFFF);
 
         int contentX = modalX + 12;
-        int y = modalY + 28;
+        int y = modalY + 38;
 
         // Labels
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eActivity:"), contentX, y, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lActivity"), contentX, y, 0xFFFFFFFF);
+        context.fill(modalX + 8, y + 40, modalX + modalW - 8, y + 41, 0x15FFFFFF); // divider
+        y += 50;
 
-        if (partyToEdit != null) {
-            y += 14 + 26;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eRegion:"), contentX, y, 0xFFFFFFFF);
-            y += 14 + 26;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eNote:"), contentX, y, 0xFFFFFFFF);
-            y += 14 + 24;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§ePing LFG Roles:"), contentX, y, 0xFFFFFFFF);
-        } else {
-            y += 14 + 26;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eRole:"), contentX, y, 0xFFFFFFFF);
-            y += 14 + 26;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eRegion:"), contentX, y, 0xFFFFFFFF);
-            y += 14 + 26;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eNote:"), contentX, y, 0xFFFFFFFF);
-            y += 14 + 24;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§eReserved Slots:"), contentX, y, 0xFFFFFFFF);
-            y += 14 + 26;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§ePing LFG Roles:"), contentX, y, 0xFFFFFFFF);
+        if (partyToEdit == null) {
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lRole"), contentX, y, 0xFFFFFFFF);
+            context.fill(modalX + 8, y + 40, modalX + modalW - 8, y + 41, 0x15FFFFFF); // divider
+            y += 50;
         }
+
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lRegion"), contentX, y, 0xFFFFFFFF);
+        context.fill(modalX + 8, y + 40, modalX + modalW - 8, y + 41, 0x15FFFFFF); // divider
+        y += 50;
+
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lNote"), contentX, y, 0xFFFFFFFF);
+        drawNoteFieldContainer(context, contentX, y + 12, modalW - 24, 18);
+        context.fill(modalX + 8, y + 40, modalX + modalW - 8, y + 41, 0x15FFFFFF); // divider
+        y += 50;
+
+        if (partyToEdit == null) {
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lReserved Slots"), contentX, y, 0xFFFFFFFF);
+            context.fill(modalX + 8, y + 40, modalX + modalW - 8, y + 41, 0x15FFFFFF); // divider
+            y += 50;
+        }
+
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lPing LFG Roles"), contentX, y, 0xFFFFFFFF);
 
         // Highlight selected activities
         for (int i = 0; i < activityButtons.size(); i++) {
-            ButtonWidget btn = activityButtons.get(i);
-            boolean selected = selectedActivities.contains(ACTIVITIES[i]);
-            btn.setMessage(Text.literal((selected ? "§a§l" : "§7") + ACTIVITIES[i]));
+            activityButtons.get(i).setSelected(selectedActivities.contains(ACTIVITIES[i]));
         }
 
         // Highlight selected regions
         for (int i = 0; i < regionButtons.size(); i++) {
-            ButtonWidget btn = regionButtons.get(i);
-            boolean selected = selectedRegions.contains(REGIONS[i]);
-            btn.setMessage(Text.literal((selected ? "§a§l" : "§7") + REGIONS[i]));
+            regionButtons.get(i).setSelected(selectedRegions.contains(REGIONS[i]));
         }
 
         if (partyToEdit == null) {
             // Highlight selected role
             for (int i = 0; i < roleButtons.size(); i++) {
-                boolean selected = ROLE_VALUES[i].equals(selectedRole);
-                roleButtons.get(i).setMessage(Text.literal((selected ? "§a§l" : "§7") + ROLES[i]));
+                roleButtons.get(i).setSelected(ROLE_VALUES[i].equals(selectedRole));
             }
 
             // Highlight selected reserved count
             int minReserved = countOtherInGameMembers();
             for (int i = 0; i < reservedButtons.size(); i++) {
-                ButtonWidget btn = reservedButtons.get(i);
-                int val = minReserved + i;
-                boolean selected = (val == reservedSlots);
-                btn.setMessage(Text.literal((selected ? "§a§l" : "§7") + val));
+                reservedButtons.get(i).setSelected((minReserved + i) == reservedSlots);
             }
         }
 
         // Status message
         if (statusMessage != null) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.literal(statusMessage),
-                    width / 2, modalY + modalH - 48, statusColor);
+            List<net.minecraft.text.OrderedText> wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+            int statusBottomY = modalY + modalH - 32;
+            int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
+            int currentY = statusStartY;
+            for (net.minecraft.text.OrderedText line : wrappedStatus) {
+                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+                currentY += 10;
+            }
         }
 
         super.render(context, mouseX, mouseY, delta);
@@ -411,5 +389,11 @@ public class CreatePartyModal extends Screen {
             return true;
         }
         return super.mouseClicked(click, boolean_arg);
+    }
+
+    private void drawNoteFieldContainer(DrawContext context, int x, int y, int w, int h) {
+        context.fill(x, y, x + w, y + h, 0xD5161622);
+        int tfBorderColor = noteField.isFocused() ? 0xFF8A9CFE : 0x1A8A9CFE;
+        CompatibilityHelper.drawBorder(context, x, y, w, h, tfBorderColor);
     }
 }

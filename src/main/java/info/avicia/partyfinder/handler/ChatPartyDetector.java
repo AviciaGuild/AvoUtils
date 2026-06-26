@@ -210,13 +210,7 @@ public class ChatPartyDetector {
                 continue; // Skip the leader (self) from auto-reserving
             }
 
-            boolean isKnownDiscord = false;
-            for (String dm : knownDiscordMembers) {
-                if (dm.equalsIgnoreCase(name)) {
-                    isKnownDiscord = true;
-                    break;
-                }
-            }
+            boolean isKnownDiscord = knownDiscordMembers.contains(lowerName);
 
             if (!isKnownDiscord) {
                 PartyFinderMod.LOGGER.info("Auto-reserving from /party list: {}", name);
@@ -236,16 +230,8 @@ public class ChatPartyDetector {
         // Auto-remove members who are no longer in the in-game party
         java.util.List<String> toRemove = new java.util.ArrayList<>();
         for (String name : inGameSeenMembers) {
-            boolean stillInParty = false;
-            for (String m : lastPartyListMembers) {
-                if (m.equalsIgnoreCase(name)) {
-                    stillInParty = true;
-                    break;
-                }
-            }
-            if (mc.player != null && name.equalsIgnoreCase(mc.player.getName().getString())) {
-                stillInParty = true;
-            }
+            boolean stillInParty = lastPartyListMembers.stream().anyMatch(m -> m.equalsIgnoreCase(name))
+                    || (mc.player != null && name.equalsIgnoreCase(mc.player.getName().getString()));
             if (!stillInParty) {
                 toRemove.add(name);
             }

@@ -37,17 +37,17 @@ public class PartyData {
         /**
          * Get the role icon character for this member.
          */
-        public String roleIcon() {
+        public String getStyledRolePrefix() {
             if (isReserved && role == null) {
-                return "\uD83D\uDD12"; // 🔒
+                return "§7\uD83D\uDD12"; // 🔒
             }
-            if (role == null) return "\uD83E\uDDE9"; // 🧩
+            if (role == null) return "§7\uD83E\uDDE9"; // 🧩
             return switch (role) {
-                case "dps" -> "\u2694"; // ⚔
-                case "healer" -> "\u2764"; // ❤
-                case "tank" -> "\uD83D\uDEE1"; // 🛡
-                case "other" -> "\uD83E\uDDE9"; // 🧩
-                default -> "\uD83E\uDDE9"; // 🧩
+                case "dps" -> "§c\u2694"; // ⚔
+                case "healer" -> "§d\u2764"; // ❤
+                case "tank" -> "§9\uD83D\uDEE1"; // 🛡
+                case "other" -> "§7\uD83E\uDDE9"; // 🧩
+                default -> "§7\uD83E\uDDE9"; // 🧩
             };
         }
     }

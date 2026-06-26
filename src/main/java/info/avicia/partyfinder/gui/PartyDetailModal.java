@@ -6,7 +6,6 @@ import info.avicia.partyfinder.handler.InviteHandler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -58,7 +57,7 @@ public class PartyDetailModal extends Screen {
     @Override
     protected void init() {
         modalW = Math.min(340, width - 40);
-        modalH = Math.min(380, height - 40);
+        modalH = Math.min(280, height - 40);
         modalX = (width - modalW) / 2;
         modalY = (height - modalH) / 2;
 
@@ -97,52 +96,43 @@ public class PartyDetailModal extends Screen {
         int btnX = modalX + (modalW - totalButtonsWidth) / 2;
 
         // Close button
-        addDrawableChild(ButtonWidget.builder(Text.literal("Close"), btn -> parent.closeModal())
-                .dimensions(modalX + modalW - 60, modalY + 5, 50, 16)
-                .build());
+        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Text.literal("✕"), () -> parent.closeModal());
+        closeBtn.setDanger(true);
+        closeBtn.setBorderless(true);
+        addDrawableChild(closeBtn);
 
         if (isLeader) {
             // Leader controls
-            addDrawableChild(ButtonWidget.builder(Text.literal("Invite All"), btn -> inviteAll())
-                    .dimensions(btnX, btnY, 70, 20)
-                    .build());
+            addDrawableChild(new FlatButtonWidget(btnX, btnY, 70, 20, Text.literal("Invite All"), () -> inviteAll()));
             btnX += 75;
 
-            addDrawableChild(ButtonWidget.builder(Text.literal("Edit"), btn -> parent.openEditModal(party))
-                    .dimensions(btnX, btnY, 50, 20)
-                    .build());
+            addDrawableChild(new FlatButtonWidget(btnX, btnY, 50, 20, Text.literal("Edit"), () -> parent.openEditModal(party)));
             btnX += 55;
 
-            addDrawableChild(ButtonWidget.builder(Text.literal("Reserve"), btn -> reserveSlot())
-                    .dimensions(btnX, btnY, 60, 20)
-                    .build());
+            addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Reserve"), () -> reserveSlot()));
             btnX += 65;
 
-            addDrawableChild(ButtonWidget.builder(Text.literal("§cDisband"), btn -> confirmDisband())
-                    .dimensions(btnX, btnY, 60, 20)
-                    .build());
+            FlatButtonWidget disbandBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Disband"), () -> confirmDisband());
+            disbandBtn.setDanger(true);
+            addDrawableChild(disbandBtn);
         } else if (isInParty) {
             // Member controls
-            addDrawableChild(ButtonWidget.builder(Text.literal("Leave"), btn -> leaveParty())
-                    .dimensions(btnX, btnY, 60, 20)
-                    .build());
+            FlatButtonWidget leaveBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Leave"), () -> leaveParty());
+            leaveBtn.setDanger(true);
+            addDrawableChild(leaveBtn);
 
             // Role change buttons
             btnX += 65;
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
-                addDrawableChild(ButtonWidget.builder(Text.literal(role), btn -> changeRole(r.toLowerCase()))
-                        .dimensions(btnX, btnY, 50, 20)
-                        .build());
+                addDrawableChild(new FlatButtonWidget(btnX, btnY, 50, 20, Text.literal(role), () -> changeRole(r.toLowerCase())));
                 btnX += 55;
             }
         } else if (!party.isFull) {
             // Join buttons
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
-                addDrawableChild(ButtonWidget.builder(Text.literal("Join as " + role), btn -> joinParty(r.toLowerCase()))
-                        .dimensions(btnX, btnY, 75, 20)
-                        .build());
+                addDrawableChild(new FlatButtonWidget(btnX, btnY, 75, 20, Text.literal("Join as " + role), () -> joinParty(r.toLowerCase())));
                 btnX += 80;
             }
         }
@@ -270,79 +260,106 @@ public class PartyDetailModal extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Modal background
-        context.fill(modalX, modalY, modalX + modalW, modalY + modalH, 0xEE1A1A2E);
-
-        // Border
-        int borderColor = 0xFF5555AA;
-        context.fill(modalX, modalY, modalX + modalW, modalY + 1, borderColor);
-        context.fill(modalX, modalY + modalH - 1, modalX + modalW, modalY + modalH, borderColor);
-        context.fill(modalX, modalY, modalX + 1, modalY + modalH, borderColor);
-        context.fill(modalX + modalW - 1, modalY, modalX + modalW, modalY + modalH, borderColor);
+        CompatibilityHelper.drawModalFrame(context, modalX, modalY, modalW, modalH);
 
         // Title
         String title = String.join(" / ", party.activities);
         context.drawCenteredTextWithShadow(textRenderer, Text.literal("§b§l" + title), width / 2, modalY + 8, 0xFFFFFFFF);
 
         int textX = modalX + 12;
-        int textY = modalY + 28;
+        int metaY = modalY + 30;
 
-        // Leader
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Leader: §f" + party.leaderName), textX, textY, 0xFFFFFFFF);
-        textY += 12;
-
-        // Region
-        String region = party.region != null ? party.region : "Any";
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Region: §f" + region), textX, textY, 0xFFFFFFFF);
-        textY += 12;
-
-        // Slots
-        int slotsColor = party.isFull ? 0xFFFF5555 : 0xFF55FF55;
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Slots: "), textX, textY, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(party.memberCount + "/" + party.maxSize),
-                textX + textRenderer.getWidth("Slots: "), textY, slotsColor);
-        textY += 12;
-
-        // Note
+        // Metadata panel card (leader, region, note)
+        int noteLinesCount = 0;
+        java.util.List<net.minecraft.text.OrderedText> wrappedNote = null;
         if (party.note != null && !party.note.isEmpty()) {
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Note: §f" + party.note), textX, textY, 0xFFFFFFFF);
-            textY += 12;
+            wrappedNote = textRenderer.wrapLines(Text.literal("§7Note: §8§o" + party.note), modalW - 24);
+            noteLinesCount = wrappedNote.size();
         }
 
-        textY += 6;
+        int cardH = 20 + (noteLinesCount > 0 ? noteLinesCount * 12 : 0);
 
-        // Members header
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§e§lMembers"), textX, textY, 0xFFFFFFFF);
-        textY += 14;
+        // Panel background
+        context.fill(modalX + 8, metaY, modalX + modalW - 8, metaY + cardH, 0x1A8A9CFE);
 
-        // Member list
+        // Panel borders
+        int metaBorder = 0x308A9CFE;
+        CompatibilityHelper.drawBorder(context, modalX + 8, metaY, modalW - 16, cardH, metaBorder);
+
+        // Leader and region
+        String region = party.region != null ? party.region : "Any";
+        String detailsStr = "§7Leader: §f" + party.leaderName + "   §8|   §7Region: §f" + region;
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(detailsStr), textX + 4, metaY + 6, 0xFFFFFFFF);
+
+        // Note
+        if (wrappedNote != null) {
+            int noteY = metaY + 18;
+            for (net.minecraft.text.OrderedText line : wrappedNote) {
+                context.drawText(textRenderer, line, textX + 4, noteY, 0xFFFFFFFF, true);
+                noteY += 12;
+            }
+        }
+
+        // Members section
+        int membersHeaderY = metaY + cardH + 15;
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lMembers"), textX, membersHeaderY, 0xFFFFFFFF);
+
+        // Slots counter
+        String slotsText = party.memberCount + "/" + party.maxSize;
+        String slotsColorCode = party.isFull ? "§c" : "§a";
+        int slotsW = textRenderer.getWidth(slotsText);
+        int slotsX = modalX + modalW - 12 - slotsW;
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsColorCode + slotsText), slotsX, membersHeaderY, 0xFFFFFFFF);
+
+        // Header separator line
+        context.fill(modalX + 8, membersHeaderY + 12, modalX + modalW - 8, membersHeaderY + 13, 0x20FFFFFF);
+
+        // Render member rows
+        int textY = membersHeaderY + 18;
         memberRows.clear();
-        for (Map.Entry<String, PartyData.MemberData> entry : party.members.entrySet()) {
+
+        List<Map.Entry<String, PartyData.MemberData>> sortedMembers = new ArrayList<>(party.members.entrySet());
+        for (int i = 0; i < sortedMembers.size(); i++) {
+            Map.Entry<String, PartyData.MemberData> entry = sortedMembers.get(i);
             PartyData.MemberData member = entry.getValue();
-            String icon = member.roleIcon();
+
+            // Row background
+            int rowBg = (i % 2 == 0) ? 0x10FFFFFF : 0x05FFFFFF;
+            context.fill(modalX + 8, textY - 2, modalX + modalW - 8, textY + 12, rowBg);
+
+            // Icon color
+            String prefix = member.getStyledRolePrefix();
             String display = member.displayName();
-            String line = icon + " " + display;
+            String styledLine = prefix + " " + (member.isReserved ? "§7" : "§f") + display;
 
             int nameColor = member.isReserved ? 0xFF888888 : 0xFFFFFFFF;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(line), textX + 4, textY, nameColor);
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(styledLine), textX + 4, textY + 1, nameColor);
 
-            // Kick button for leaders (not self)
+            // Kick button for leaders
             if (isLeader && !member.name.equalsIgnoreCase(party.leaderName)) {
-                int kickX = modalX + modalW - 40;
-                boolean kickHovered = mouseX >= kickX && mouseX <= kickX + 30
-                        && mouseY >= textY - 1 && mouseY <= textY + 10;
-                int kickColor = kickHovered ? 0xFFFF5555 : 0xFFAA4444;
-                CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§c[X]"), kickX, textY, kickColor);
+                int kickX = modalX + modalW - 24;
+                boolean kickHovered = isKickButtonHovered(mouseX, mouseY, kickX, textY);
+                if (kickHovered) {
+                    context.fill(kickX - 4, textY - 1, kickX + 10, textY + 11, 0x40FF4D4D);
+                }
+                int kickColor = kickHovered ? 0xFFFF4D4D : 0xFFAA4444;
+                CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("✕"), kickX, textY + 1, kickColor);
             }
 
             memberRows.add(new MemberRow(entry.getKey(), textY));
-            textY += 12;
+            textY += 16;
         }
 
         // Status message
         if (statusMessage != null) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.literal(statusMessage),
-                    width / 2, modalY + modalH - 48, statusColor);
+            List<net.minecraft.text.OrderedText> wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+            int statusBottomY = modalY + modalH - 34;
+            int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
+            int currentY = statusStartY;
+            for (net.minecraft.text.OrderedText line : wrappedStatus) {
+                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+                currentY += 10;
+            }
         }
 
         // Render buttons
@@ -354,15 +371,15 @@ public class PartyDetailModal extends Screen {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
+
         // Check kick clicks for leader
         if (isLeader && button == 0) {
             for (MemberRow row : memberRows) {
                 PartyData.MemberData member = party.members.get(row.memberKey);
                 if (member == null) continue;
-                int kickX = modalX + modalW - 40;
+                int kickX = modalX + modalW - 24;
                 if (!member.name.equalsIgnoreCase(party.leaderName)
-                        && mouseX >= kickX && mouseX <= kickX + 30
-                        && mouseY >= row.y - 1 && mouseY <= row.y + 10) {
+                        && isKickButtonHovered(mouseX, mouseY, kickX, row.y)) {
                     apiClient.kickMember(party.partyId, member.name).thenAccept(resp -> {
                         MinecraftClient.getInstance().execute(() -> {
                             if (resp.ok) {
@@ -385,5 +402,10 @@ public class PartyDetailModal extends Screen {
         }
 
         return super.mouseClicked(click, boolean_arg);
+    }
+
+    private boolean isKickButtonHovered(double mouseX, double mouseY, int kickX, int rowY) {
+        return mouseX >= kickX - 4 && mouseX <= kickX + 10
+                && mouseY >= rowY - 2 && mouseY <= rowY + 12;
     }
 }

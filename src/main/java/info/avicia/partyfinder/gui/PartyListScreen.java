@@ -8,7 +8,6 @@ import info.avicia.partyfinder.handler.InviteHandler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -33,7 +32,7 @@ public class PartyListScreen extends Screen {
 
     // Scroll state
     private int scrollOffset = 0;
-    private static final int ROW_HEIGHT = 36;
+    private static final int ROW_HEIGHT = 42;
     private static final int LIST_TOP = 50;
     private static final int SIDE_PADDING = 20;
 
@@ -53,14 +52,10 @@ public class PartyListScreen extends Screen {
         int buttonY = 8;
 
         // Refresh button (top-left)
-        addDrawableChild(ButtonWidget.builder(Text.literal("⟳ Refresh"), btn -> fetchParties())
-                .dimensions(SIDE_PADDING, buttonY, 80, 20)
-                .build());
+        addDrawableChild(new FlatButtonWidget(SIDE_PADDING, buttonY, 80, 20, Text.literal("⟳ Refresh"), () -> fetchParties()));
 
         // Create Party button (top-right)
-        addDrawableChild(ButtonWidget.builder(Text.literal("+ Create Party"), btn -> openCreateModal())
-                .dimensions(width - SIDE_PADDING - 120, buttonY, 120, 20)
-                .build());
+        addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Text.literal("+ Create Party"), () -> openCreateModal()));
 
         // Re-initialize active modal if present on resize
         if (activeModal != null) {
@@ -95,12 +90,10 @@ public class PartyListScreen extends Screen {
                     if (p.leaderName != null && p.leaderName.equalsIgnoreCase(selfName)) {
                         chatDetector.setTrackedPartyId(p.partyId);
                         if (p.members != null) {
-                            List<String> memberNames = new java.util.ArrayList<>();
-                            for (PartyData.MemberData m : p.members.values()) {
-                                if (m.name != null) {
-                                    memberNames.add(m.name);
-                                }
-                            }
+                            List<String> memberNames = p.members.values().stream()
+                                    .map(m -> m.name)
+                                    .filter(java.util.Objects::nonNull)
+                                    .toList();
                             chatDetector.addKnownMembers(memberNames);
                         }
                         isLeadingAny = true;
@@ -155,9 +148,10 @@ public class PartyListScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, width, height, 0xC0101015);
-
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal("§lParty Finder"), width / 2, 12, 0xFFFFFFFF);
+        // Background
+        context.fill(0, 0, width, height, 0xD80A0A0F);
+        // Title
+        context.drawCenteredTextWithShadow(textRenderer, Text.literal("§b§lAVICIA §f§lPARTY FINDER"), width / 2, 12, 0xFFFFFFFF);
 
         if (errorMessage != null) {
             Text text = Text.literal("§c" + errorMessage);
@@ -168,11 +162,11 @@ public class PartyListScreen extends Screen {
 
         // Render party list or status
         if (loading) {
-            Text text = Text.literal("§7Loading...");
+            Text text = Text.literal("§7Loading active parties...");
             int textWidth = textRenderer.getWidth(text);
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, text, (width - textWidth) / 2, height / 2, 0xFFFFFFFF);
         } else if (parties.isEmpty()) {
-            Text text = Text.literal("§7No active parties.");
+            Text text = Text.literal("§7No active parties. Create one to get started!");
             int textWidth = textRenderer.getWidth(text);
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, text, (width - textWidth) / 2, height / 2, 0xFFFFFFFF);
         } else {
@@ -197,40 +191,56 @@ public class PartyListScreen extends Screen {
             if (y + ROW_HEIGHT < LIST_TOP || y > listBottom) continue;
 
             PartyData party = parties.get(i);
-            boolean hovered = mouseX >= SIDE_PADDING && mouseX <= width - SIDE_PADDING
-                    && mouseY >= y && mouseY < y + ROW_HEIGHT - 4;
+            boolean hovered = isRowHovered(mouseX, mouseY, y);
+
+            // Card drop shadow
+            context.fill(SIDE_PADDING + 1, y + 1, width - SIDE_PADDING + 1, y + ROW_HEIGHT - 3, 0x3F000000);
 
             // Card background
-            int bgColor = hovered ? 0xDD333344 : 0xBB222233;
+            int bgColor = hovered ? 0xF2222232 : 0xD5161622;
             context.fill(SIDE_PADDING, y, width - SIDE_PADDING, y + ROW_HEIGHT - 4, bgColor);
 
-            // Border
-            int borderColor = hovered ? 0xFF6666FF : 0xFF444466;
-            // Top
-            context.fill(SIDE_PADDING, y, width - SIDE_PADDING, y + 1, borderColor);
-            // Bottom
-            context.fill(SIDE_PADDING, y + ROW_HEIGHT - 5, width - SIDE_PADDING, y + ROW_HEIGHT - 4, borderColor);
-            // Left
-            context.fill(SIDE_PADDING, y, SIDE_PADDING + 1, y + ROW_HEIGHT - 4, borderColor);
-            // Right
-            context.fill(width - SIDE_PADDING - 1, y, width - SIDE_PADDING, y + ROW_HEIGHT - 4, borderColor);
+            // Left status accent bar
+            int accentColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+            context.fill(SIDE_PADDING + 1, y + 1, SIDE_PADDING + 4, y + ROW_HEIGHT - 5, accentColor);
+
+            // Border outline
+            int borderColor = hovered ? 0xFF8A9CFE : 0x1A8A9CFE;
+            CompatibilityHelper.drawBorder(context, SIDE_PADDING, y, width - 2 * SIDE_PADDING, ROW_HEIGHT - 4, borderColor);
+
+            // Card text and badges
+            int leftTextX = SIDE_PADDING + 12;
 
             // Activity label
             String activities = String.join(" / ", party.activities);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b" + activities), SIDE_PADDING + 8, y + 6, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§l" + activities), leftTextX, y + 7, 0xFFFFFFFF);
 
             // Leader name
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Leader: §f" + party.leaderName),
-                    SIDE_PADDING + 8, y + 18, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Leader: §f" + party.leaderName), leftTextX, y + 21, 0xFFFFFFFF);
 
-            // Slots + region
+            // Slots badge / pill on the right
             String slotsText = party.memberCount + "/" + party.maxSize;
+            int slotsWidth = textRenderer.getWidth(slotsText);
+            int badgeRight = width - SIDE_PADDING - 10;
+            int badgeLeft = badgeRight - slotsWidth - 8;
+
+            // Fill slots pill background
+            int pillBgColor = party.isFull ? 0x22FF4D4D : 0x2200FF66;
+            context.fill(badgeLeft, y + 6, badgeRight, y + 18, pillBgColor);
+
+            // Slots pill border
+            int pillBorderColor = party.isFull ? 0x55FF4D4D : 0x5500FF66;
+            CompatibilityHelper.drawBorder(context, badgeLeft, y + 5, badgeRight - badgeLeft, 14, pillBorderColor);
+
+            // Slots text inside badge
+            int slotsColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsText), badgeLeft + 4, y + 8, slotsColor);
+
+            // Region label
             String regionText = party.region != null ? party.region : "Any";
-            int slotsColor = party.isFull ? 0xFFFF5555 : 0xFF55FF55;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsText),
-                    width - SIDE_PADDING - 80, y + 6, slotsColor);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7" + regionText),
-                    width - SIDE_PADDING - 80, y + 18, 0xFFFFFFFF);
+            String regionLabel = "§7Region: §e" + regionText;
+            int regionWidth = textRenderer.getWidth(regionLabel);
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(regionLabel), badgeRight - regionWidth, y + 21, 0xFFFFFFFF);
         }
     }
 
@@ -253,8 +263,7 @@ public class PartyListScreen extends Screen {
         if (button == 0 && !loading && !parties.isEmpty()) {
             for (int i = 0; i < parties.size(); i++) {
                 int y = LIST_TOP + (i * ROW_HEIGHT) - scrollOffset;
-                if (mouseX >= SIDE_PADDING && mouseX <= width - SIDE_PADDING
-                        && mouseY >= y && mouseY < y + ROW_HEIGHT - 4) {
+                if (isRowHovered(mouseX, mouseY, y)) {
                     openDetailModal(parties.get(i));
                     return true;
                 }
@@ -318,5 +327,10 @@ public class PartyListScreen extends Screen {
 
     public ChatPartyDetector getChatDetector() {
         return chatDetector;
+    }
+
+    private boolean isRowHovered(double mouseX, double mouseY, int rowY) {
+        return mouseX >= SIDE_PADDING && mouseX <= width - SIDE_PADDING
+                && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT - 4;
     }
 }

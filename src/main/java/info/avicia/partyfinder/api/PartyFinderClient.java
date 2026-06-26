@@ -143,6 +143,18 @@ public class PartyFinderClient {
                 });
     }
 
+    private HttpRequest buildRequest(String path, String token, String method, HttpRequest.BodyPublisher bodyPublisher) {
+        HttpRequest.Builder builder = baseRequest(path, token);
+        if (method.equals("GET")) {
+            builder.GET();
+        } else if (method.equals("DELETE")) {
+            builder.DELETE();
+        } else {
+            builder.method(method, bodyPublisher);
+        }
+        return builder.build();
+    }
+
     private <T> CompletableFuture<T> executeAuthenticated(
             String path,
             String method,
@@ -150,15 +162,8 @@ public class PartyFinderClient {
             java.util.function.Function<HttpResponse<String>, T> parser
     ) {
         return getSessionToken().thenCompose(token -> {
-            HttpRequest.Builder builder = baseRequest(path, token);
-            if (method.equals("GET")) {
-                builder.GET();
-            } else if (method.equals("DELETE")) {
-                builder.DELETE();
-            } else {
-                builder.method(method, bodyPublisher);
-            }
-            return httpClient.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofString())
+            HttpRequest request = buildRequest(path, token, method, bodyPublisher);
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                     .thenCompose(response -> {
                         if (response.statusCode() == 401) {
                             // Token is invalid/expired; reset token and retry once
@@ -166,15 +171,8 @@ public class PartyFinderClient {
                                 sessionToken = null;
                             }
                             return getSessionToken().thenCompose(newToken -> {
-                                HttpRequest.Builder retryBuilder = baseRequest(path, newToken);
-                                if (method.equals("GET")) {
-                                    retryBuilder.GET();
-                                } else if (method.equals("DELETE")) {
-                                    retryBuilder.DELETE();
-                                } else {
-                                    retryBuilder.method(method, bodyPublisher);
-                                }
-                                return httpClient.sendAsync(retryBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                                HttpRequest retryRequest = buildRequest(path, newToken, method, bodyPublisher);
+                                return httpClient.sendAsync(retryRequest, HttpResponse.BodyHandlers.ofString());
                             });
                         }
                         return CompletableFuture.completedFuture(response);
@@ -193,6 +191,21 @@ public class PartyFinderClient {
         }
     }
 
+    private void throwOnError(HttpResponse<String> response, String actionName, String defaultMessagePrefix) {
+        if (response.statusCode() != 200) {
+            PartyFinderMod.LOGGER.warn("{} failed: HTTP {}", actionName, response.statusCode());
+            String errorMessage = defaultMessagePrefix + " (HTTP " + response.statusCode() + ").";
+            try {
+                ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
+                if (apiResp != null && apiResp.error != null) {
+                    errorMessage = apiResp.error;
+                }
+            } catch (Exception ignored) {
+            }
+            throw new RuntimeException(errorMessage);
+        }
+    }
+
     // ── API Calls ─────────────────────────────────────────────────────────
 
     /**
@@ -200,18 +213,7 @@ public class PartyFinderClient {
      */
     public CompletableFuture<List<PartyData>> listParties() {
         return executeAuthenticated("/api/parties", "GET", null, response -> {
-            if (response.statusCode() != 200) {
-                PartyFinderMod.LOGGER.warn("listParties failed: HTTP {}", response.statusCode());
-                String errorMessage = "Failed to fetch parties (HTTP " + response.statusCode() + ").";
-                try {
-                    ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-                    if (apiResp != null && apiResp.error != null) {
-                        errorMessage = apiResp.error;
-                    }
-                } catch (Exception ignored) {
-                }
-                throw new RuntimeException(errorMessage);
-            }
+            throwOnError(response, "listParties", "Failed to fetch parties");
             ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
             return apiResp.parties != null ? apiResp.parties : List.of();
         });
@@ -222,18 +224,7 @@ public class PartyFinderClient {
      */
     public CompletableFuture<PartyData> getParty(long partyId) {
         return executeAuthenticated("/api/parties/" + partyId, "GET", null, response -> {
-            if (response.statusCode() != 200) {
-                PartyFinderMod.LOGGER.warn("getParty failed: HTTP {}", response.statusCode());
-                String errorMessage = "Failed to fetch party (HTTP " + response.statusCode() + ").";
-                try {
-                    ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-                    if (apiResp != null && apiResp.error != null) {
-                        errorMessage = apiResp.error;
-                    }
-                } catch (Exception ignored) {
-                }
-                throw new RuntimeException(errorMessage);
-            }
+            throwOnError(response, "getParty", "Failed to fetch party");
             ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
             if (apiResp == null || apiResp.party == null) {
                 throw new RuntimeException("Party not found.");
