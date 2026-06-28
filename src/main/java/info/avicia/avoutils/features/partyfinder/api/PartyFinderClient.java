@@ -1,11 +1,11 @@
-package info.avicia.partyfinder.api;
+package info.avicia.avoutils.features.partyfinder.api;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonObject;
-import info.avicia.partyfinder.PartyFinderMod;
-import info.avicia.partyfinder.config.ModConfig;
+import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.config.ModConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.session.Session;
 
@@ -19,7 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * HTTP client for the pfinder API.
+ * HTTP client for the pfinder API
  */
 public class PartyFinderClient {
     private static final Gson GSON = new GsonBuilder()
@@ -193,7 +193,7 @@ public class PartyFinderClient {
 
     private void throwOnError(HttpResponse<String> response, String actionName, String defaultMessagePrefix) {
         if (response.statusCode() != 200) {
-            PartyFinderMod.LOGGER.warn("{} failed: HTTP {}", actionName, response.statusCode());
+            AvoUtilsMod.LOGGER.warn("{} failed: HTTP {}", actionName, response.statusCode());
             String errorMessage = defaultMessagePrefix + " (HTTP " + response.statusCode() + ").";
             try {
                 ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);

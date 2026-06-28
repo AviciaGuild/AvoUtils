@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
-  "id": "avicia-pfinder",
+  "id": "avoutils",
   "version": "${version}",
-  "name": "Avicia Party Finder",
-  "description": "In-game party finder GUI that syncs with AvoBot's party system.",
+  "name": "AvoUtils",
+  "description": "A general utilities mod for Avicia, incorporating the Party Finder system.",
   "authors": ["Avicia"],
   "contact": {
-    "homepage": "https://github.com/AviciaGuild/avicia-pfinder",
-    "sources": "https://github.com/AviciaGuild/avicia-pfinder",
-    "issues": "https://github.com/AviciaGuild/avicia-pfinder/issues"
+    "homepage": "https://github.com/AviciaGuild/AvoUtils",
+    "sources": "https://github.com/AviciaGuild/AvoUtils",
+    "issues": "https://github.com/AviciaGuild/AvoUtils/issues"
   },
   "license": "MIT",
-  "icon": "assets/avicia-pfinder/icon.png",
+  "icon": "assets/avoutils/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "info.avicia.partyfinder.PartyFinderMod"
+      "info.avicia.avoutils.AvoUtilsMod"
     ]
   },
   "mixins": [
-    "avicia-pfinder.mixins.json"
+    "avoutils.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.15.0",

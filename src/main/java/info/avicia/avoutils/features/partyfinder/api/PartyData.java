@@ -1,4 +1,4 @@
-package info.avicia.partyfinder.api;
+package info.avicia.avoutils.features.partyfinder.api;
 
 import java.util.List;
 import java.util.Map;
@@ -25,7 +25,7 @@ public class PartyData {
         public String guildTag;
 
         /**
-         * Get a display string for this member (e.g. "PlayerName [TAG]").
+         * Get a display string for this member (e.g. "PlayerName [TAG]")
          */
         public String displayName() {
             if (guildTag != null && !guildTag.isEmpty()) {
@@ -35,7 +35,7 @@ public class PartyData {
         }
 
         /**
-         * Get the role icon character for this member.
+         * Get the role icon character for this member
          */
         public String getStyledRolePrefix() {
             if (isReserved && role == null) {

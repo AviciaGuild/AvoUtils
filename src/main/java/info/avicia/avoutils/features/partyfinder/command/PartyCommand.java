@@ -1,9 +1,9 @@
-package info.avicia.partyfinder.command;
+package info.avicia.avoutils.features.partyfinder.command;
 
-import info.avicia.partyfinder.api.PartyFinderClient;
-import info.avicia.partyfinder.gui.PartyListScreen;
-import info.avicia.partyfinder.handler.ChatPartyDetector;
-import info.avicia.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
+import info.avicia.avoutils.features.partyfinder.handler.ChatPartyDetector;
+import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.client.MinecraftClient;

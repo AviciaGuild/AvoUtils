@@ -1,10 +1,13 @@
-package info.avicia.partyfinder.gui;
+package info.avicia.avoutils.features.partyfinder.gui;
 
-import info.avicia.partyfinder.PartyFinderMod;
-import info.avicia.partyfinder.api.PartyData;
-import info.avicia.partyfinder.api.PartyFinderClient;
-import info.avicia.partyfinder.handler.ChatPartyDetector;
-import info.avicia.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.features.partyfinder.api.PartyData;
+import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.handler.ChatPartyDetector;
+import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.core.gui.CompatibilityHelper;
+import info.avicia.avoutils.core.gui.FlatButtonWidget;
+import info.avicia.avoutils.core.gui.ModalOverlay;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -15,7 +18,7 @@ import java.util.List;
 
 /**
  * Main pfinder screen. Shows all active parties as a scrollable list.
- * Parties are fetched once when the screen opens; a Refresh button re-fetches.
+ * Parties are fetched once when the screen opens; a refresh button re-fetches.
  * 
  * Clicking a party opens a {@link PartyDetailModal} as an overlay.
  * The "Create Party" button opens a {@link CreatePartyModal}.
@@ -58,12 +61,8 @@ public class PartyListScreen extends Screen {
         addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Text.literal("+ Create Party"), () -> openCreateModal()));
 
         // Re-initialize active modal if present on resize
-        if (activeModal != null) {
-            if (activeModal instanceof PartyDetailModal) {
-                ((PartyDetailModal) activeModal).initModal(client, width, height);
-            } else if (activeModal instanceof CreatePartyModal) {
-                ((CreatePartyModal) activeModal).initModal(client, width, height);
-            }
+        if (activeModal instanceof ModalOverlay modal) {
+            modal.initModal(client, width, height);
         }
 
         // Fetch parties on open
@@ -106,7 +105,7 @@ public class PartyListScreen extends Screen {
             });
         }).exceptionally(ex -> {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-            PartyFinderMod.LOGGER.warn("Failed to fetch parties: {}", cause.getMessage());
+            AvoUtilsMod.LOGGER.warn("Failed to fetch parties: {}", cause.getMessage());
             MinecraftClient.getInstance().execute(() -> {
                 errorMessage = cause.getMessage() != null ? cause.getMessage() : "Failed to load parties.";
                 loading = false;
@@ -320,8 +319,8 @@ public class PartyListScreen extends Screen {
     }
 
     public void onPartyListUpdated() {
-        if (activeModal instanceof CreatePartyModal) {
-            ((CreatePartyModal) activeModal).initModal(client, width, height);
+        if (activeModal instanceof PartyDetailModal detailModal) {
+            detailModal.refreshPartyState();
         }
     }
 

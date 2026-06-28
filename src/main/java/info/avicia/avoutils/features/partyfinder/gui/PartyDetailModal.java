@@ -1,8 +1,10 @@
-package info.avicia.partyfinder.gui;
+package info.avicia.avoutils.features.partyfinder.gui;
 
-import info.avicia.partyfinder.api.PartyData;
-import info.avicia.partyfinder.api.PartyFinderClient;
-import info.avicia.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.features.partyfinder.api.PartyData;
+import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.core.gui.CompatibilityHelper;
+import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -12,10 +14,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import info.avicia.avoutils.core.gui.ModalOverlay;
+
 /**
- * Modal overlay showing a party's details.
+ * Modal overlay showing a party's details
  */
-public class PartyDetailModal extends Screen {
+public class PartyDetailModal extends Screen implements ModalOverlay {
 
     private final PartyListScreen parent;
     private final PartyFinderClient apiClient;
@@ -36,6 +40,10 @@ public class PartyDetailModal extends Screen {
     // Per-frame snapshot of each member row's Y position and associated key.
     private record MemberRow(String memberKey, int y) {}
     private final List<MemberRow> memberRows = new ArrayList<>();
+ 
+    // Cached note wrapping layout calculations to avoid per-frame text wrapping overhead
+    private List<net.minecraft.text.OrderedText> wrappedNote = null;
+    private int noteLinesCount = 0;
 
     public PartyDetailModal(PartyListScreen parent, PartyFinderClient apiClient,
                             InviteHandler inviteHandler,
@@ -136,6 +144,17 @@ public class PartyDetailModal extends Screen {
                 btnX += 80;
             }
         }
+        updateWrappedNote();
+    }
+ 
+    private void updateWrappedNote() {
+        if (party.note != null && !party.note.isEmpty()) {
+            wrappedNote = textRenderer.wrapLines(Text.literal("§7Note: §8§o" + party.note), modalW - 24);
+            noteLinesCount = wrappedNote.size();
+        } else {
+            wrappedNote = null;
+            noteLinesCount = 0;
+        }
     }
 
     // ── Actions ──────────────────────────────────────────────────────────
@@ -227,7 +246,7 @@ public class PartyDetailModal extends Screen {
         });
     }
 
-    private void refreshPartyState() {
+    public void refreshPartyState() {
         apiClient.getParty(party.partyId).thenAccept(p -> {
             MinecraftClient.getInstance().execute(() -> {
                 this.party.memberCount = p.memberCount;
@@ -269,13 +288,7 @@ public class PartyDetailModal extends Screen {
         int textX = modalX + 12;
         int metaY = modalY + 30;
 
-        // Metadata panel card (leader, region, note)
-        int noteLinesCount = 0;
-        java.util.List<net.minecraft.text.OrderedText> wrappedNote = null;
-        if (party.note != null && !party.note.isEmpty()) {
-            wrappedNote = textRenderer.wrapLines(Text.literal("§7Note: §8§o" + party.note), modalW - 24);
-            noteLinesCount = wrappedNote.size();
-        }
+        // Metadata panel card (leader, region, note) - uses pre-wrapped fields cached in init()
 
         int cardH = 20 + (noteLinesCount > 0 ? noteLinesCount * 12 : 0);
 

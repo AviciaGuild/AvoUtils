@@ -1,4 +1,4 @@
-package info.avicia.partyfinder.gui;
+package info.avicia.avoutils.core.gui;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;

@@ -1,7 +1,9 @@
-package info.avicia.partyfinder.gui;
+package info.avicia.avoutils.features.partyfinder.gui;
 
-import info.avicia.partyfinder.api.PartyData;
-import info.avicia.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.api.PartyData;
+import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.core.gui.FlatButtonWidget;
+import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -13,10 +15,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import info.avicia.avoutils.core.gui.ModalOverlay;
+
 /**
- * Modal overlay for creating or editing a party.
+ * Modal overlay for creating or editing a party
  */
-public class CreatePartyModal extends Screen {
+public class CreatePartyModal extends Screen implements ModalOverlay {
 
     private static final String[] ACTIVITIES = {"NOTG", "NOL", "TCC", "TNA", "WTP"};
     private static final String[] ROLES = {"DPS", "Healer", "Tank", "Other"};

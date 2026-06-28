@@ -1,6 +1,6 @@
-package info.avicia.partyfinder.handler;
+package info.avicia.avoutils.features.partyfinder.handler;
 
-import info.avicia.partyfinder.PartyFinderMod;
+import info.avicia.avoutils.AvoUtilsMod;
 import net.minecraft.client.MinecraftClient;
 
 import java.util.ArrayDeque;
@@ -30,7 +30,7 @@ public class InviteHandler {
             inviteQueue.add("__CREATE__");
         }
         inviteQueue.addAll(playerNames);
-        PartyFinderMod.LOGGER.info("Queued {} party invites. Need party creation: {}", playerNames.size(), !chatDetector.isInParty());
+        AvoUtilsMod.LOGGER.info("Queued {} party invites. Need party creation: {}", playerNames.size(), !chatDetector.isInParty());
     }
 
     /**
@@ -53,7 +53,7 @@ public class InviteHandler {
             } else {
                 command = "party invite " + action;
             }
-            PartyFinderMod.LOGGER.info("Sending: /{}", command);
+            AvoUtilsMod.LOGGER.info("Sending: /{}", command);
             client.player.networkHandler.sendChatCommand(command);
             cooldownTicks = TICKS_BETWEEN_INVITES;
         }

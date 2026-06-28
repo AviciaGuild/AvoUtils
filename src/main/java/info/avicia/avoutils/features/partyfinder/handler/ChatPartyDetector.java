@@ -1,8 +1,8 @@
-package info.avicia.partyfinder.handler;
+package info.avicia.avoutils.features.partyfinder.handler;
 
-import info.avicia.partyfinder.PartyFinderMod;
-import info.avicia.partyfinder.api.PartyFinderClient;
-import info.avicia.partyfinder.gui.PartyListScreen;
+import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
 import net.minecraft.client.MinecraftClient;
 
 import java.util.Set;
@@ -30,7 +30,10 @@ public class ChatPartyDetector {
             "has joined your party",
             "has been kicked from the party",
             "has left the party",
-            "you must be in a party"
+            "you must be in a party",
+            "you have been kicked from your party",
+            "you have left your current party",
+            "your party has been disbanded"
     };
 
     private final PartyFinderClient apiClient;
@@ -140,6 +143,10 @@ public class ChatPartyDetector {
         }
 
         boolean notInPartyMsg = "you must be in a party".equals(matchedKeyword);
+        boolean isExitMsg = notInPartyMsg
+                || "you have been kicked from your party".equals(matchedKeyword)
+                || "you have left your current party".equals(matchedKeyword)
+                || "your party has been disbanded".equals(matchedKeyword);
 
         boolean shouldHide = false;
         long now = System.currentTimeMillis();
@@ -150,12 +157,12 @@ public class ChatPartyDetector {
             }
         }
 
-        if (notInPartyMsg) {
+        if (isExitMsg) {
             inParty = false;
             lastPartyListMembers.clear();
             inGameSeenMembers.clear();
             knownDiscordMembers.clear();
-            PartyFinderMod.LOGGER.info("Detected player is not in a party.");
+            AvoUtilsMod.LOGGER.info("Detected player is not in a party (event: {}).", matchedKeyword);
             return shouldHide;
         }
 
@@ -182,7 +189,7 @@ public class ChatPartyDetector {
             ("has been kicked from the party".equals(matchedKeyword) && PARTY_KICK_PATTERN.matcher(trimmed).find()) ||
             ("has left the party".equals(matchedKeyword) && PARTY_LEAVE_PATTERN.matcher(trimmed).find())) {
 
-            PartyFinderMod.LOGGER.info("Detected party event ({}) message. Requesting /party list.", matchedKeyword);
+            AvoUtilsMod.LOGGER.info("Detected party event ({}) message. Requesting /party list.", matchedKeyword);
             triggerPartyList();
             return shouldHide;
         }
@@ -191,7 +198,7 @@ public class ChatPartyDetector {
     }
 
     private void onPartyListParsed() {
-        PartyFinderMod.LOGGER.info("Parsed /party list: {} members", lastPartyListMembers.size());
+        AvoUtilsMod.LOGGER.info("Parsed /party list: {} members", lastPartyListMembers.size());
 
         // Notify active screen to update UI if needed
         MinecraftClient mc = MinecraftClient.getInstance();
@@ -213,7 +220,7 @@ public class ChatPartyDetector {
             boolean isKnownDiscord = knownDiscordMembers.contains(lowerName);
 
             if (!isKnownDiscord) {
-                PartyFinderMod.LOGGER.info("Auto-reserving from /party list: {}", name);
+                AvoUtilsMod.LOGGER.info("Auto-reserving from /party list: {}", name);
                 knownDiscordMembers.add(lowerName);
                 inGameSeenMembers.add(lowerName);
                 apiClient.reserveIngame(trackedPartyId, name).thenAccept(resp -> {
@@ -239,7 +246,7 @@ public class ChatPartyDetector {
 
         for (String name : toRemove) {
             String lowerName = name.toLowerCase();
-            PartyFinderMod.LOGGER.info("Auto-kicking member no longer in party: {}", name);
+            AvoUtilsMod.LOGGER.info("Auto-kicking member no longer in party: {}", name);
             inGameSeenMembers.remove(lowerName);
             knownDiscordMembers.remove(lowerName);
             apiClient.kickMember(trackedPartyId, name).thenAccept(resp -> {

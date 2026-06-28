@@ -63,11 +63,11 @@ jobs:
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: avicia-pfinder-mod
+          name: avo-utils-mod
           path: |
-            build/libs/avicia-pfinder-*.jar
-            !build/libs/avicia-pfinder-*-sources.jar
-            !build/libs/avicia-pfinder-*-dev.jar
+            build/libs/avoutils-*.jar
+            !build/libs/avoutils-*-sources.jar
+            !build/libs/avoutils-*-dev.jar
 
       - name: Create GitHub Release
         if: steps.determine_version.outputs.should_publish == 'true'
@@ -75,9 +75,9 @@ jobs:
         with:
           tag_name: ${{ steps.determine_version.outputs.tag_name }}
           files: |
-            build/libs/avicia-pfinder-*.jar
-            !build/libs/avicia-pfinder-*-sources.jar
-            !build/libs/avicia-pfinder-*-dev.jar
+            build/libs/avoutils-*.jar
+            !build/libs/avoutils-*-sources.jar
+            !build/libs/avoutils-*-dev.jar
           draft: false
           prerelease: ${{ contains(steps.determine_version.outputs.version, '-') }}
           generate_release_notes: true
@@ -89,6 +89,6 @@ jobs:
       #     modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
       #     modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
       #     files: |
-      #       build/libs/avicia-pfinder-*.jar
-      #       !build/libs/avicia-pfinder-*-sources.jar
-      #       !build/libs/avicia-pfinder-*-dev.jar
+      #       build/libs/avoutils-*.jar
+      #       !build/libs/avoutils-*-sources.jar
+      #       !build/libs/avoutils-*-dev.jar

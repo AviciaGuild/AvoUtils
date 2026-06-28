@@ -1,9 +1,9 @@
-package info.avicia.partyfinder.api;
+package info.avicia.avoutils.features.partyfinder.api;
 
 import java.util.List;
 
 /**
- * Wrapper for API JSON responses.
+ * Wrapper for API JSON responses
  */
 public class ApiResponse {
     public boolean ok;

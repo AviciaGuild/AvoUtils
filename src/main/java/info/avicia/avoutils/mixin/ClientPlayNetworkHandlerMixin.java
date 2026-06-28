@@ -1,6 +1,7 @@
-package info.avicia.partyfinder.mixin;
+package info.avicia.avoutils.mixin;
 
-import info.avicia.partyfinder.PartyFinderMod;
+import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,14 +20,17 @@ public class ClientPlayNetworkHandlerMixin {
             }
             if (packet.content() != null) {
                 String text = packet.content().getString();
-                if (text != null && PartyFinderMod.getInstance() != null && PartyFinderMod.getInstance().getChatDetector() != null) {
-                    if (PartyFinderMod.getInstance().getChatDetector().onChatMessage(text)) {
-                        ci.cancel();
+                if (text != null && AvoUtilsMod.getInstance() != null) {
+                    PartyFinderFeature pf = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
+                    if (pf != null && pf.getChatDetector() != null) {
+                        if (pf.getChatDetector().onChatMessage(text)) {
+                            ci.cancel();
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            PartyFinderMod.LOGGER.error("Error handling game message in mixin", e);
+            AvoUtilsMod.LOGGER.error("Error handling game message in mixin", e);
         }
     }
 }
