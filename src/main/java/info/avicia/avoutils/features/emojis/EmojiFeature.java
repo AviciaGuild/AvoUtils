@@ -465,15 +465,7 @@ public class EmojiFeature implements AvoFeature {
         return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase();
     }
 
-
     private void downloadImage(String imageUrl, Path destination) throws IOException, InterruptedException {
-        if (isLocalPath(imageUrl)) {
-            Path srcPath = parsePath(imageUrl);
-            Files.createDirectories(destination.getParent());
-            Files.copy(srcPath, destination, StandardCopyOption.REPLACE_EXISTING);
-            return;
-        }
-
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(imageUrl))
                 .timeout(Duration.ofSeconds(15))
@@ -487,18 +479,6 @@ public class EmojiFeature implements AvoFeature {
         try (InputStream in = response.body()) {
             Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
         }
-    }
-
-    private boolean isLocalPath(String urlString) {
-        return urlString.startsWith("file://") || urlString.startsWith("/") || urlString.contains(":\\")
-                || urlString.startsWith("file:/");
-    }
-
-    private Path parsePath(String urlString) {
-        if (urlString.startsWith("file://") || urlString.startsWith("file:/")) {
-            return Path.of(URI.create(urlString));
-        }
-        return Path.of(urlString);
     }
 
     private static int resolvePackFormat() {
