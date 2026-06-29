@@ -33,7 +33,7 @@ public class ModConfig {
                     config.validate();
                     return config;
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 AvoUtilsMod.LOGGER.error("Failed to load config, using defaults.", e);
             }
         }

@@ -2,6 +2,7 @@ package info.avicia.avoutils;
 
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import net.fabricmc.api.ClientModInitializer;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ public class AvoUtilsMod implements ClientModInitializer {
 
         // Register mod features
         registerFeature(new PartyFinderFeature());
+        registerFeature(new EmojiFeature());
 
         // Initialize all registered features
         for (AvoFeature feature : features) {
@@ -45,12 +47,10 @@ public class AvoUtilsMod implements ClientModInitializer {
         return instance;
     }
 
-    public ModConfig getConfig() {
-        return config;
-    }
-
     public <T extends AvoFeature> T getFeature(Class<T> featureClass) {
-        for (AvoFeature feature : features) {
+        int size = features.size();
+        for (int i = 0; i < size; i++) {
+            AvoFeature feature = features.get(i);
             if (featureClass.isInstance(feature)) {
                 return featureClass.cast(feature);
             }

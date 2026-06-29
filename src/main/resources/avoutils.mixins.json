@@ -3,7 +3,9 @@
   "package": "info.avicia.avoutils.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "ClientPlayNetworkHandlerMixin"
+    "ClientPlayNetworkHandlerMixin",
+    "ChatHudMixin",
+    "GameMessageS2CPacketMixin"
   ],
   "injectors": {
     "defaultRequire": 1

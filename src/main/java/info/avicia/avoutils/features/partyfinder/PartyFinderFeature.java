@@ -34,15 +34,7 @@ public class PartyFinderFeature implements AvoFeature {
         PartyCommand.register(apiClient, chatDetector, inviteHandler);
     }
  
-    public PartyFinderClient getApiClient() {
-        return apiClient;
-    }
- 
     public ChatPartyDetector getChatDetector() {
         return chatDetector;
-    }
- 
-    public InviteHandler getInviteHandler() {
-        return inviteHandler;
     }
 }
