@@ -40,7 +40,6 @@ public class EmojiFeature implements AvoFeature {
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
     private static final Pattern SAFE_NAME_PATTERN = Pattern.compile("[^a-zA-Z0-9_.-]");
     private static final String TWEMOJI_ZIP_URL = "https://github.com/AmberWat/PixelTwemojiMC-18/releases/download/v8.0/PixelTwemojiMC-18.zip";
-    private static final String CUSTOM_EMOJIS_JSON_URL = "https://raw.githubusercontent.com/AviciaGuild/AvoUtils/main/custom_emojis.json";
     private static final String TWEMOJI_RAW_JSON_PATH = "assets/twemoji/font/emoji_raw.json";
     private static final String TWEMOJI_SHORTCODES_JSON_PATH = "assets/emoji_shortcodes/lang/en_us.json";
     private static final String TWEMOJI_PACK_NAME = "file/avoutils-twemoji.zip";
@@ -182,21 +181,21 @@ public class EmojiFeature implements AvoFeature {
             AvoUtilsMod.LOGGER.info("Starting loading and caching emojis...");
             Map<String, String> allEmojis = new HashMap<>();
 
-            String customEmojiUrl = CUSTOM_EMOJIS_JSON_URL;
-            try {
-                String json = fetchUrl(customEmojiUrl);
-                Type type = new TypeToken<Map<String, String>>() {
-                }.getType();
-                Map<String, String> setEmojis = GSON.fromJson(json, type);
-                if (setEmojis != null) {
-                    allEmojis.putAll(setEmojis);
+            try (InputStream is = EmojiFeature.class.getResourceAsStream("/assets/avoutils/custom_emojis.json")) {
+                if (is != null) {
+                    try (InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+                        Type type = new TypeToken<Map<String, String>>() {
+                        }.getType();
+                        Map<String, String> setEmojis = GSON.fromJson(isr, type);
+                        if (setEmojis != null) {
+                            allEmojis.putAll(setEmojis);
+                        }
+                    }
+                } else {
+                    AvoUtilsMod.LOGGER.error("custom_emojis.json not found in mod resources!");
                 }
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.error("Failed to fetch custom emoji set", e);
-                if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+                AvoUtilsMod.LOGGER.error("Failed to load custom emojis from resources", e);
             }
 
             Map<String, String> downloadedEmojis = new HashMap<>();
@@ -233,7 +232,7 @@ public class EmojiFeature implements AvoFeature {
 
             synchronized (customEmojis) {
                 customEmojis.clear();
-                char currentUnicode = '\uE000';
+                char currentUnicode = '\uF000';
                 for (String name : sortedNames) {
                     customEmojis.put(":" + name + ":", String.valueOf(currentUnicode));
                     currentUnicode++;
@@ -466,22 +465,6 @@ public class EmojiFeature implements AvoFeature {
         return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase();
     }
 
-    private String fetchUrl(String urlString) throws IOException, InterruptedException {
-        if (isLocalPath(urlString)) {
-            return Files.readString(parsePath(urlString));
-        }
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(urlString))
-                .timeout(Duration.ofSeconds(10))
-                .header("User-Agent", "AvoUtils Mod")
-                .build();
-        HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new IOException("HTTP status " + response.statusCode() + " for URL: " + urlString);
-        }
-        return response.body();
-    }
 
     private void downloadImage(String imageUrl, Path destination) throws IOException, InterruptedException {
         if (isLocalPath(imageUrl)) {

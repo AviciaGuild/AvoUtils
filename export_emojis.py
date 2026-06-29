@@ -2,7 +2,7 @@ import json
 import urllib.request
 import ssl
 
-def export_emojis(guild_id, bot_token, output_file='custom_emojis.json'):
+def export_emojis(guild_id, bot_token, output_file='src/main/resources/assets/avoutils/custom_emojis.json'):
     url = f"https://discord.com/api/v10/guilds/{guild_id}/emojis"
     req = urllib.request.Request(url)
     req.add_header('Authorization', f'Bot {bot_token}')
