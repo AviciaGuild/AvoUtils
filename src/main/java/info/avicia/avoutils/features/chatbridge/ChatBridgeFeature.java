@@ -5,6 +5,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.core.util.WynnPillUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
@@ -52,11 +53,11 @@ public class ChatBridgeFeature implements AvoFeature {
                 String message = json.get("message").getAsString();
                 
                 if (MinecraftClient.getInstance().player != null) {
-                    MutableText prefix = Text.literal("[AvoBridge] ").formatted(Formatting.LIGHT_PURPLE);
+                    MutableText prefix = WynnPillUtil.create("AvoBridge", Formatting.DARK_AQUA, Formatting.WHITE).append(Text.literal(" "));
                     MutableText formatted = prefix
-                            .append(Text.literal(username).formatted(Formatting.WHITE))
+                            .append(Text.literal(username).formatted(Formatting.DARK_AQUA))
                             .append(Text.literal(": ").formatted(Formatting.GRAY))
-                            .append(Text.literal(message).formatted(Formatting.WHITE));
+                            .append(Text.literal(message).formatted(Formatting.AQUA));
                     MinecraftClient.getInstance().player.sendMessage(formatted, false);
                 }
             }
