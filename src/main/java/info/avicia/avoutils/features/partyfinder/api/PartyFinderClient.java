@@ -6,8 +6,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.config.ModConfig;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.session.Session;
+import info.avicia.avoutils.core.auth.AvoAuthService;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -15,7 +14,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -28,10 +26,6 @@ public class PartyFinderClient {
 
     private final ModConfig config;
     private final HttpClient httpClient;
-
-    private final Object authLock = new Object();
-    private volatile String sessionToken = null;
-    private CompletableFuture<String> activeAuthFuture = null;
 
     public PartyFinderClient(ModConfig config) {
         this.config = config;
@@ -51,96 +45,8 @@ public class PartyFinderClient {
                 .timeout(Duration.ofSeconds(15));
     }
 
-    private CompletableFuture<String> getSessionToken() {
-        synchronized (authLock) {
-            if (sessionToken != null) {
-                return CompletableFuture.completedFuture(sessionToken);
-            }
-            if (activeAuthFuture != null) {
-                return activeAuthFuture;
-            }
-            activeAuthFuture = fetchSessionTokenAsync().thenApply(token -> {
-                synchronized (authLock) {
-                    sessionToken = token;
-                    activeAuthFuture = null;
-                }
-                return token;
-            }).exceptionally(ex -> {
-                synchronized (authLock) {
-                    activeAuthFuture = null;
-                }
-                throw new RuntimeException("Authentication failed: " + ex.getMessage(), ex);
-            });
-            return activeAuthFuture;
-        }
-    }
-
-    private CompletableFuture<String> fetchSessionTokenAsync() {
-        Session session = MinecraftClient.getInstance().getSession();
-        UUID uuid = session.getUuidOrNull();
-        if (uuid == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Not logged into Minecraft."));
-        }
-        String uuidStr = uuid.toString().replace("-", "");
-
-        // Get challenge
-        HttpRequest challengeReq = HttpRequest.newBuilder()
-                .uri(URI.create(config.apiBaseUrl + "/api/auth/challenge?uuid=" + uuidStr))
-                .GET()
-                .timeout(Duration.ofSeconds(10))
-                .build();
-
-        return httpClient.sendAsync(challengeReq, HttpResponse.BodyHandlers.ofString())
-                .thenCompose(response -> {
-                    if (response.statusCode() != 200) {
-                        throw new RuntimeException("Failed to get challenge (HTTP " + response.statusCode() + ")");
-                    }
-                    ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-                    if (apiResp == null || apiResp.challenge == null) {
-                        throw new RuntimeException("Invalid challenge response");
-                    }
-                    return CompletableFuture.completedFuture(apiResp.challenge);
-                })
-                .thenCompose(challenge -> {
-                    // Join server via Mojang SessionService
-                    return CompletableFuture.runAsync(() -> {
-                        try {
-                            MinecraftClient.getInstance().getApiServices().sessionService().joinServer(
-                                    session.getUuidOrNull(),
-                                    session.getAccessToken(),
-                                    challenge
-                            );
-                        } catch (Exception e) {
-                            throw new RuntimeException("Mojang authentication failed: " + e.getMessage(), e);
-                        }
-                    }).thenApply(v -> challenge);
-                })
-                .thenCompose(challenge -> {
-                    // Post to login
-                    JsonObject body = new JsonObject();
-                    body.addProperty("uuid", uuidStr);
-                    body.addProperty("username", session.getUsername());
-                    body.addProperty("challenge", challenge);
-
-                    HttpRequest loginReq = HttpRequest.newBuilder()
-                            .uri(URI.create(config.apiBaseUrl + "/api/auth/login"))
-                            .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body)))
-                            .header("Content-Type", "application/json")
-                            .timeout(Duration.ofSeconds(10))
-                            .build();
-
-                    return httpClient.sendAsync(loginReq, HttpResponse.BodyHandlers.ofString());
-                })
-                .thenApply(response -> {
-                    if (response.statusCode() != 200) {
-                        throw new RuntimeException("Login failed (HTTP " + response.statusCode() + ")");
-                    }
-                    ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-                    if (apiResp == null || apiResp.token == null) {
-                        throw new RuntimeException("Invalid login response: missing token");
-                    }
-                    return apiResp.token;
-                });
+    public CompletableFuture<String> getSessionToken() {
+        return AvoAuthService.getInstance().getSessionToken();
     }
 
     private HttpRequest buildRequest(String path, String token, String method, HttpRequest.BodyPublisher bodyPublisher) {
@@ -167,9 +73,7 @@ public class PartyFinderClient {
                     .thenCompose(response -> {
                         if (response.statusCode() == 401) {
                             // Token is invalid/expired; reset token and retry once
-                            synchronized (authLock) {
-                                sessionToken = null;
-                            }
+                            AvoAuthService.getInstance().invalidateToken();
                             return getSessionToken().thenCompose(newToken -> {
                                 HttpRequest retryRequest = buildRequest(path, newToken, method, bodyPublisher);
                                 return httpClient.sendAsync(retryRequest, HttpResponse.BodyHandlers.ofString());

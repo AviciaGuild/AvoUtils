@@ -4,6 +4,9 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
+import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import info.avicia.avoutils.core.auth.AvoAuthService;
+import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.api.ClientModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +30,14 @@ public class AvoUtilsMod implements ClientModInitializer {
         // Load configs
         config = ModConfig.load();
 
+        // Initialize core services
+        AvoAuthService.initialize(config);
+        AvoWebSocketManager.initialize(config);
+
         // Register mod features
         registerFeature(new PartyFinderFeature());
         registerFeature(new EmojiFeature());
+        registerFeature(new ChatBridgeFeature());
 
         // Initialize all registered features
         for (AvoFeature feature : features) {

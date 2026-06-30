@@ -11,7 +11,6 @@ import java.nio.file.Path;
 
 /**
  * Mod configuration
- * Stores the API base URL (pointing to the AvoBot server)
  */
 public class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -19,6 +18,7 @@ public class ModConfig {
 
     private static final String DEFAULT_API_BASE_URL = "https://auth.avicia.info:8443";
     public String apiBaseUrl = DEFAULT_API_BASE_URL;
+    public boolean chatBridgeEnabled = true;
 
     /**
      * Load config from disk, or create a default one if it doesn't exist
