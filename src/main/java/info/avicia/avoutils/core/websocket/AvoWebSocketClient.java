@@ -16,6 +16,8 @@ import java.util.function.BiConsumer;
  */
 public class AvoWebSocketClient extends WebSocketClient {
     private static final Gson GSON = new Gson();
+    private static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256 KB
+    public static final int AUTH_FAILURE_CLOSE_CODE = 4001;
 
     private final BiConsumer<String, JsonObject> eventHandler;
     private final Runnable onOpenCallback;
@@ -25,6 +27,7 @@ public class AvoWebSocketClient extends WebSocketClient {
                               BiConsumer<String, JsonObject> eventHandler,
                               Runnable onOpenCallback, Runnable onCloseCallback) {
         super(serverUri, httpHeaders);
+        setConnectionLostTimeout(30);
         this.eventHandler = eventHandler;
         this.onOpenCallback = onOpenCallback;
         this.onCloseCallback = onCloseCallback;
@@ -32,7 +35,7 @@ public class AvoWebSocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection opened. Status: " + handshakedata.getHttpStatus());
+        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection opened. Status: {}", handshakedata.getHttpStatus());
         if (onOpenCallback != null) {
             onOpenCallback.run();
         }
@@ -40,6 +43,10 @@ public class AvoWebSocketClient extends WebSocketClient {
 
     @Override
     public void onMessage(String message) {
+        if (message.length() > MAX_MESSAGE_SIZE) {
+            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Dropping oversized message: {} bytes", message.length());
+            return;
+        }
         try {
             JsonObject json = GSON.fromJson(message, JsonObject.class);
             if (json != null && json.has("type")) {
@@ -47,15 +54,15 @@ public class AvoWebSocketClient extends WebSocketClient {
                 eventHandler.accept(type, json);
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error processing message: " + message, e);
+            AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error processing incoming message", e);
         }
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection closed. Code: " + code + ", Reason: " + reason + ", Remote: " + remote);
-        if (reason != null && reason.contains("401")) {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Unauthorized connection attempt (401). Invalidating cached session token.");
+        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection closed. Code: {}, Reason: {}, Remote: {}", code, reason, remote);
+        if (code == AUTH_FAILURE_CLOSE_CODE) {
+            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Authentication failure (code={}). Invalidating cached session token.", code);
             AvoAuthService.getInstance().invalidateToken();
         }
         if (onCloseCallback != null) {
@@ -70,13 +77,11 @@ public class AvoWebSocketClient extends WebSocketClient {
 
     public void sendEvent(String type, JsonObject payload) {
         if (isOpen()) {
-            if (payload == null) {
-                payload = new JsonObject();
-            }
-            payload.addProperty("type", type);
-            send(GSON.toJson(payload));
+            JsonObject envelope = payload != null ? payload.deepCopy() : new JsonObject();
+            envelope.addProperty("type", type);
+            send(GSON.toJson(envelope));
         } else {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Cannot send event. Connection not open: " + type);
+            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Cannot send event. Connection not open: {}", type);
         }
     }
 }

@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -29,8 +31,13 @@ public class AvoWebSocketManager {
     private final Map<String, BooleanSupplier> connectionDemands = new ConcurrentHashMap<>();
 
     private volatile AvoWebSocketClient client;
-    private volatile boolean isConnecting = false;
+    private final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private volatile long lastConnectAttempt = 0;
+    private int tickCounter = 0;
+    private int consecutiveFailures = 0;
+    private static final int TICK_INTERVAL = 20;
+    private static final long BASE_RETRY_MS = 5_000;
+    private static final long MAX_RETRY_MS = 120_000;
 
     private AvoWebSocketManager(ModConfig config) {
         this.config = config;
@@ -45,17 +52,19 @@ public class AvoWebSocketManager {
 
     public static synchronized AvoWebSocketManager getInstance() {
         if (instance == null) {
-            instance = new AvoWebSocketManager(ModConfig.load());
-            instance.setupLifecycle();
+            throw new IllegalStateException("AvoWebSocketManager not initialized.");
         }
         return instance;
     }
 
     private void setupLifecycle() {
         // Tick connection check when player is in-game
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (MinecraftClient.getInstance().player != null) {
-                tickConnection();
+        ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+            if (++tickCounter >= TICK_INTERVAL) {
+                tickCounter = 0;
+                if (MinecraftClient.getInstance().player != null) {
+                    tickConnection();
+                }
             }
         });
 
@@ -92,7 +101,7 @@ public class AvoWebSocketManager {
         if (activeClient != null && activeClient.isOpen()) {
             activeClient.sendEvent(eventType, payload);
         } else {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Cannot send event. Socket not open: " + eventType);
+            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Cannot send event. Socket not open: {}", eventType);
         }
     }
 
@@ -103,15 +112,7 @@ public class AvoWebSocketManager {
 
     private void tickConnection() {
         // Connect if any registered feature demands a connection
-        boolean anyDemand = false;
-        for (BooleanSupplier demand : connectionDemands.values()) {
-            if (demand.getAsBoolean()) {
-                anyDemand = true;
-                break;
-            }
-        }
-
-        if (!anyDemand) {
+        if (connectionDemands.values().stream().noneMatch(BooleanSupplier::getAsBoolean)) {
             disconnect();
             return;
         }
@@ -120,11 +121,14 @@ public class AvoWebSocketManager {
         if (activeClient != null && activeClient.isOpen()) {
             return;
         }
-        if (isConnecting) {
+        if (isConnecting.get()) {
             return;
         }
         long now = System.currentTimeMillis();
-        if (now - lastConnectAttempt < 10000) { // Retry every 10 seconds
+        long baseBackoff = Math.min(BASE_RETRY_MS * (1L << Math.min(consecutiveFailures, 5)), MAX_RETRY_MS);
+        long jitter = (long)(ThreadLocalRandom.current().nextDouble() * baseBackoff * 0.3);
+        long backoff = baseBackoff + jitter;
+        if (now - lastConnectAttempt < backoff) {
             return;
         }
 
@@ -132,14 +136,17 @@ public class AvoWebSocketManager {
     }
 
     private void triggerConnect() {
+        if (!isConnecting.compareAndSet(false, true)) {
+            return;
+        }
         lastConnectAttempt = System.currentTimeMillis();
-        isConnecting = true;
 
         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Requesting authentication token...");
         AvoAuthService.getInstance().getSessionToken().whenComplete((token, throwable) -> {
             if (throwable != null) {
                 AvoUtilsMod.LOGGER.error("[AvoWebSocket] Failed to retrieve session token", throwable);
-                isConnecting = false;
+                isConnecting.set(false);
+                consecutiveFailures++;
                 return;
             }
 
@@ -152,14 +159,18 @@ public class AvoWebSocketManager {
     private void connectWithToken(String token) {
         try {
             if (client != null) {
-                client.close();
+                try {
+                    client.close();
+                } catch (Exception e) {
+                    AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Error closing previous client", e);
+                }
             }
 
             URI base = new URI(config.apiBaseUrl);
             String wsScheme = "https".equalsIgnoreCase(base.getScheme()) ? "wss" : "ws";
             URI wsUri = new URI(wsScheme, null, base.getHost(), base.getPort(), "/ws", null, null);
 
-            AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connecting to: " + wsUri);
+            AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connecting to: {}", wsUri);
 
             Map<String, String> headers = new java.util.HashMap<>();
             headers.put("Authorization", "Bearer " + token);
@@ -167,18 +178,21 @@ public class AvoWebSocketManager {
             client = new AvoWebSocketClient(wsUri, headers,
                     this::handleIncomingEvent,
                     () -> {
-                        isConnecting = false;
+                        isConnecting.set(false);
+                        consecutiveFailures = 0;
                         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connected successfully.");
                     },
                     () -> {
-                        isConnecting = false;
+                        isConnecting.set(false);
+                        consecutiveFailures = 0;
                         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Disconnected.");
                     }
             );
             client.connect();
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error connecting", e);
-            isConnecting = false;
+            isConnecting.set(false);
+            consecutiveFailures++;
         }
     }
 
@@ -190,7 +204,7 @@ public class AvoWebSocketManager {
                     try {
                         listener.accept(json);
                     } catch (Exception e) {
-                        AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error invoking listener for event: " + type, e);
+                        AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error invoking listener for event: {}", type, e);
                     }
                 }
             }
@@ -206,6 +220,7 @@ public class AvoWebSocketManager {
             }
             client = null;
         }
-        isConnecting = false;
+        isConnecting.set(false);
+        consecutiveFailures = 0;
     }
 }

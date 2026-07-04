@@ -9,10 +9,13 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import com.google.gson.JsonObject;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
 
@@ -45,6 +48,8 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     private List<net.minecraft.text.OrderedText> wrappedNote = null;
     private int noteLinesCount = 0;
 
+    private final Consumer<JsonObject> partyUpdateListener;
+
     public PartyDetailModal(PartyListScreen parent, PartyFinderClient apiClient,
                             InviteHandler inviteHandler,
                             PartyData party) {
@@ -53,6 +58,11 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         this.apiClient = apiClient;
         this.inviteHandler = inviteHandler;
         this.party = party;
+        this.partyUpdateListener = json -> {
+            if (json.has("party_id") && json.get("party_id").getAsLong() == this.party.partyId) {
+                refreshPartyState();
+            }
+        };
         refreshPartyState();
     }
 
@@ -68,6 +78,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         modalH = Math.min(280, height - 40);
         modalX = (width - modalW) / 2;
         modalY = (height - modalH) / 2;
+
+        // Register WebSocket listener
+        AvoWebSocketManager.getInstance().unregisterListener("party_updated", partyUpdateListener);
+        AvoWebSocketManager.getInstance().registerListener("party_updated", partyUpdateListener);
 
         // Determine player state
         MinecraftClient mc = MinecraftClient.getInstance();
@@ -268,6 +282,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             });
             return null;
         });
+    }
+
+    public void onCloseModal() {
+        AvoWebSocketManager.getInstance().unregisterListener("party_updated", partyUpdateListener);
     }
 
     private void setStatus(String msg, int color) {

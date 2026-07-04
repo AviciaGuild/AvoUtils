@@ -63,9 +63,11 @@ public class ChatPartyDetector {
      * Set the party ID to track for auto-reserving
      */
     public void setTrackedPartyId(long partyId) {
-        this.trackedPartyId = partyId;
-        knownDiscordMembers.clear();
-        inGameSeenMembers.clear();
+        if (this.trackedPartyId != partyId) {
+            this.trackedPartyId = partyId;
+            knownDiscordMembers.clear();
+            inGameSeenMembers.clear();
+        }
     }
 
     public long getTrackedPartyId() {

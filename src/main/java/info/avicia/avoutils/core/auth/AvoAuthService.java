@@ -29,9 +29,20 @@ public class AvoAuthService {
 
     private final ModConfig config;
     private final HttpClient httpClient;
+    private final java.util.concurrent.ExecutorService authExecutor =
+            java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+                Thread t = new Thread(r, "AvoAuth-Worker");
+                t.setDaemon(true);
+                return t;
+            });
+
+    private static final long TOKEN_TTL_MS = 23 * 60 * 60 * 1000L; // 23 hours
 
     private final Object authLock = new Object();
     private volatile String sessionToken = null;
+    private volatile long sessionTokenExpiry = 0;
+    private volatile long invalidatedGeneration = 0;
+    private volatile Boolean cachedGuildMember = null;
     private CompletableFuture<String> activeAuthFuture = null;
 
     private AvoAuthService(ModConfig config) {
@@ -39,6 +50,7 @@ public class AvoAuthService {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
+        Runtime.getRuntime().addShutdownHook(new Thread(authExecutor::shutdownNow, "AvoAuth-Shutdown"));
     }
 
     public static synchronized void initialize(ModConfig config) {
@@ -49,7 +61,7 @@ public class AvoAuthService {
 
     public static synchronized AvoAuthService getInstance() {
         if (instance == null) {
-            instance = new AvoAuthService(ModConfig.load());
+            throw new IllegalStateException("AvoAuthService not initialized.");
         }
         return instance;
     }
@@ -57,20 +69,40 @@ public class AvoAuthService {
     public void invalidateToken() {
         synchronized (authLock) {
             sessionToken = null;
+            sessionTokenExpiry = 0;
+            cachedGuildMember = null;
+            invalidatedGeneration++;
         }
+    }
+
+    public Boolean getCachedGuildMember() {
+        return cachedGuildMember;
+    }
+
+    public void setCachedGuildMember(Boolean guildMember) {
+        cachedGuildMember = guildMember;
     }
 
     public CompletableFuture<String> getSessionToken() {
         synchronized (authLock) {
-            if (sessionToken != null) {
+            if (sessionToken != null && System.currentTimeMillis() < sessionTokenExpiry) {
                 return CompletableFuture.completedFuture(sessionToken);
+            }
+            if (sessionToken != null) {
+                sessionToken = null;
+                sessionTokenExpiry = 0;
             }
             if (activeAuthFuture != null) {
                 return activeAuthFuture;
             }
+            long genAtStart = invalidatedGeneration;
             activeAuthFuture = fetchSessionTokenAsync().thenApply(token -> {
                 synchronized (authLock) {
-                    sessionToken = token;
+                    // Discard token if invalidateToken() was called during auth
+                    if (genAtStart == invalidatedGeneration) {
+                        sessionToken = token;
+                        sessionTokenExpiry = System.currentTimeMillis() + TOKEN_TTL_MS;
+                    }
                     activeAuthFuture = null;
                 }
                 return token;
@@ -90,7 +122,7 @@ public class AvoAuthService {
         if (uuid == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Not logged into Minecraft."));
         }
-        String uuidStr = uuid.toString().replace("-", "");
+        String uuidStr = uuid.toString();
 
         // Get challenge
         HttpRequest challengeReq = HttpRequest.newBuilder()
@@ -122,7 +154,7 @@ public class AvoAuthService {
                         } catch (Exception e) {
                             throw new RuntimeException("Mojang authentication failed: " + e.getMessage(), e);
                         }
-                    }).thenApply(v -> challenge);
+                    }, authExecutor).thenApply(v -> challenge);
                 })
                 .thenCompose(challenge -> {
                     // Post to login
@@ -148,6 +180,7 @@ public class AvoAuthService {
                     if (apiResp == null || apiResp.token == null) {
                         throw new RuntimeException("Invalid login response: missing token");
                     }
+                    cachedGuildMember = apiResp.guild_member;
                     return apiResp.token;
                 });
     }
@@ -155,5 +188,6 @@ public class AvoAuthService {
     private static class AuthApiResponse {
         public String challenge;
         public String token;
+        public Boolean guild_member;
     }
 }

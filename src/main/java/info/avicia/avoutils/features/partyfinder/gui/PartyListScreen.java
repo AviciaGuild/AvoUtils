@@ -12,9 +12,12 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import com.google.gson.JsonObject;
 
 /**
  * Main pfinder screen. Shows all active parties as a scrollable list.
@@ -32,6 +35,10 @@ public class PartyListScreen extends Screen {
     private List<PartyData> parties = new ArrayList<>();
     private boolean loading = true;
     private String errorMessage = null;
+
+    private final Consumer<JsonObject> partyListListener = json -> {
+        fetchParties();
+    };
 
     // Scroll state
     private int scrollOffset = 0;
@@ -67,6 +74,10 @@ public class PartyListScreen extends Screen {
 
         // Fetch parties on open
         fetchParties();
+
+        // Register WebSocket listener
+        AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
+        AvoWebSocketManager.getInstance().registerListener("party_list_updated", partyListListener);
 
         // Run `/party list` automatically to sync in-game party members
         chatDetector.triggerPartyList();
@@ -139,8 +150,20 @@ public class PartyListScreen extends Screen {
     }
 
     public void closeModal() {
+        if (activeModal instanceof PartyDetailModal detailModal) {
+            detailModal.onCloseModal();
+        }
         activeModal = null;
         fetchParties();
+    }
+
+    @Override
+    public void close() {
+        AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
+        if (activeModal instanceof PartyDetailModal detailModal) {
+            detailModal.onCloseModal();
+        }
+        super.close();
     }
 
     // ── Rendering ────────────────────────────────────────────────────────

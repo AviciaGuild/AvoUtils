@@ -3,6 +3,7 @@ package info.avicia.avoutils.features.chatbridge;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
+import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import info.avicia.avoutils.core.util.WynnPillUtil;
@@ -33,27 +34,51 @@ public class ChatBridgeFeature implements AvoFeature {
             Pattern.CASE_INSENSITIVE);
 
     private ModConfig config;
-    
+
     // Deduplication state for outgoing messages
     private String lastOutgoingKey = null;
     private long lastOutgoingTime = 0;
     private static final long DEDUPE_WINDOW_MS = 750;
+    private static final String AVATAR_URL_BASE = "https://mc-heads.net/avatar/";
+
+    // Event type constants
+    private static final String EVT_DISCORD_CHAT = "discord_chat";
+    private static final String EVT_GUILD_CHAT = "guild_chat";
+    private static final String EVT_BRIDGE_STATUS = "bridge_status";
+
+    private static MutableText createChatPrefix() {
+        return WynnPillUtil.create("AvoBridge", Formatting.DARK_AQUA, Formatting.WHITE)
+                .append(Text.literal(" "));
+    }
+
+    private boolean isGuildMember() {
+        Boolean cached = AvoAuthService.getInstance().getCachedGuildMember();
+        return cached != null && cached;
+    }
+
+    private boolean isBridgeActive() {
+        return config.chatBridgeEnabled && isGuildMember();
+    }
 
     @Override
     public void initialize(ModConfig config) {
         this.config = config;
 
+        if (!isGuildMember()) {
+            AvoUtilsMod.LOGGER.info("[ChatBridge] User is not a guild member. Chat bridge disabled.");
+        }
+
         // Register listener for Discord chat events
-        AvoWebSocketManager.getInstance().registerListener("discord_chat", json -> {
-            if (!config.chatBridgeEnabled) {
+        AvoWebSocketManager.getInstance().registerListener(EVT_DISCORD_CHAT, json -> {
+            if (!isBridgeActive()) {
                 return;
             }
             if (json.has("username") && json.has("message")) {
                 String username = json.get("username").getAsString();
                 String message = json.get("message").getAsString();
-                
+
                 if (MinecraftClient.getInstance().player != null) {
-                    MutableText prefix = WynnPillUtil.create("AvoBridge", Formatting.DARK_AQUA, Formatting.WHITE).append(Text.literal(" "));
+                    MutableText prefix = createChatPrefix();
                     MutableText formatted = prefix
                             .append(Text.literal(username).formatted(Formatting.DARK_AQUA))
                             .append(Text.literal(": ").formatted(Formatting.GRAY))
@@ -63,15 +88,24 @@ public class ChatBridgeFeature implements AvoFeature {
             }
         });
 
-        // Register connection demand lease
-        AvoWebSocketManager.getInstance().registerConnectionDemand("chatbridge", () -> config.chatBridgeEnabled);
+        // Register listener for bridge_status events (backend pushes guild membership changes)
+        AvoWebSocketManager.getInstance().registerListener(EVT_BRIDGE_STATUS, json -> {
+            if (json.has("guild_member")) {
+                boolean guildMember = json.get("guild_member").getAsBoolean();
+                AvoAuthService.getInstance().setCachedGuildMember(guildMember);
+                AvoUtilsMod.LOGGER.info("[ChatBridge] Guild membership updated via bridge_status: {}", guildMember);
+            }
+        });
+
+        // Register connection demand lease (only if user has it enabled and is a guild member)
+        AvoWebSocketManager.getInstance().registerConnectionDemand("chatbridge", this::isBridgeActive);
 
         registerCommand();
         AvoUtilsMod.LOGGER.info("[ChatBridge] Initialized.");
     }
 
     public void onSystemChat(Text message) {
-        if (!config.chatBridgeEnabled) {
+        if (!isBridgeActive()) {
             return;
         }
         if (!AvoWebSocketManager.getInstance().isConnected()) {
@@ -104,6 +138,11 @@ public class ChatBridgeFeature implements AvoFeature {
             }
         }
 
+        if (!isValidUsername(realUsername)) {
+            AvoUtilsMod.LOGGER.warn("[ChatBridge] Dropping guild chat: username '{}' does not match Minecraft pattern", realUsername);
+            return;
+        }
+
         if (isDuplicateOutgoing(realUsername, content)) {
             return;
         }
@@ -111,14 +150,14 @@ public class ChatBridgeFeature implements AvoFeature {
         JsonObject payload = new JsonObject();
         payload.addProperty("username", realUsername);
         payload.addProperty("message", content);
-        
-        String avatarUrl = "https://mc-heads.net/avatar/" + realUsername + "/128";
+
+        String avatarUrl = AVATAR_URL_BASE + realUsername + "/128";
         payload.addProperty("avatar_url", avatarUrl);
-        
-        AvoWebSocketManager.getInstance().sendEvent("guild_chat", payload);
+
+        AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_CHAT, payload);
     }
 
-    public static boolean hasLeadingGuildChatColor(Text message) {
+    private static boolean hasLeadingGuildChatColor(Text message) {
         if (message == null) {
             return false;
         }
@@ -205,16 +244,25 @@ public class ChatBridgeFeature implements AvoFeature {
             dispatcher.register(
                     ClientCommandManager.literal("avobridge")
                             .executes(context -> {
+                                MutableText prefix = createChatPrefix();
+
+                                // Block enabling the bridge if user is not a guild member
+                                if (!config.chatBridgeEnabled && !isGuildMember()) {
+                                    MutableText blocked = prefix.append(Text.literal("Chat bridge is unavailable: you are not in Avicia.").formatted(Formatting.RED));
+                                    MinecraftClient.getInstance().player.sendMessage(blocked, false);
+                                    return 1;
+                                }
+
+                                // Toggle the chat bridge enabled state and save the config
                                 config.chatBridgeEnabled = !config.chatBridgeEnabled;
                                 config.save();
-                                String status = config.chatBridgeEnabled ? "§aenabled" : "§cdisabled";
-                                MinecraftClient.getInstance().player.sendMessage(
-                                        Text.literal("§d[AvoBridge] §7Chat bridge is now " + status + "§7."),
-                                        false
-                                    );
-                                if (!config.chatBridgeEnabled) {
-                                    AvoWebSocketManager.getInstance().disconnect();
-                                }
+                                Formatting statusColor = config.chatBridgeEnabled ? Formatting.GREEN : Formatting.RED;
+                                String statusWord = config.chatBridgeEnabled ? "enabled" : "disabled";
+                                MutableText formatted = prefix
+                                        .append(Text.literal("Chat bridge is now ").formatted(Formatting.GRAY))
+                                        .append(Text.literal(statusWord).formatted(statusColor))
+                                        .append(Text.literal(".").formatted(Formatting.GRAY));
+                                MinecraftClient.getInstance().player.sendMessage(formatted, false);
                                 return 1;
                             })
             );
