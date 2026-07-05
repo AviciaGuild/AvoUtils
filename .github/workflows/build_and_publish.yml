@@ -94,13 +94,13 @@ jobs:
           prerelease: ${{ contains(steps.determine_version.outputs.version, '-') }}
           generate_release_notes: true
 
-      # - name: Publish to Modrinth
-      #   if: steps.determine_version.outputs.should_publish == 'true'
-      #   uses: Kir-Antipov/mc-publish@v3.3
-      #   with:
-      #     modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
-      #     modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-      #     files: |
-      #       build/libs/avoutils-*.jar
-      #       !build/libs/avoutils-*-sources.jar
-      #       !build/libs/avoutils-*-dev.jar
+      - name: Publish to Modrinth
+        if: steps.determine_version.outputs.should_publish == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: |
+            build/libs/avoutils-*.jar
+            !build/libs/avoutils-*-sources.jar
+            !build/libs/avoutils-*-dev.jar
