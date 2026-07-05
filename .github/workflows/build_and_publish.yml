@@ -50,22 +50,26 @@ jobs:
             VERSION="${VERSION#v}"
             TAG_NAME="${{ github.ref_name }}"
             SHOULD_PUBLISH="true"
+            SHOULD_PUBLISH_MODRINTH="true"
             echo "Publishing release version: $VERSION from tag"
           elif [[ "${{ github.ref }}" == refs/heads/main && "${{ github.event_name }}" == "push" ]]; then
-            VERSION="${BASE_VERSION}+build.${{ github.run_number }}"
+            VERSION="${BASE_VERSION}-beta.${{ github.run_number }}"
             TAG_NAME="v${VERSION}"
             SHOULD_PUBLISH="true"
-            echo "Publishing build version: $VERSION from main push"
+            SHOULD_PUBLISH_MODRINTH="false"
+            echo "Publishing build version: $VERSION from main push (GitHub only)"
           else
             VERSION="${BASE_VERSION}-dev.${{ github.run_number }}"
             TAG_NAME=""
             SHOULD_PUBLISH="false"
+            SHOULD_PUBLISH_MODRINTH="false"
             echo "Building dev version: $VERSION (no publishing)"
           fi
           
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "should_publish=${SHOULD_PUBLISH}" >> $GITHUB_OUTPUT
+          echo "should_publish_modrinth=${SHOULD_PUBLISH_MODRINTH}" >> $GITHUB_OUTPUT
 
       - name: Build Mod with Gradle
         run: |
@@ -95,7 +99,7 @@ jobs:
           generate_release_notes: true
 
       - name: Publish to Modrinth
-        if: steps.determine_version.outputs.should_publish == 'true'
+        if: steps.determine_version.outputs.should_publish_modrinth == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
