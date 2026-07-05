@@ -104,6 +104,7 @@ jobs:
         with:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
           files: |
             build/libs/avoutils-*.jar
             !build/libs/avoutils-*-sources.jar
