@@ -17,9 +17,13 @@ public class PartyFinderNotificationHandler {
     private static final String EVT_PARTY_MEMBER_JOINED = "party_member_joined";
     private static final String EVT_PARTY_FILLED = "party_filled";
 
+    private static final Formatting PILL_BG = Formatting.AQUA;
+    private static final Formatting PILL_FG = Formatting.BLACK;
+    private static final Formatting ARROW_COLOR = Formatting.GRAY;
+
     private static MutableText createPrefix() {
-        return WynnPillUtil.create("AvoUtils", Formatting.DARK_AQUA, Formatting.WHITE)
-                .append(Text.literal(" "));
+        return WynnPillUtil.create("AvoUtils", PILL_BG, PILL_FG)
+                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
     }
 
     private static boolean isSelf(String leaderName) {

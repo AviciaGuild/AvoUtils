@@ -1,6 +1,7 @@
 package info.avicia.avoutils.core.util;
 
 import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
@@ -19,15 +20,19 @@ public final class WynnPillUtil {
 
     public static MutableText create(String label, Formatting backgroundColor, Formatting foregroundColor) {
         MutableText pill = Text.empty();
-        pill.append(Text.literal(PILL_CORNER_LEFT).formatted(backgroundColor));
+        pill.append(Text.literal(PILL_CORNER_LEFT)
+                .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
 
         for (int i = 0; i < label.length(); i++) {
             String glyph = toWynncraftGlyph(label.charAt(i));
-            pill.append(Text.literal(PILL_BG_BACK).formatted(backgroundColor));
-            pill.append(Text.literal(PILL_BG_FRONT + glyph).formatted(foregroundColor));
+            pill.append(Text.literal(PILL_BG_BACK)
+                    .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
+            pill.append(Text.literal(PILL_BG_FRONT + glyph)
+                    .setStyle(Style.EMPTY.withColor(foregroundColor).withoutShadow()));
         }
 
-        pill.append(Text.literal(PILL_CORNER_RIGHT).formatted(backgroundColor));
+        pill.append(Text.literal(PILL_CORNER_RIGHT)
+                .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
         return pill;
     }
 

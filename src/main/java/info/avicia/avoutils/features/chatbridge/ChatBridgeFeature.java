@@ -46,9 +46,19 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_GUILD_CHAT = "guild_chat";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
+    private static final Formatting PILL_BG = Formatting.AQUA;
+    private static final Formatting PILL_FG = Formatting.BLACK;
+    private static final Formatting PILL_ERR_BG = Formatting.RED;
+    private static final Formatting ARROW_COLOR = Formatting.GRAY;
+
     private static MutableText createChatPrefix() {
-        return WynnPillUtil.create("AvoBridge", Formatting.DARK_AQUA, Formatting.WHITE)
-                .append(Text.literal(" "));
+        return WynnPillUtil.create("AvoBridge", PILL_BG, PILL_FG)
+                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
+    }
+
+    private static MutableText createErrorPrefix() {
+        return WynnPillUtil.create("AvoBridge", PILL_ERR_BG, PILL_FG)
+                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
     }
 
     private boolean isGuildMember() {
@@ -81,7 +91,7 @@ public class ChatBridgeFeature implements AvoFeature {
                     MutableText prefix = createChatPrefix();
                     MutableText formatted = prefix
                             .append(Text.literal(username).formatted(Formatting.DARK_AQUA))
-                            .append(Text.literal(": ").formatted(Formatting.GRAY))
+                            .append(Text.literal(": ").formatted(Formatting.DARK_AQUA))
                             .append(Text.literal(message).formatted(Formatting.AQUA));
                     MinecraftClient.getInstance().player.sendMessage(formatted, false);
                 }
@@ -244,11 +254,10 @@ public class ChatBridgeFeature implements AvoFeature {
             dispatcher.register(
                     ClientCommandManager.literal("avobridge")
                             .executes(context -> {
-                                MutableText prefix = createChatPrefix();
-
                                 // Block enabling the bridge if user is not a guild member
                                 if (!config.chatBridgeEnabled && !isGuildMember()) {
-                                    MutableText blocked = prefix.append(Text.literal("Chat bridge is unavailable: you are not in Avicia.").formatted(Formatting.RED));
+                                    MutableText blocked = createErrorPrefix()
+                                            .append(Text.literal("Chat bridge is unavailable: you are not in Avicia.").formatted(Formatting.RED));
                                     MinecraftClient.getInstance().player.sendMessage(blocked, false);
                                     return 1;
                                 }
@@ -258,7 +267,7 @@ public class ChatBridgeFeature implements AvoFeature {
                                 config.save();
                                 Formatting statusColor = config.chatBridgeEnabled ? Formatting.GREEN : Formatting.RED;
                                 String statusWord = config.chatBridgeEnabled ? "enabled" : "disabled";
-                                MutableText formatted = prefix
+                                MutableText formatted = createChatPrefix()
                                         .append(Text.literal("Chat bridge is now ").formatted(Formatting.GRAY))
                                         .append(Text.literal(statusWord).formatted(statusColor))
                                         .append(Text.literal(".").formatted(Formatting.GRAY));
