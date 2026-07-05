@@ -52,7 +52,7 @@ jobs:
             SHOULD_PUBLISH="true"
             echo "Publishing release version: $VERSION from tag"
           elif [[ "${{ github.ref }}" == refs/heads/main && "${{ github.event_name }}" == "push" ]]; then
-            VERSION="${BASE_VERSION}-build.${{ github.run_number }}"
+            VERSION="${BASE_VERSION}+build.${{ github.run_number }}"
             TAG_NAME="v${VERSION}"
             SHOULD_PUBLISH="true"
             echo "Publishing build version: $VERSION from main push"
