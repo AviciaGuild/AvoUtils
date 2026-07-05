@@ -110,7 +110,9 @@ public class AvoAuthService {
                 synchronized (authLock) {
                     activeAuthFuture = null;
                 }
-                throw new RuntimeException("Authentication failed: " + ex.getMessage(), ex);
+                Throwable cause = ex.getCause();
+                String msg = cause != null ? cause.getMessage() : ex.getMessage();
+                throw new RuntimeException(msg, ex);
             });
             return activeAuthFuture;
         }
@@ -174,7 +176,8 @@ public class AvoAuthService {
                 })
                 .thenApply(response -> {
                     if (response.statusCode() != 200) {
-                        throw new RuntimeException("Login failed (HTTP " + response.statusCode() + ")");
+                        String errorMsg = extractErrorMessage(response.body());
+                        throw new RuntimeException(errorMsg != null ? errorMsg : "Login failed (HTTP " + response.statusCode() + ")");
                     }
                     AuthApiResponse apiResp = GSON.fromJson(response.body(), AuthApiResponse.class);
                     if (apiResp == null || apiResp.token == null) {
@@ -183,6 +186,17 @@ public class AvoAuthService {
                     cachedGuildMember = apiResp.guild_member;
                     return apiResp.token;
                 });
+    }
+
+    private static String extractErrorMessage(String responseBody) {
+        try {
+            JsonObject json = GSON.fromJson(responseBody, JsonObject.class);
+            if (json != null && json.has("error")) {
+                return json.get("error").getAsString();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private static class AuthApiResponse {

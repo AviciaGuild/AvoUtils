@@ -144,7 +144,8 @@ public class AvoWebSocketManager {
         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Requesting authentication token...");
         AvoAuthService.getInstance().getSessionToken().whenComplete((token, throwable) -> {
             if (throwable != null) {
-                AvoUtilsMod.LOGGER.error("[AvoWebSocket] Failed to retrieve session token", throwable);
+                String msg = throwable.getCause() != null ? throwable.getCause().getMessage() : throwable.getMessage();
+                AvoUtilsMod.LOGGER.error("[AvoWebSocket] Failed to retrieve session token: {}", msg);
                 isConnecting.set(false);
                 consecutiveFailures++;
                 return;
