@@ -8,9 +8,9 @@ import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ModalOverlay;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.Click;
 import net.minecraft.text.Text;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
@@ -35,6 +35,10 @@ public class PartyListScreen extends Screen {
     private List<PartyData> parties = new ArrayList<>();
     private boolean loading = true;
     private String errorMessage = null;
+
+    private FlatButtonWidget createPartyButton;
+    private FlatButtonWidget viewPartyButton;
+    private FlatButtonWidget inviteAllButton;
 
     private final Consumer<JsonObject> partyListListener = json -> {
         fetchParties();
@@ -61,11 +65,30 @@ public class PartyListScreen extends Screen {
         // Top bar buttons
         int buttonY = 8;
 
-        // Refresh button (top-left)
+        // Refresh button
         addDrawableChild(new FlatButtonWidget(SIDE_PADDING, buttonY, 80, 20, Text.literal("⟳ Refresh"), () -> fetchParties()));
 
-        // Create Party button (top-right)
-        addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Text.literal("+ Create Party"), () -> openCreateModal()));
+        // Create Party button
+        createPartyButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Text.literal("+ Create Party"), () -> openCreateModal()));
+        createPartyButton.visible = true;
+
+        // View Party button (when party owned)
+        viewPartyButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 80, buttonY, 80, 20, Text.literal("View Party"), () -> {
+            PartyData ownedParty = getOwnedParty();
+            if (ownedParty != null) {
+                openDetailModal(ownedParty);
+            }
+        }));
+        viewPartyButton.visible = false;
+
+        // Invite All button (when party owned)
+        inviteAllButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 155, buttonY, 70, 20, Text.literal("Invite All"), () -> {
+            PartyData ownedParty = getOwnedParty();
+            if (ownedParty != null) {
+                inviteHandler.inviteAll(ownedParty, client.getSession().getUsername());
+            }
+        }));
+        inviteAllButton.visible = false;
 
         // Re-initialize active modal if present on resize
         if (activeModal instanceof ModalOverlay modal) {
@@ -89,13 +112,14 @@ public class PartyListScreen extends Screen {
         loading = true;
         errorMessage = null;
         apiClient.listParties().thenAccept(result -> {
-            MinecraftClient.getInstance().execute(() -> {
+            client.execute(() -> {
                 parties = result;
                 loading = false;
 
                 // Track if we are leading any active party
-                String selfName = MinecraftClient.getInstance().getSession().getUsername();
+                String selfName = client.getSession().getUsername();
                 boolean isLeadingAny = false;
+                PartyData ownedParty = null;
                 for (PartyData p : result) {
                     if (p.leaderName != null && p.leaderName.equalsIgnoreCase(selfName)) {
                         chatDetector.setTrackedPartyId(p.partyId);
@@ -107,22 +131,44 @@ public class PartyListScreen extends Screen {
                             chatDetector.addKnownMembers(memberNames);
                         }
                         isLeadingAny = true;
+                        ownedParty = p;
                         break;
                     }
                 }
                 if (!isLeadingAny) {
                     chatDetector.clearTracking();
                 }
+
+                // Update button visibilities
+                if (ownedParty != null) {
+                    createPartyButton.visible = false;
+                    viewPartyButton.visible = true;
+                    inviteAllButton.visible = true;
+                } else {
+                    createPartyButton.visible = true;
+                    viewPartyButton.visible = false;
+                    inviteAllButton.visible = false;
+                }
             });
         }).exceptionally(ex -> {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
             AvoUtilsMod.LOGGER.warn("Failed to fetch parties: {}", cause.getMessage());
-            MinecraftClient.getInstance().execute(() -> {
+            client.execute(() -> {
                 errorMessage = cause.getMessage() != null ? cause.getMessage() : "Failed to load parties.";
                 loading = false;
             });
             return null;
         });
+    }
+
+    private PartyData getOwnedParty() {
+        String selfName = client.getSession().getUsername();
+        for (PartyData p : parties) {
+            if (p.leaderName != null && p.leaderName.equalsIgnoreCase(selfName)) {
+                return p;
+            }
+        }
+        return null;
     }
 
     // ── Modal management ─────────────────────────────────────────────────
@@ -269,7 +315,7 @@ public class PartyListScreen extends Screen {
     // ── Input handling ───────────────────────────────────────────────────
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean boolean_arg) {
+    public boolean mouseClicked(Click click, boolean boolean_arg) {
         if (errorMessage != null) {
             return false;
         }

@@ -38,7 +38,7 @@ public class PartyFinderNotificationHandler {
                 String username = json.get("username").getAsString();
 
                 MinecraftClient mc = MinecraftClient.getInstance();
-                if (isSelf(leaderName) && mc.player != null) {
+                if (mc.player != null && isSelf(leaderName) && !isSelf(username)) {
                     MutableText formatted = createPrefix()
                             .append(Text.literal(username).formatted(Formatting.WHITE))
                             .append(Text.literal(" has joined your party!").formatted(Formatting.GRAY));

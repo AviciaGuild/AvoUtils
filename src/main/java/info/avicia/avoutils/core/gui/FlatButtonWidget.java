@@ -3,6 +3,7 @@ package info.avicia.avoutils.core.gui;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.text.Text;
@@ -13,6 +14,10 @@ public class FlatButtonWidget extends ClickableWidget {
     private boolean isDanger = false;
     private boolean borderless = false;
 
+    private Integer selectedBorderColor = null;
+    private Integer selectedBgColor = null;
+    private Integer selectedTextColor = null;
+
     public FlatButtonWidget(int x, int y, int width, int height, Text message, Runnable onPress) {
         super(x, y, width, height, message);
         this.onPress = onPress;
@@ -20,6 +25,12 @@ public class FlatButtonWidget extends ClickableWidget {
 
     public void setSelected(boolean selected) {
         this.selected = selected;
+    }
+
+    public void setSelectedColors(int border, int bg, int text) {
+        this.selectedBorderColor = border;
+        this.selectedBgColor = bg;
+        this.selectedTextColor = text;
     }
 
     public void setDanger(boolean danger) {
@@ -31,7 +42,7 @@ public class FlatButtonWidget extends ClickableWidget {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean boolean_arg) {
+    public boolean mouseClicked(Click click, boolean boolean_arg) {
         if (this.active && this.visible && click.button() == 0) {
             int x = getX();
             int y = getY();
@@ -68,13 +79,18 @@ public class FlatButtonWidget extends ClickableWidget {
             }
         } else {
             // Background
-            int bgColor = selected ? 0xF2222232 : (hovered ? 0xF22A2D3C : 0xD5161622);
+            int bgColor;
+            if (selected) {
+                bgColor = (selectedBgColor != null) ? selectedBgColor : 0x258A9CFE;
+            } else {
+                bgColor = hovered ? 0xF22A2D3C : 0xD5161622;
+            }
             context.fill(x, y, x + w, y + h, bgColor);
 
             // Border color
             int borderColor;
             if (selected) {
-                borderColor = 0xFF55FF55;
+                borderColor = (selectedBorderColor != null) ? selectedBorderColor : 0xFF8A9CFE;
             } else if (isDanger) {
                 borderColor = hovered ? 0xFFFF4D4D : 0xAAFF4D4D;
             } else {
@@ -93,7 +109,7 @@ public class FlatButtonWidget extends ClickableWidget {
 
         int textColor;
         if (selected) {
-            textColor = 0xFF55FF55;
+            textColor = (selectedTextColor != null) ? selectedTextColor : 0xFF8A9CFE;
         } else if (isDanger) {
             textColor = hovered ? 0xFFFF4D4D : 0xFFAA4444;
         } else {

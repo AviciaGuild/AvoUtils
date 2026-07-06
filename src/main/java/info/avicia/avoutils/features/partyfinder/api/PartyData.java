@@ -29,9 +29,23 @@ public class PartyData {
          */
         public String displayName() {
             if (guildTag != null && !guildTag.isEmpty()) {
-                return name + " [" + guildTag + "]";
+                return name + " §7[" + guildTag + "]";
             }
             return name;
+        }
+
+        /**
+         * Get the role icon character for a given role string
+         */
+        public static String getStyledRolePrefix(String role) {
+            if (role == null) return "§7\uD83E\uDDE9"; // 🧩
+            return switch (role.toLowerCase()) {
+                case "dps" -> "§c\uD83D\uDDE1"; // 🗡
+                case "healer" -> "§d\u2764"; // ❤
+                case "tank" -> "§9\uD83D\uDEE1"; // 🛡
+                case "other" -> "§7\uD83E\uDDE9"; // 🧩
+                default -> "§7\uD83E\uDDE9"; // 🧩
+            };
         }
 
         /**
@@ -41,14 +55,7 @@ public class PartyData {
             if (isReserved && role == null) {
                 return "§7\uD83D\uDD12"; // 🔒
             }
-            if (role == null) return "§7\uD83E\uDDE9"; // 🧩
-            return switch (role) {
-                case "dps" -> "§c\u2694"; // ⚔
-                case "healer" -> "§d\u2764"; // ❤
-                case "tank" -> "§9\uD83D\uDEE1"; // 🛡
-                case "other" -> "§7\uD83E\uDDE9"; // 🧩
-                default -> "§7\uD83E\uDDE9"; // 🧩
-            };
+            return getStyledRolePrefix(role);
         }
     }
 }

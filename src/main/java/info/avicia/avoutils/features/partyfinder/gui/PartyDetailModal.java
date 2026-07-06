@@ -8,7 +8,9 @@ import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.Click;
 import net.minecraft.text.Text;
+import net.minecraft.text.OrderedText;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
@@ -45,7 +47,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     private final List<MemberRow> memberRows = new ArrayList<>();
  
     // Cached note wrapping layout calculations to avoid per-frame text wrapping overhead
-    private List<net.minecraft.text.OrderedText> wrappedNote = null;
+    private List<OrderedText> wrappedNote = null;
     private int noteLinesCount = 0;
 
     private final Consumer<JsonObject> partyUpdateListener;
@@ -109,9 +111,9 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         if (isLeader) {
             totalButtonsWidth = 70 + 5 + 50 + 5 + 60 + 5 + 60; // Invite All (70) + Edit (50) + Reserve (60) + Disband (60)
         } else if (isInParty) {
-            totalButtonsWidth = 60 + 5 + (50 * 4 + 15); // Leave (60) + 4 role buttons (50 each)
+            totalButtonsWidth = 60 + 5 + (60 * 4 + 15); // Leave (60) + 4 role buttons (60 each)
         } else if (!party.isFull) {
-            totalButtonsWidth = 75 * 4 + 15; // 4 join buttons (75 each)
+            totalButtonsWidth = 60 * 4 + 15; // 4 join buttons (60 each)
         }
 
         int btnY = modalY + modalH - 30;
@@ -147,15 +149,17 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             btnX += 65;
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
-                addDrawableChild(new FlatButtonWidget(btnX, btnY, 50, 20, Text.literal(role), () -> changeRole(r.toLowerCase())));
-                btnX += 55;
+                String icon = PartyData.MemberData.getStyledRolePrefix(r);
+                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> changeRole(r.toLowerCase())));
+                btnX += 65;
             }
         } else if (!party.isFull) {
             // Join buttons
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
-                addDrawableChild(new FlatButtonWidget(btnX, btnY, 75, 20, Text.literal("Join as " + role), () -> joinParty(r.toLowerCase())));
-                btnX += 80;
+                String icon = PartyData.MemberData.getStyledRolePrefix(r);
+                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> joinParty(r.toLowerCase())));
+                btnX += 65;
             }
         }
         updateWrappedNote();
@@ -174,26 +178,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     // ── Actions ──────────────────────────────────────────────────────────
 
     private void inviteAll() {
-        List<String> names = new ArrayList<>();
-        for (PartyData.MemberData member : party.members.values()) {
-            if (member.name != null 
-                    && !member.name.isEmpty() 
-                    && !member.name.equalsIgnoreCase("<RESERVED>") 
-                    && !member.name.equalsIgnoreCase(playerName)) {
-
-                boolean alreadyInGame = false;
-                for (String inGameName : parent.getChatDetector().getLastPartyListMembers()) {
-                    if (inGameName.equalsIgnoreCase(member.name)) {
-                        alreadyInGame = true;
-                        break;
-                    }
-                }
-                if (!alreadyInGame) {
-                    names.add(member.name);
-                }
-            }
-        }
-        inviteHandler.queueInvites(names);
+        List<String> names = inviteHandler.inviteAll(party, playerName);
         setStatus("Inviting " + names.size() + " players...", 0x55FF55);
     }
 
@@ -306,27 +291,33 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int textX = modalX + 12;
         int metaY = modalY + 30;
 
-        // Metadata panel card (leader, region, note) - uses pre-wrapped fields cached in init()
-
-        int cardH = 20 + (noteLinesCount > 0 ? noteLinesCount * 12 : 0);
+        // Metadata panel card (leader, region, note)
+        int topPadding = 8;
+        int bottomPadding = 8;
+        int noteGap = 6;
+        int lineH = 10;
+        int cardH = topPadding + lineH + bottomPadding;
+        if (noteLinesCount > 0) {
+            cardH += noteGap + (noteLinesCount * 12);
+        }
 
         // Panel background
-        context.fill(modalX + 8, metaY, modalX + modalW - 8, metaY + cardH, 0x1A8A9CFE);
+        context.fill(modalX + 8, metaY, modalX + modalW - 8, metaY + cardH, 0xD5161622);
 
-        // Panel borders
-        int metaBorder = 0x308A9CFE;
-        CompatibilityHelper.drawBorder(context, modalX + 8, metaY, modalW - 16, cardH, metaBorder);
+        // Left accent bar
+        int accentColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+        context.fill(modalX + 8, metaY + 1, modalX + 10, metaY + cardH - 1, accentColor);
 
         // Leader and region
         String region = party.region != null ? party.region : "Any";
         String detailsStr = "§7Leader: §f" + party.leaderName + "   §8|   §7Region: §f" + region;
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(detailsStr), textX + 4, metaY + 6, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(detailsStr), modalX + 16, metaY + topPadding, 0xFFFFFFFF);
 
         // Note
         if (wrappedNote != null) {
-            int noteY = metaY + 18;
-            for (net.minecraft.text.OrderedText line : wrappedNote) {
-                context.drawText(textRenderer, line, textX + 4, noteY, 0xFFFFFFFF, true);
+            int noteY = metaY + topPadding + lineH + noteGap;
+            for (OrderedText line : wrappedNote) {
+                context.drawText(textRenderer, line, modalX + 16, noteY, 0xFFFFFFFF, true);
                 noteY += 12;
             }
         }
@@ -342,21 +333,30 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int slotsX = modalX + modalW - 12 - slotsW;
         CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsColorCode + slotsText), slotsX, membersHeaderY, 0xFFFFFFFF);
 
-        // Header separator line
-        context.fill(modalX + 8, membersHeaderY + 12, modalX + modalW - 8, membersHeaderY + 13, 0x20FFFFFF);
-
         // Render member rows
-        int textY = membersHeaderY + 18;
+        int textY = membersHeaderY + 17;
         memberRows.clear();
 
         List<Map.Entry<String, PartyData.MemberData>> sortedMembers = new ArrayList<>(party.members.entrySet());
+        int listY = membersHeaderY + 14;
+        int listH = sortedMembers.isEmpty() ? 16 : sortedMembers.size() * 18 - 2;
+
+        // Members list background
+        context.fill(modalX + 8, listY, modalX + modalW - 8, listY + listH, 0xD5161622);
+
+        // Left accent bar
+        accentColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+        context.fill(modalX + 8, listY + 1, modalX + 10, listY + listH - 1, accentColor);
+
         for (int i = 0; i < sortedMembers.size(); i++) {
             Map.Entry<String, PartyData.MemberData> entry = sortedMembers.get(i);
             PartyData.MemberData member = entry.getValue();
 
             // Row background
-            int rowBg = (i % 2 == 0) ? 0x10FFFFFF : 0x05FFFFFF;
-            context.fill(modalX + 8, textY - 2, modalX + modalW - 8, textY + 12, rowBg);
+            int rowBg = (i % 2 == 0) ? 0x30000000 : 0x00000000;
+            if (rowBg != 0) {
+                context.fill(modalX + 8, textY - 3, modalX + modalW - 8, textY + 13, rowBg);
+            }
 
             // Icon color
             String prefix = member.getStyledRolePrefix();
@@ -371,23 +371,23 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 int kickX = modalX + modalW - 24;
                 boolean kickHovered = isKickButtonHovered(mouseX, mouseY, kickX, textY);
                 if (kickHovered) {
-                    context.fill(kickX - 4, textY - 1, kickX + 10, textY + 11, 0x40FF4D4D);
+                    context.fill(kickX - 4, textY - 2, kickX + 10, textY + 12, 0x40FF4D4D);
                 }
                 int kickColor = kickHovered ? 0xFFFF4D4D : 0xFFAA4444;
                 CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("✕"), kickX, textY + 1, kickColor);
             }
 
             memberRows.add(new MemberRow(entry.getKey(), textY));
-            textY += 16;
+            textY += 18;
         }
 
         // Status message
         if (statusMessage != null) {
-            List<net.minecraft.text.OrderedText> wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+            List<OrderedText> wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
             int statusBottomY = modalY + modalH - 34;
             int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
             int currentY = statusStartY;
-            for (net.minecraft.text.OrderedText line : wrappedStatus) {
+            for (OrderedText line : wrappedStatus) {
                 context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
                 currentY += 10;
             }
@@ -398,7 +398,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean boolean_arg) {
+    public boolean mouseClicked(Click click, boolean boolean_arg) {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();

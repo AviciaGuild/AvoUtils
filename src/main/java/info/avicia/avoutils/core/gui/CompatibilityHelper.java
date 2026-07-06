@@ -22,13 +22,15 @@ public class CompatibilityHelper {
         context.fill(x + 3, y + 3, x + w + 3, y + h + 3, 0x7F000000);
 
         // Modal background
-        context.fill(x, y, x + w, y + h, 0xF812121C);
+        context.fill(x, y, x + w, y + h, 0xF80D0D12);
+
+        // Header background stripe
+        context.fill(x + 1, y + 1, x + w - 1, y + 24, 0xFF1A1A26);
 
         // Outline border
-        drawBorder(context, x, y, w, h, 0xFF8A9CFE);
+        drawBorder(context, x, y, w, h, 0x308A9CFE);
 
-        // Header stripe background & separator line
-        context.fill(x + 1, y + 1, x + w - 1, y + 24, 0x308A9CFE);
-        context.fill(x + 1, y + 24, x + w - 1, y + 25, 0xFF8A9CFE);
+        // Header separator line
+        drawBorder(context, x + 1, y + 24, w - 2, 1, 0x208A9CFE);
     }
 }
