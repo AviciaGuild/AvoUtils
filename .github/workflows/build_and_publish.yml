@@ -135,16 +135,25 @@ jobs:
         if: steps.determine_version.outputs.should_publish_modrinth == 'true'
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
+          MODRINTH_PROJECT_SLUG: ${{ secrets.MODRINTH_PROJECT_SLUG }}
         shell: bash
         run: |
           set -euo pipefail
+
+          project_id="$(curl --fail --show-error --silent \
+            -H "User-Agent: AviciaGuild/AvoUtils-release-workflow" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_SLUG}" | jq -r '.id')"
+
+          if [[ -z "${project_id}" || "${project_id}" == "null" ]]; then
+            echo "Failed to resolve Modrinth project ID for slug ${MODRINTH_PROJECT_SLUG}." >&2
+            exit 1
+          fi
 
           payload="$(jq -cn \
             --arg name "AvoUtils ${{ steps.determine_version.outputs.version }}" \
             --arg version_number "${{ steps.determine_version.outputs.version }}" \
             --arg changelog "${{ steps.modrinth_meta.outputs.changelog }}" \
-            --arg project_id "${MODRINTH_PROJECT_ID}" \
+            --arg project_id "${project_id}" \
             --arg minecraft_version "${{ steps.modrinth_meta.outputs.minecraft_version }}" \
             '{
               name: $name,
