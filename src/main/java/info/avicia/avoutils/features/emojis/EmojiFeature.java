@@ -9,9 +9,15 @@ import com.google.gson.reflect.TypeToken;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.core.util.WynnPillUtil;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +36,11 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
@@ -37,54 +48,102 @@ import java.util.zip.ZipOutputStream;
 
 public class EmojiFeature implements AvoFeature {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.ALWAYS)
+            .build();
     private static final Pattern SAFE_NAME_PATTERN = Pattern.compile("[^a-zA-Z0-9_.-]");
     private static final String TWEMOJI_ZIP_URL = "https://github.com/AmberWat/PixelTwemojiMC-18/releases/download/v8.0/PixelTwemojiMC-18.zip";
     private static final String TWEMOJI_RAW_JSON_PATH = "assets/twemoji/font/emoji_raw.json";
     private static final String TWEMOJI_SHORTCODES_JSON_PATH = "assets/emoji_shortcodes/lang/en_us.json";
-    private static final String TWEMOJI_PACK_NAME = "file/avoutils-twemoji.zip";
-    private static final String CUSTOM_EMOJIS_PACK_NAME = "file/avoutils-emojis";
 
-    private final Path twemojiPath = FabricLoader.getInstance().getGameDir().resolve("resourcepacks/avoutils-twemoji.zip");
-    private final Path packDir = FabricLoader.getInstance().getGameDir().resolve("resourcepacks/avoutils-emojis");
+    private final Path twemojiPath = FabricLoader.getInstance().getGameDir().resolve("avoutils/emojis/avoutils-twemoji.zip");
+    private final Path packDir = FabricLoader.getInstance().getGameDir().resolve("avoutils/emojis/avoutils-emojis");
     private final int packFormat = resolvePackFormat();
 
     private final Map<String, String> standardEmojis = new HashMap<>();
     private final Map<Integer, String> standardCharToPua = new HashMap<>();
-    private final Map<String, String> customEmojis = new HashMap<>();
+    private final Map<String, String> customEmojis = new ConcurrentHashMap<>();
+    private final Map<String, String> safeNameCache = new ConcurrentHashMap<>();
 
-    private final AtomicBoolean loading = new AtomicBoolean(false);
+    private ModConfig config;
+
+    private final AtomicBoolean downloadingTwemoji = new AtomicBoolean(false);
+    private final AtomicBoolean loadingEmojis = new AtomicBoolean(false);
+
     private volatile EmojiTrie activeTrie = new EmojiTrie();
+    private volatile boolean packsLoaded = false;
     private FontConfig standardFontConfig;
 
     public EmojiTrie getActiveTrie() {
         return activeTrie;
     }
 
+    public boolean isEnabled() {
+        return config != null && config.emojiEnabled;
+    }
+
     @Override
     public void initialize(ModConfig config) {
-        // Initialize resource pack directories
+        this.config = config;
+
         try {
             createResourcePackStructure();
         } catch (IOException e) {
             AvoUtilsMod.LOGGER.error("Failed to create emoji resource pack folders", e);
         }
 
-        // Register startup listener to load emojis and enable the packs
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
-            boolean wasEnabled = client.getResourcePackManager().getEnabledIds().contains(TWEMOJI_PACK_NAME)
-                    && client.getResourcePackManager().getEnabledIds().contains(CUSTOM_EMOJIS_PACK_NAME);
             CompletableFuture.runAsync(() -> {
+                boolean changed = !Files.exists(twemojiPath);
                 downloadTwemojiPack();
                 loadStandardEmojiResources();
                 loadAndCacheEmojis();
-                client.execute(() -> {
-                    enableResourcePacks();
-                    if (!wasEnabled) {
-                        client.reloadResources();
-                    }
-                });
+                if (changed) {
+                    client.execute(client::reloadResources);
+                }
+                packsLoaded = isEnabled();
             });
+        });
+
+        registerCommand();
+    }
+
+    private static final Formatting PILL_BG = Formatting.DARK_AQUA;
+    private static final Formatting PILL_FG = Formatting.DARK_GRAY;
+    private static final Formatting ARROW_COLOR = Formatting.GRAY;
+
+    private static MutableText createPillPrefix() {
+        return WynnPillUtil.create("AvoUtils", PILL_BG, PILL_FG)
+                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
+    }
+
+    private void registerCommand() {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            dispatcher.register(
+                    ClientCommandManager.literal("avoemojis")
+                            .executes(context -> {
+                                config.emojiEnabled = !config.emojiEnabled;
+                                config.save();
+
+                                MinecraftClient client = MinecraftClient.getInstance();
+                                Formatting statusColor = config.emojiEnabled ? Formatting.GREEN : Formatting.RED;
+                                String statusWord = config.emojiEnabled ? "enabled" : "disabled";
+
+                                MutableText message = createPillPrefix()
+                                        .append(Text.literal("Emojis are now ").formatted(Formatting.GRAY))
+                                        .append(Text.literal(statusWord).formatted(statusColor))
+                                        .append(Text.literal(".").formatted(Formatting.GRAY));
+
+                                if (client.player != null) {
+                                    client.player.sendMessage(message, false);
+                                    if (config.emojiEnabled && !packsLoaded) {
+                                        client.execute(client::reloadResources);
+                                        packsLoaded = true;
+                                    }
+                                }
+                                return 1;
+                            })
+            );
         });
     }
 
@@ -105,27 +164,18 @@ public class EmojiFeature implements AvoFeature {
     private void loadPuaMappings(ZipFile zip) {
         standardCharToPua.clear();
         ZipEntry entry = zip.getEntry(TWEMOJI_RAW_JSON_PATH);
-        if (entry == null) {
+        if (entry == null)
             return;
-        }
+
         try (InputStream is = zip.getInputStream(entry);
                 InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8)) {
             standardFontConfig = GSON.fromJson(isr, FontConfig.class);
             if (standardFontConfig != null && standardFontConfig.providers != null) {
                 for (FontProvider prov : standardFontConfig.providers) {
-                    for (String row : prov.chars) {
-                        int i = 0;
-                        while (i < row.length()) {
-                            int codePoint = row.codePointAt(i);
-                            int charCount = Character.charCount(codePoint);
-                            if (codePoint > 32) {
-                                if (!standardCharToPua.containsKey(codePoint)) {
-                                    standardCharToPua.put(codePoint, String.valueOf((char) (0xE200 + standardCharToPua.size())));
-                                }
-                            }
-                            i += charCount;
-                        }
-                    }
+                    walkProviderChars(prov, (codePoint, _charCount) -> {
+                        standardCharToPua.putIfAbsent(codePoint,
+                                String.valueOf((char) (0xE200 + standardCharToPua.size())));
+                    });
                 }
             }
         } catch (Exception e) {
@@ -145,36 +195,28 @@ public class EmojiFeature implements AvoFeature {
             for (Map.Entry<String, JsonElement> entrySet : root.entrySet()) {
                 String shortcode = entrySet.getKey();
                 String value = entrySet.getValue().getAsString();
-                if (!value.isEmpty()) {
-                    int cp = value.codePointAt(0);
-                    String puaValue = standardCharToPua.get(cp);
-                    if (puaValue != null) {
-                        standardEmojis.put(shortcode, puaValue);
+                if (value.isEmpty())
+                    continue;
+                StringBuilder puaBuilder = new StringBuilder();
+                walkStringCodePoints(value, codePoint -> {
+                    String puaChar = standardCharToPua.get(codePoint);
+                    if (puaChar != null) {
+                        puaBuilder.append(puaChar);
                     }
+                });
+                if (puaBuilder.length() > 0) {
+                    standardEmojis.put(shortcode, puaBuilder.toString());
                 }
             }
-            AvoUtilsMod.LOGGER.info("Successfully loaded " + standardEmojis.size() + " standard Twemoji shortcodes from ZIP.");
-            rebuildActiveEmojis();
+            AvoUtilsMod.LOGGER.info("Successfully loaded {} standard Twemoji shortcodes from ZIP.",
+                    standardEmojis.size());
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("Failed to parse Twemoji shortcodes from ZIP", e);
         }
     }
 
-    private void rebuildActiveEmojis() {
-        EmojiTrie newTrie = new EmojiTrie();
-        for (Map.Entry<String, String> entry : standardEmojis.entrySet()) {
-            newTrie.insert(entry.getKey(), entry.getValue());
-        }
-        synchronized (customEmojis) {
-            for (Map.Entry<String, String> entry : customEmojis.entrySet()) {
-                newTrie.insert(entry.getKey(), entry.getValue());
-            }
-        }
-        this.activeTrie = newTrie;
-    }
-
     private void loadAndCacheEmojis() {
-        if (!loading.compareAndSet(false, true))
+        if (!loadingEmojis.compareAndSet(false, true))
             return;
 
         try {
@@ -198,61 +240,88 @@ public class EmojiFeature implements AvoFeature {
                 AvoUtilsMod.LOGGER.error("Failed to load custom emojis from resources", e);
             }
 
-            Set<String> downloadedEmojis = new LinkedHashSet<>();
             if (!allEmojis.isEmpty()) {
-                // Download images
                 Path texturesDir = packDir.resolve("assets/avoutils/textures/font");
                 Files.createDirectories(texturesDir);
 
-                for (Map.Entry<String, String> entry : allEmojis.entrySet()) {
-                    String emojiName = entry.getKey();
-                    String imageUrl = entry.getValue();
-                    String safeName = getSafeName(emojiName);
-                    Path imagePath = texturesDir.resolve(safeName + ".png");
+                // Download images in parallel using a dedicated I/O thread pool
+                List<Map.Entry<String, String>> entries = new ArrayList<>(allEmojis.entrySet());
+                Set<String> downloadedEmojis = ConcurrentHashMap.newKeySet();
+                ExecutorService downloadExecutor = Executors.newFixedThreadPool(8);
 
+                try {
+                    List<CompletableFuture<Void>> futures = new ArrayList<>();
+                    for (Map.Entry<String, String> entry : entries) {
+                        futures.add(CompletableFuture.runAsync(() -> {
+                            String emojiName = entry.getKey();
+                            String imageUrl = entry.getValue();
+                            String safeName = getSafeName(emojiName);
+                            safeNameCache.put(emojiName, safeName);
+                            Path imagePath = texturesDir.resolve(safeName + ".png");
+
+                            try {
+                                if (!Files.exists(imagePath)) {
+                                    downloadImage(imageUrl, imagePath);
+                                }
+                                downloadedEmojis.add(emojiName);
+                            } catch (IOException e) {
+                                AvoUtilsMod.LOGGER.error("Failed to download emoji image for {} from {}",
+                                        emojiName, imageUrl, e);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }, downloadExecutor));
+                    }
+                    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                } finally {
+                    downloadExecutor.shutdown();
                     try {
-                        // Download emoji image if it doesn't exist
-                        if (!Files.exists(imagePath)) {
-                            downloadImage(imageUrl, imagePath);
-                        }
-                        downloadedEmojis.add(emojiName);
-                    } catch (Exception e) {
-                        AvoUtilsMod.LOGGER.error("Failed to download emoji image for " + emojiName + " from " + imageUrl, e);
-                        if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
+                        downloadExecutor.awaitTermination(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
                 }
-            }
 
-            // Rebuild Unicode mapping
-            List<String> sortedNames = new ArrayList<>(downloadedEmojis);
-            Collections.sort(sortedNames);
-
-            synchronized (customEmojis) {
-                customEmojis.clear();
-                char currentUnicode = '\uF000';
-                for (String name : sortedNames) {
-                    customEmojis.put(":" + name + ":", String.valueOf(currentUnicode));
-                    currentUnicode++;
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
                 }
+
+                // Rebuild Unicode mapping
+                List<String> sortedNames = new ArrayList<>(downloadedEmojis);
+                Collections.sort(sortedNames);
+
+                synchronized (customEmojis) {
+                    customEmojis.clear();
+                    char currentUnicode = '\uF800';
+                    for (String name : sortedNames) {
+                        customEmojis.put(":" + name + ":", String.valueOf(currentUnicode));
+                        currentUnicode++;
+                    }
+                }
+                AvoUtilsMod.LOGGER.info("Successfully loaded {} custom emojis.", downloadedEmojis.size());
             }
+
             rebuildActiveEmojis();
-
-            AvoUtilsMod.LOGGER.info("Successfully loaded {} custom emojis.", downloadedEmojis.size());
-
-            // Write font default.json
             writeFontJson();
 
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("Error occurred while loading emojis", e);
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
         } finally {
-            loading.set(false);
+            loadingEmojis.set(false);
         }
+    }
+
+    private void rebuildActiveEmojis() {
+        EmojiTrie newTrie = new EmojiTrie();
+        for (Map.Entry<String, String> entry : standardEmojis.entrySet()) {
+            newTrie.insert(entry.getKey(), entry.getValue());
+        }
+        synchronized (customEmojis) {
+            for (Map.Entry<String, String> entry : customEmojis.entrySet()) {
+                newTrie.insert(entry.getKey(), entry.getValue());
+            }
+        }
+        this.activeTrie = newTrie;
     }
 
     private void createResourcePackStructure() throws IOException {
@@ -273,7 +342,7 @@ public class EmojiFeature implements AvoFeature {
 
         if (needsUpdate) {
             Files.createDirectories(packDir);
-            PackMetadata pack = new PackMetadata(new PackInfo(packFormat, "Dynamic emojis for AvoUtils"));
+            PackMetadata pack = new PackMetadata(PackInfo.uniform(packFormat, "Dynamic emojis for AvoUtils"));
             Files.writeString(mcmetaPath, GSON.toJson(pack));
         }
 
@@ -293,7 +362,7 @@ public class EmojiFeature implements AvoFeature {
             for (Map.Entry<String, String> entry : customEmojis.entrySet()) {
                 String fullTrigger = entry.getKey();
                 String name = fullTrigger.substring(1, fullTrigger.length() - 1);
-                String safeName = getSafeName(name);
+                String safeName = safeNameCache.getOrDefault(name, getSafeName(name));
                 String unicodeStr = entry.getValue();
 
                 FontProvider provider = new FontProvider();
@@ -303,7 +372,7 @@ public class EmojiFeature implements AvoFeature {
             }
         }
 
-        // Read twemoji config, map to BMP PUA range, and write
+        // Map Twemoji font providers to PUA range
         if (standardFontConfig != null && standardFontConfig.providers != null) {
             for (FontProvider prov : standardFontConfig.providers) {
                 FontProvider defaultProv = new FontProvider(prov.type, prov.file, prov.ascent, prov.height);
@@ -319,7 +388,7 @@ public class EmojiFeature implements AvoFeature {
                             if (puaStr != null) {
                                 sbDefault.append(puaStr);
                             } else {
-                                sbDefault.append("\u0000");
+                                sbDefault.append('\u0000');
                             }
                         } else {
                             sbDefault.append(row, i, i + charCount);
@@ -337,6 +406,9 @@ public class EmojiFeature implements AvoFeature {
 
     private void downloadTwemojiPack() {
         if (Files.exists(twemojiPath)) {
+            return;
+        }
+        if (!downloadingTwemoji.compareAndSet(false, true)) {
             return;
         }
 
@@ -360,7 +432,7 @@ public class EmojiFeature implements AvoFeature {
 
                 AvoUtilsMod.LOGGER.info("Twemoji resource pack downloaded and sanitized successfully.");
             } else {
-                AvoUtilsMod.LOGGER.error("Failed to download Twemoji pack. HTTP code: " + response.statusCode());
+                AvoUtilsMod.LOGGER.error("Failed to download Twemoji pack. HTTP code: {}", response.statusCode());
             }
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("Error downloading Twemoji resource pack", e);
@@ -368,6 +440,8 @@ public class EmojiFeature implements AvoFeature {
                 Files.deleteIfExists(tempPath);
             } catch (IOException ignored) {
             }
+        } finally {
+            downloadingTwemoji.set(false);
         }
     }
 
@@ -389,10 +463,9 @@ public class EmojiFeature implements AvoFeature {
                         JsonObject rootObj = JsonParser.parseString(raw).getAsJsonObject();
                         if (rootObj.has("pack")) {
                             JsonObject packObj = rootObj.getAsJsonObject("pack");
-                            int fmt = packFormat;
-                            packObj.addProperty("pack_format", fmt);
-                            packObj.addProperty("min_format", fmt);
-                            packObj.addProperty("max_format", fmt);
+                            packObj.addProperty("pack_format", packFormat);
+                            packObj.addProperty("min_format", packFormat);
+                            packObj.addProperty("max_format", packFormat);
                             packObj.remove("supported_formats");
                         }
                         raw = GSON.toJson(rootObj);
@@ -417,33 +490,6 @@ public class EmojiFeature implements AvoFeature {
         }
     }
 
-    private void enableResourcePacks() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null)
-            return;
-
-        List<String> packsToEnable = List.of(TWEMOJI_PACK_NAME, CUSTOM_EMOJIS_PACK_NAME);
-        try {
-            client.getResourcePackManager().scanPacks();
-            Collection<String> enabled = new ArrayList<>(client.getResourcePackManager().getEnabledIds());
-            boolean modified = false;
-            for (String packId : packsToEnable) {
-                if (client.getResourcePackManager().getProfile(packId) != null && !enabled.contains(packId)) {
-                    enabled.add(packId);
-                    modified = true;
-                }
-            }
-            if (modified) {
-                client.getResourcePackManager().setEnabledProfiles(enabled);
-                client.options.resourcePacks.clear();
-                client.options.resourcePacks.addAll(enabled);
-                client.options.write();
-            }
-        } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to enable emojis resource packs", e);
-        }
-    }
-
     private String getSafeName(String name) {
         return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase();
     }
@@ -464,6 +510,53 @@ public class EmojiFeature implements AvoFeature {
         }
     }
 
+    public String replaceUnicodeEmojisWithPua(String text) {
+        if (text == null || text.isEmpty() || standardCharToPua.isEmpty()) {
+            return text;
+        }
+        StringBuilder sb = null;
+        int i = 0;
+        int len = text.length();
+        while (i < len) {
+            int cp = text.codePointAt(i);
+            int charCount = Character.charCount(cp);
+            String replacement = standardCharToPua.get(cp);
+            if (replacement != null) {
+                if (sb == null) {
+                    sb = new StringBuilder(len);
+                    sb.append(text, 0, i);
+                }
+                sb.append(replacement);
+            } else if (sb != null) {
+                sb.append(text, i, i + charCount);
+            }
+            i += charCount;
+        }
+        return sb != null ? sb.toString() : text;
+    }
+
+    private static void walkProviderChars(FontProvider prov, BiConsumer<Integer, Integer> consumer) {
+        for (String row : prov.chars) {
+            walkStringCodePoints(row, codePoint -> {
+                if (codePoint > 32) {
+                    consumer.accept(codePoint, Character.charCount(codePoint));
+                }
+            });
+        }
+    }
+
+    private static void walkStringCodePoints(String str, java.util.function.IntConsumer consumer) {
+        int i = 0;
+        while (i < str.length()) {
+            int codePoint = str.codePointAt(i);
+            int charCount = Character.charCount(codePoint);
+            if (codePoint > 32) {
+                consumer.accept(codePoint);
+            }
+            i += charCount;
+        }
+    }
+
     private static int resolvePackFormat() {
         try {
             Object gameVersion = Class.forName("net.minecraft.SharedConstants")
@@ -477,36 +570,6 @@ public class EmojiFeature implements AvoFeature {
         } catch (Throwable t) {
             return 75; // Fallback
         }
-    }
-
-    public String replaceUnicodeEmojisWithPua(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
-        }
-        if (standardCharToPua.isEmpty()) {
-            return text;
-        }
-        return replaceCodePoints(text, (cp, strVal) -> standardCharToPua.get(cp));
-    }
-
-    @FunctionalInterface
-    private interface CodePointMapper {
-        String map(int codePoint, String stringValue);
-    }
-
-    private String replaceCodePoints(String text, CodePointMapper mapper) {
-        StringBuilder sb = new StringBuilder();
-        int i = 0;
-        int len = text.length();
-        while (i < len) {
-            int cp = text.codePointAt(i);
-            int charCount = Character.charCount(cp);
-            String strVal = text.substring(i, i + charCount);
-            String replacement = mapper.map(cp, strVal);
-            sb.append(replacement != null ? replacement : strVal);
-            i += charCount;
-        }
-        return sb.toString();
     }
 
     // ── Font JSON structures ─────────────────────────────────────────────
@@ -539,8 +602,8 @@ public class EmojiFeature implements AvoFeature {
     }
 
     private record PackInfo(int pack_format, int min_format, int max_format, String description) {
-        public PackInfo(int packFormat, String description) {
-            this(packFormat, packFormat, packFormat, description);
+        static PackInfo uniform(int format, String description) {
+            return new PackInfo(format, format, format, description);
         }
     }
 }

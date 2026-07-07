@@ -66,8 +66,12 @@ public class ChatBridgeFeature implements AvoFeature {
         return cached != null && cached;
     }
 
+    public boolean isEnabled() {
+        return config != null && config.chatBridgeEnabled;
+    }
+
     private boolean isBridgeActive() {
-        return config.chatBridgeEnabled && isGuildMember();
+        return isEnabled() && isGuildMember();
     }
 
     @Override

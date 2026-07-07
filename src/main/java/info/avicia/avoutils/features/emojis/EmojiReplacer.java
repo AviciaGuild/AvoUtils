@@ -2,202 +2,163 @@ package info.avicia.avoutils.features.emojis;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import net.minecraft.text.MutableText;
-import net.minecraft.text.PlainTextContent;
-import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
 import net.minecraft.text.Style;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextColor;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Replaces emoji shortcodes in Text components
+ */
 public class EmojiReplacer {
 
-    /**
-     * Replaces emoji shortcodes in the given Text component
-     * Returns the original Text component reference if no replacements were made
-     */
-    public static Text replace(Text text) {
-        if (text == null) return null;
+    private static final TextColor EMOJI_COLOR = TextColor.fromRgb(0xFFFFFF);
 
-        EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-        if (feature == null) return text;
-
-        EmojiTrie trie = feature.getActiveTrie();
-        if (trie.isEmpty()) return text;
-
-        return replace(text, trie);
-    }
-
-    private static Text replace(Text text, EmojiTrie trie) {
-        if (text == null) return null;
-
-        boolean modified = false;
-        MutableText result = null;
-
-        // Process main content
-        if (text.getContent() instanceof PlainTextContent literalContent) {
-            MutableText replaced = replaceEmojiShortcodes(literalContent.string(), trie, text.getStyle());
-            if (replaced != null) {
-                result = replaced;
-                modified = true;
-            }
-        } else if (text.getContent() instanceof TranslatableTextContent translatableContent) {
-            Object[] args = translatableContent.getArgs();
-            Object[] processedArgs = null;
-            for (int i = 0; i < args.length; i++) {
-                Object arg = args[i];
-                Object replacedArg = null;
-                if (arg instanceof Text textArg) {
-                    Text replaced = replace(textArg, trie);
-                    if (replaced != textArg) {
-                        replacedArg = replaced;
-                    }
-                } else if (arg instanceof String strArg) {
-                    replacedArg = replaceEmojiShortcodes(strArg, trie, text.getStyle());
-                }
-
-                if (replacedArg != null) {
-                    if (processedArgs == null) {
-                        processedArgs = Arrays.copyOf(args, args.length);
-                    }
-                    processedArgs[i] = replacedArg;
-                    modified = true;
-                }
-            }
-            if (modified) {
-                result = Text.translatable(translatableContent.getKey(), processedArgs).setStyle(text.getStyle());
-            }
-        }
-
-        // Process siblings recursively
-        List<Text> siblings = text.getSiblings();
-        int size = siblings.size();
-        List<Text> processedSiblings = null;
-        for (int i = 0; i < size; i++) {
-            Text sibling = siblings.get(i);
-            Text replacedSibling = replace(sibling, trie);
-            if (replacedSibling != sibling) {
-                if (processedSiblings == null) {
-                    processedSiblings = new ArrayList<>(siblings.subList(0, i));
-                }
-                processedSiblings.add(replacedSibling);
-                modified = true;
-            } else if (processedSiblings != null) {
-                processedSiblings.add(sibling);
-            }
-        }
-
-        if (!modified) {
-            return text;
-        }
-
-        // If content did not change but siblings did, clone the parent node content
-        if (result == null) {
-            result = MutableText.of(text.getContent()).setStyle(text.getStyle());
-        }
-
-        // Append siblings
-        if (processedSiblings != null) {
-            for (Text child : processedSiblings) {
-                result.append(child);
-            }
-        } else {
-            for (Text sibling : siblings) {
-                result.append(sibling);
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Scans a string for emoji shortcodes and replaces them
-     * Returns null if no replacements were made
-     */
-    private static MutableText replaceEmojiShortcodes(String text, EmojiTrie trie, Style parentStyle) {
-        if (text == null || text.isEmpty()) {
-            return null;
-        }
-
-        // Only run Unicode→PUA conversion if text contains non-ASCII chars
-        if (!isAsciiOnly(text)) {
-            EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-            if (feature != null) {
-                String converted = feature.replaceUnicodeEmojisWithPua(text);
-                if (!converted.equals(text)) {
-                    text = converted;
-                }
-            }
-        }
-
-        int len = text.length();
-        int start = text.indexOf(':');
-        if (start == -1 || start == len - 1) {
-            return null;
-        }
-
-        MutableText root = null;
-        int lastIndex = 0;
-        int current = start;
-
-        while (current < len - 2) {
-            int nextColon = text.indexOf(':', current + 1);
-            if (nextColon == -1) {
-                break;
-            }
-            int diff = nextColon - current;
-            if (diff >= 2) {
-                boolean valid = true;
-                for (int i = current + 1; i < nextColon; i++) {
-                    if (!isValidShortcodeChar(text.charAt(i))) {
-                        valid = false;
-                        break;
-                    }
-                }
-                if (valid) {
-                    String replacement = trie.search(text, current, nextColon + 1);
-                    if (replacement != null) {
-                        if (root == null) {
-                            root = Text.empty();
-                        }
-                        if (current > lastIndex) {
-                            root.append(Text.literal(text.substring(lastIndex, current)).setStyle(parentStyle));
-                        }
-                        
-                        Style emojiStyle = parentStyle.withColor(net.minecraft.text.TextColor.fromRgb(0xFFFFFF));
-                        root.append(Text.literal(replacement).setStyle(emojiStyle));
-                        
-                        lastIndex = nextColon + 1;
-                        current = nextColon;
-                        continue;
-                    }
-                }
-            }
-            current = nextColon;
-        }
-
-        if (root == null) {
-            return null;
-        }
-
-        if (lastIndex < len) {
-            root.append(Text.literal(text.substring(lastIndex)).setStyle(parentStyle));
-        }
-
-        return root;
+    private static final boolean[] VALID_SHORTCODE = new boolean[128];
+    static {
+        for (char c = 'a'; c <= 'z'; c++)
+            VALID_SHORTCODE[c] = true;
+        for (char c = 'A'; c <= 'Z'; c++)
+            VALID_SHORTCODE[c] = true;
+        for (char c = '0'; c <= '9'; c++)
+            VALID_SHORTCODE[c] = true;
+        VALID_SHORTCODE['_'] = true;
+        VALID_SHORTCODE['+'] = true;
+        VALID_SHORTCODE['-'] = true;
     }
 
     private static boolean isValidShortcodeChar(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '+' || c == '-';
+        return c < 128 && VALID_SHORTCODE[c];
     }
 
-    private static boolean isAsciiOnly(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) > 127) {
-                return false;
+    public static Text replace(Text text) {
+        if (text == null)
+            return null;
+
+        EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+        if (feature == null || !feature.isEnabled())
+            return text;
+
+        EmojiTrie trie = feature.getActiveTrie();
+        if (trie.isEmpty())
+            return text;
+
+        // Skip strings with no valid shortcode pattern
+        if (!hasShortcodeCandidates(text.getString()))
+            return text;
+
+        MutableText result = Text.empty();
+        AtomicBoolean modified = new AtomicBoolean(false);
+
+        text.visit((style, str) -> {
+            if (str.isEmpty())
+                return Optional.empty();
+
+            // Unicode → PUA conversion for native emoji characters
+            String converted = feature.replaceUnicodeEmojisWithPua(str);
+
+            // Replace :shortcode: patterns with PUA chars
+            MutableText replaced = replaceShortcodes(converted, trie, style);
+            if (replaced != null) {
+                result.append(replaced);
+                modified.set(true);
+            } else {
+                result.append(Text.literal(converted).setStyle(style));
+            }
+            return Optional.empty();
+        }, Style.EMPTY);
+
+        return modified.get() ? result : text;
+    }
+
+    private static boolean hasShortcodeCandidates(String text) {
+        int len = text.length();
+        int colon = -1;
+        for (int i = 0; i < len; i++) {
+            if (text.charAt(i) == ':') {
+                if (colon == -1) {
+                    colon = i;
+                } else {
+                    // Found a closing colon; verify at least one valid char between them
+                    if (i > colon + 1) {
+                        for (int j = colon + 1; j < i; j++) {
+                            if (isValidShortcodeChar(text.charAt(j))) {
+                                return true;
+                            }
+                        }
+                    }
+                    colon = -1; // Reset for next pair
+                }
             }
         }
-        return true;
+        return false;
+    }
+
+    /**
+     * State-machine based shortcode replacement.
+     * Returns null if no replacements were made.
+     */
+    private static MutableText replaceShortcodes(String text, EmojiTrie trie, Style parentStyle) {
+        int len = text.length();
+        int firstColon = text.indexOf(':');
+        if (firstColon == -1 || firstColon == len - 1)
+            return null;
+
+        MutableText root = null;
+        int lastEnd = 0;
+        int i = firstColon;
+
+        while (i < len) {
+            if (text.charAt(i) == ':') {
+                int end = text.indexOf(':', i + 1);
+                if (end == -1)
+                    break;
+
+                // Validate token characters between the colons
+                boolean valid = end > i + 1;
+                if (valid) {
+                    for (int j = i + 1; j < end; j++) {
+                        if (!isValidShortcodeChar(text.charAt(j))) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (valid) {
+                    String replacement = trie.search(text, i, end + 1);
+                    if (replacement != null) {
+                        if (root == null)
+                            root = Text.empty();
+
+                        // Flush text before this token
+                        if (i > lastEnd) {
+                            root.append(Text.literal(text.substring(lastEnd, i)).setStyle(parentStyle));
+                        }
+
+                        // Append emoji with white color to ensure proper bitmap font rendering
+                        Style emojiStyle = parentStyle.withColor(EMOJI_COLOR);
+                        root.append(Text.literal(replacement).setStyle(emojiStyle));
+
+                        lastEnd = end + 1;
+                        i = end;
+                        continue;
+                    }
+                }
+                i = end;
+            }
+            i++;
+        }
+
+        if (root == null)
+            return null;
+
+        if (lastEnd < len) {
+            root.append(Text.literal(text.substring(lastEnd)).setStyle(parentStyle));
+        }
+
+        return root;
     }
 }

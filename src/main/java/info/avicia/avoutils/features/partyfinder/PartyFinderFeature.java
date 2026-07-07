@@ -14,6 +14,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
  * Wrapper for all pfinder systems
  */
 public class PartyFinderFeature implements AvoFeature {
+    private ModConfig config;
     private PartyFinderClient apiClient;
     private ChatPartyDetector chatDetector;
     private InviteHandler inviteHandler;
@@ -21,6 +22,8 @@ public class PartyFinderFeature implements AvoFeature {
  
     @Override
     public void initialize(ModConfig config) {
+        this.config = config;
+
         // Initialize API client
         apiClient = new PartyFinderClient(config);
  
