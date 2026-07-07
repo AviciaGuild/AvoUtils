@@ -105,6 +105,8 @@ jobs:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: true
+          modrinth-loaders: fabric
+          modrinth-game-versions: 1.21.11
           files: |
             build/libs/avoutils-*.jar
             !build/libs/avoutils-*-sources.jar
