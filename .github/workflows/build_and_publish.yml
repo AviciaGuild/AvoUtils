@@ -51,18 +51,21 @@ jobs:
             TAG_NAME="${{ github.ref_name }}"
             SHOULD_PUBLISH="true"
             SHOULD_PUBLISH_MODRINTH="true"
+            VERSION_TYPE="release"
             echo "Publishing release version: $VERSION from tag"
           elif [[ "${{ github.ref }}" == refs/heads/main && "${{ github.event_name }}" == "push" ]]; then
             VERSION="${BASE_VERSION}-beta.${{ github.run_number }}"
             TAG_NAME="v${VERSION}"
             SHOULD_PUBLISH="true"
-            SHOULD_PUBLISH_MODRINTH="false"
-            echo "Publishing build version: $VERSION from main push (GitHub only)"
+            SHOULD_PUBLISH_MODRINTH="true"
+            VERSION_TYPE="beta"
+            echo "Publishing beta version: $VERSION from main push"
           else
             VERSION="${BASE_VERSION}-dev.${{ github.run_number }}"
             TAG_NAME=""
             SHOULD_PUBLISH="false"
             SHOULD_PUBLISH_MODRINTH="false"
+            VERSION_TYPE="alpha"
             echo "Building dev version: $VERSION (no publishing)"
           fi
           
@@ -70,6 +73,7 @@ jobs:
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "should_publish=${SHOULD_PUBLISH}" >> $GITHUB_OUTPUT
           echo "should_publish_modrinth=${SHOULD_PUBLISH_MODRINTH}" >> $GITHUB_OUTPUT
+          echo "version_type=${VERSION_TYPE}" >> $GITHUB_OUTPUT
 
       - name: Build Mod with Gradle
         run: |
@@ -148,7 +152,7 @@ jobs:
               changelog: $changelog,
               project_id: $project_id,
               game_versions: [$minecraft_version],
-              version_type: "release",
+              version_type: "${{ steps.determine_version.outputs.version_type }}",
               dependencies: [],
               loaders: ["fabric"],
               featured: true,
