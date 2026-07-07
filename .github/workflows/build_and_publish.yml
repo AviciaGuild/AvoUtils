@@ -98,16 +98,69 @@ jobs:
           prerelease: ${{ contains(steps.determine_version.outputs.version, '-') }}
           generate_release_notes: true
 
+      - name: Resolve Modrinth Metadata
+        if: steps.determine_version.outputs.should_publish_modrinth == 'true'
+        id: modrinth_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t release_jars < <(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | sort)
+          if [[ "${#release_jars[@]}" -ne 1 ]]; then
+            echo "Expected exactly one release jar, found ${#release_jars[@]}" >&2
+            printf 'Found jars:\n%s\n' "${release_jars[@]}" >&2
+            exit 1
+          fi
+
+          minecraft_version="$(sed -n 's/^minecraft_version=//p' gradle.properties)"
+
+          changelog="$(git tag -l --format='%(contents)' "${{ steps.determine_version.outputs.tag_name }}")"
+          if [[ -z "$changelog" || "$changelog" == "${{ steps.determine_version.outputs.tag_name }}" ]]; then
+            changelog="See https://github.com/${GITHUB_REPOSITORY}/releases/tag/${{ steps.determine_version.outputs.tag_name }}"
+          fi
+
+          {
+            echo "mod_jar=${release_jars[0]}"
+            echo "minecraft_version=${minecraft_version}"
+            echo "changelog<<EOF"
+            echo "${changelog}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish to Modrinth
         if: steps.determine_version.outputs.should_publish_modrinth == 'true'
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-featured: true
-          modrinth-loaders: fabric
-          modrinth-game-versions: 1.21.11
-          files: |
-            build/libs/avoutils-*.jar
-            !build/libs/avoutils-*-sources.jar
-            !build/libs/avoutils-*-dev.jar
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          payload="$(jq -cn \
+            --arg name "AvoUtils ${{ steps.determine_version.outputs.version }}" \
+            --arg version_number "${{ steps.determine_version.outputs.version }}" \
+            --arg changelog "${{ steps.modrinth_meta.outputs.changelog }}" \
+            --arg project_id "${MODRINTH_PROJECT_ID}" \
+            --arg minecraft_version "${{ steps.modrinth_meta.outputs.minecraft_version }}" \
+            '{
+              name: $name,
+              version_number: $version_number,
+              changelog: $changelog,
+              project_id: $project_id,
+              game_versions: [$minecraft_version],
+              version_type: "release",
+              dependencies: [],
+              loaders: ["fabric"],
+              featured: true,
+              status: "listed",
+              file_parts: ["primary"],
+              primary_file: "primary"
+            }'
+          )"
+
+          curl --fail-with-body --show-error --silent \
+            -X POST "https://api.modrinth.com/v2/version" \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: AviciaGuild/AvoUtils-release-workflow" \
+            --form-string "data=${payload}" \
+            -F "primary=@${{ steps.modrinth_meta.outputs.mod_jar }}"
