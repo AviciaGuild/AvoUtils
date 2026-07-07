@@ -119,6 +119,18 @@ public class EmojiReplacer {
         if (text == null || text.isEmpty()) {
             return null;
         }
+
+        // Only run Unicode→PUA conversion if text contains non-ASCII chars
+        if (!isAsciiOnly(text)) {
+            EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+            if (feature != null) {
+                String converted = feature.replaceUnicodeEmojisWithPua(text);
+                if (!converted.equals(text)) {
+                    text = converted;
+                }
+            }
+        }
+
         int len = text.length();
         int start = text.indexOf(':');
         if (start == -1 || start == len - 1) {
@@ -178,5 +190,14 @@ public class EmojiReplacer {
 
     private static boolean isValidShortcodeChar(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '+' || c == '-';
+    }
+
+    private static boolean isAsciiOnly(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 127) {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -4,8 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ClientPlayNetworkHandlerMixin",
-    "ChatHudMixin",
-    "GameMessageS2CPacketMixin"
+    "ChatHudMixin"
   ],
   "injectors": {
     "defaultRequire": 1

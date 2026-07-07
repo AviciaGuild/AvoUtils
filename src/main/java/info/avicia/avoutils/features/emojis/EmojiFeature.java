@@ -161,14 +161,14 @@ public class EmojiFeature implements AvoFeature {
     }
 
     private void rebuildActiveEmojis() {
-        Map<String, String> merged = new HashMap<>(standardEmojis);
-        synchronized (customEmojis) {
-            merged.putAll(customEmojis);
-        }
-
         EmojiTrie newTrie = new EmojiTrie();
-        for (Map.Entry<String, String> entry : merged.entrySet()) {
+        for (Map.Entry<String, String> entry : standardEmojis.entrySet()) {
             newTrie.insert(entry.getKey(), entry.getValue());
+        }
+        synchronized (customEmojis) {
+            for (Map.Entry<String, String> entry : customEmojis.entrySet()) {
+                newTrie.insert(entry.getKey(), entry.getValue());
+            }
         }
         this.activeTrie = newTrie;
     }
@@ -198,7 +198,7 @@ public class EmojiFeature implements AvoFeature {
                 AvoUtilsMod.LOGGER.error("Failed to load custom emojis from resources", e);
             }
 
-            Map<String, String> downloadedEmojis = new HashMap<>();
+            Set<String> downloadedEmojis = new LinkedHashSet<>();
             if (!allEmojis.isEmpty()) {
                 // Download images
                 Path texturesDir = packDir.resolve("assets/avoutils/textures/font");
@@ -215,7 +215,7 @@ public class EmojiFeature implements AvoFeature {
                         if (!Files.exists(imagePath)) {
                             downloadImage(imageUrl, imagePath);
                         }
-                        downloadedEmojis.put(emojiName, imageUrl);
+                        downloadedEmojis.add(emojiName);
                     } catch (Exception e) {
                         AvoUtilsMod.LOGGER.error("Failed to download emoji image for " + emojiName + " from " + imageUrl, e);
                         if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
@@ -227,7 +227,7 @@ public class EmojiFeature implements AvoFeature {
             }
 
             // Rebuild Unicode mapping
-            List<String> sortedNames = new ArrayList<>(downloadedEmojis.keySet());
+            List<String> sortedNames = new ArrayList<>(downloadedEmojis);
             Collections.sort(sortedNames);
 
             synchronized (customEmojis) {
@@ -240,25 +240,10 @@ public class EmojiFeature implements AvoFeature {
             }
             rebuildActiveEmojis();
 
-            if (downloadedEmojis.isEmpty()) {
-                AvoUtilsMod.LOGGER.info("No custom emojis loaded, proceeding with standard emojis.");
-            } else {
-                AvoUtilsMod.LOGGER.info("Successfully loaded " + downloadedEmojis.size() + " custom emojis.");
-            }
+            AvoUtilsMod.LOGGER.info("Successfully loaded {} custom emojis.", downloadedEmojis.size());
 
             // Write font default.json
             writeFontJson();
-
-            // Enable pack and reload resources if client is in-game
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client != null) {
-                client.execute(() -> {
-                    enableResourcePacks();
-                    if (client.world != null) {
-                        client.reloadResources();
-                    }
-                });
-            }
 
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("Error occurred while loading emojis", e);
@@ -345,8 +330,6 @@ public class EmojiFeature implements AvoFeature {
                 }
                 defaultFontConfig.providers.add(defaultProv);
             }
-            // Clear reference to allow garbage collection
-            standardFontConfig = null;
         }
 
         Files.writeString(defaultFontPath, GSON.toJson(defaultFontConfig));
@@ -494,6 +477,36 @@ public class EmojiFeature implements AvoFeature {
         } catch (Throwable t) {
             return 75; // Fallback
         }
+    }
+
+    public String replaceUnicodeEmojisWithPua(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        if (standardCharToPua.isEmpty()) {
+            return text;
+        }
+        return replaceCodePoints(text, (cp, strVal) -> standardCharToPua.get(cp));
+    }
+
+    @FunctionalInterface
+    private interface CodePointMapper {
+        String map(int codePoint, String stringValue);
+    }
+
+    private String replaceCodePoints(String text, CodePointMapper mapper) {
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        int len = text.length();
+        while (i < len) {
+            int cp = text.codePointAt(i);
+            int charCount = Character.charCount(cp);
+            String strVal = text.substring(i, i + charCount);
+            String replacement = mapper.map(cp, strVal);
+            sb.append(replacement != null ? replacement : strVal);
+            i += charCount;
+        }
+        return sb.toString();
     }
 
     // ── Font JSON structures ─────────────────────────────────────────────
