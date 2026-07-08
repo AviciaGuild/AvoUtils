@@ -39,12 +39,10 @@ public class EmojiTrie {
 
     /**
      * Search the trie for a string slice [start, end).
+     * Caller guarantees: text != null, 0 <= start < end <= text.length().
      * Returns the emoji PUA value if found, null otherwise.
      */
     public String search(String text, int start, int end) {
-        if (text == null || start < 0 || end > text.length() || start >= end) {
-            return null;
-        }
         Node current = root;
         for (int i = start; i < end; i++) {
             current = current.children.get(text.charAt(i));
