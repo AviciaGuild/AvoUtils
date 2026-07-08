@@ -18,6 +18,7 @@ public class AvoWebSocketClient extends WebSocketClient {
     private static final Gson GSON = new Gson();
     private static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256 KB
     public static final int AUTH_FAILURE_CLOSE_CODE = 4001;
+    private static final int PROTOCOL_ERROR_CLOSE_CODE = 1002;
 
     private final BiConsumer<String, JsonObject> eventHandler;
     private final Runnable onOpenCallback;
@@ -61,8 +62,8 @@ public class AvoWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection closed. Code: {}, Reason: {}, Remote: {}", code, reason, remote);
-        if (code == AUTH_FAILURE_CLOSE_CODE) {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Authentication failure (code={}). Invalidating cached session token.", code);
+        if (code == AUTH_FAILURE_CLOSE_CODE || code == PROTOCOL_ERROR_CLOSE_CODE) {
+            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Auth failure or protocol error (code={}). Invalidating session token.", code);
             AvoAuthService.getInstance().invalidateToken();
         }
         if (onCloseCallback != null) {
