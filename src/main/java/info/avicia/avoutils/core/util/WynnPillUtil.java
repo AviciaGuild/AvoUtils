@@ -15,6 +15,9 @@ public final class WynnPillUtil {
     private static final String PILL_BG_BACK = "\uE00F";
     private static final String PILL_BG_FRONT = "\uE012";
 
+    private static final Formatting PILL_FG = Formatting.BLACK;
+    private static final Formatting ARROW_COLOR = Formatting.GRAY;
+
     private WynnPillUtil() {
     }
 
@@ -34,6 +37,11 @@ public final class WynnPillUtil {
         pill.append(Text.literal(PILL_CORNER_RIGHT)
                 .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
         return pill;
+    }
+
+    public static MutableText createPrefixedPill(String label, boolean isError) {
+        Formatting bg = isError ? Formatting.RED : Formatting.AQUA;
+        return create(label, bg, PILL_FG).append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
     }
 
     private static String toWynncraftGlyph(char rawChar) {

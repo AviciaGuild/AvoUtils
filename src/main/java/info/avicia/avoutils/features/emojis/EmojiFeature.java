@@ -100,15 +100,6 @@ public class EmojiFeature implements AvoFeature {
         registerCommand();
     }
 
-    private static final Formatting PILL_BG = Formatting.AQUA;
-    private static final Formatting PILL_FG = Formatting.BLACK;
-    private static final Formatting ARROW_COLOR = Formatting.GRAY;
-
-    private static MutableText createPillPrefix() {
-        return WynnPillUtil.create("AvoUtils", PILL_BG, PILL_FG)
-                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
-    }
-
     private void registerCommand() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(
@@ -121,7 +112,7 @@ public class EmojiFeature implements AvoFeature {
                                 Formatting statusColor = config.emojiEnabled ? Formatting.GREEN : Formatting.RED;
                                 String statusWord = config.emojiEnabled ? "enabled" : "disabled";
 
-                                MutableText message = createPillPrefix()
+                                MutableText message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
                                         .append(Text.literal("Emojis are now ").formatted(Formatting.GRAY))
                                         .append(Text.literal(statusWord).formatted(statusColor))
                                         .append(Text.literal(".").formatted(Formatting.GRAY));

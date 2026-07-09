@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.util;
 
 import java.util.regex.Pattern;
 

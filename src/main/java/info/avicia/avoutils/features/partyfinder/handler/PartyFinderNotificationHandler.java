@@ -17,15 +17,6 @@ public class PartyFinderNotificationHandler {
     private static final String EVT_PARTY_MEMBER_JOINED = "party_member_joined";
     private static final String EVT_PARTY_FILLED = "party_filled";
 
-    private static final Formatting PILL_BG = Formatting.AQUA;
-    private static final Formatting PILL_FG = Formatting.BLACK;
-    private static final Formatting ARROW_COLOR = Formatting.GRAY;
-
-    private static MutableText createPrefix() {
-        return WynnPillUtil.create("AvoUtils", PILL_BG, PILL_FG)
-                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
-    }
-
     private static boolean isSelf(String leaderName) {
         MinecraftClient mc = MinecraftClient.getInstance();
         return mc.player != null && leaderName.equalsIgnoreCase(mc.getSession().getUsername());
@@ -39,7 +30,7 @@ public class PartyFinderNotificationHandler {
 
                 MinecraftClient mc = MinecraftClient.getInstance();
                 if (mc.player != null && isSelf(leaderName) && !isSelf(username)) {
-                    MutableText formatted = createPrefix()
+                    MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
                             .append(Text.literal(username).formatted(Formatting.WHITE))
                             .append(Text.literal(" has joined your party!").formatted(Formatting.GRAY));
                     mc.player.sendMessage(formatted, false);
@@ -54,7 +45,7 @@ public class PartyFinderNotificationHandler {
 
                 MinecraftClient mc = MinecraftClient.getInstance();
                 if (isSelf(leaderName) && mc.player != null) {
-                    MutableText formatted = createPrefix()
+                    MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
                             .append(Text.literal("Your party is now full!").formatted(Formatting.GREEN));
                     mc.player.sendMessage(formatted, false);
                     mc.player.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);

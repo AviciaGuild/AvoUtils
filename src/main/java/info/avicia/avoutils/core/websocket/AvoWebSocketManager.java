@@ -34,7 +34,7 @@ public class AvoWebSocketManager {
     private final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private volatile long lastConnectAttempt = 0;
     private int tickCounter = 0;
-    private int consecutiveFailures = 0;
+    private volatile int consecutiveFailures = 0;
     private static final int TICK_INTERVAL = 20;
     private static final long BASE_RETRY_MS = 5_000;
     private static final long MAX_RETRY_MS = 120_000;
@@ -183,10 +183,12 @@ public class AvoWebSocketManager {
                         consecutiveFailures = 0;
                         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connected successfully.");
                     },
-                    () -> {
+                    code -> {
                         isConnecting.set(false);
-                        consecutiveFailures = 0;
-                        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Disconnected.");
+                        if (code == 1000 || code == 1001) {
+                            consecutiveFailures = 0;
+                        }
+                        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Disconnected (code={}).", code);
                     }
             );
             client.connect();

@@ -10,6 +10,7 @@ import org.java_websocket.handshake.ServerHandshake;
 import java.net.URI;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.IntConsumer;
 
 /**
  * WebSocket client connecting to the AvoUtils API gateway
@@ -22,11 +23,11 @@ public class AvoWebSocketClient extends WebSocketClient {
 
     private final BiConsumer<String, JsonObject> eventHandler;
     private final Runnable onOpenCallback;
-    private final Runnable onCloseCallback;
+    private final IntConsumer onCloseCallback;
 
     public AvoWebSocketClient(URI serverUri, Map<String, String> httpHeaders,
                               BiConsumer<String, JsonObject> eventHandler,
-                              Runnable onOpenCallback, Runnable onCloseCallback) {
+                              Runnable onOpenCallback, IntConsumer onCloseCallback) {
         super(serverUri, httpHeaders);
         setConnectionLostTimeout(30);
         this.eventHandler = eventHandler;
@@ -67,7 +68,7 @@ public class AvoWebSocketClient extends WebSocketClient {
             AvoAuthService.getInstance().invalidateToken();
         }
         if (onCloseCallback != null) {
-            onCloseCallback.run();
+            onCloseCallback.accept(code);
         }
     }
 

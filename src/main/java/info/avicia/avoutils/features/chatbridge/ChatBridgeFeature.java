@@ -6,6 +6,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
@@ -29,37 +30,31 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final Pattern CHAT_PATTERN = Pattern.compile(
             "^(?:<\\d+>\\s*)?([a-zA-Z0-9_][a-zA-Z0-9_ ]*[a-zA-Z0-9_]|[a-zA-Z0-9_]{3,16})\\s*:\\s*(.*)$",
             Pattern.DOTALL);
+    private static final Pattern BANK_PATTERN = Pattern.compile(
+            "^(.+?)\\s+(deposited|withdrew)\\s+(.+?)\\s+(to|from)\\s+the Guild Bank\\s+\\((.+)\\)$",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern BANK_NO_TIER_PATTERN = Pattern.compile(
+            "^(.+?)\\s+(deposited|withdrew)\\s+(.+?)\\s+(to|from)\\s+the Guild(?: Bank)?$",
+            Pattern.CASE_INSENSITIVE);
+    private static final String DEFAULT_ACCESS_TIER = "Unknown";
     private static final Pattern HOVER_REAL_NAME_PATTERN = Pattern.compile(
             "(?:'(?:s)? real name is\\s+|Real Username:\\s*)([a-zA-Z0-9_]{3,16})",
             Pattern.CASE_INSENSITIVE);
 
     private ModConfig config;
 
-    // Deduplication state for outgoing messages
-    private String lastOutgoingKey = null;
-    private long lastOutgoingTime = 0;
-    private static final long DEDUPE_WINDOW_MS = 750;
     private static final String AVATAR_URL_BASE = "https://mc-heads.net/avatar/";
+    private static final String BANK_CHEST_AVATAR_URL = "https://wynncraft.wiki.gg/images/UnidentifiedMythicBox.png";
 
-    // Event type constants
+    private static final long DEDUPE_WINDOW_MS = 750;
+    private final Deduplicator chatDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
+    private final Deduplicator bankLogDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
+
     private static final String EVT_DISCORD_CHAT = "discord_chat";
     private static final String EVT_GUILD_CHAT = "guild_chat";
+    private static final String EVT_GUILD_BANK = "guild_bank_event";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
-    private static final Formatting PILL_BG = Formatting.AQUA;
-    private static final Formatting PILL_FG = Formatting.BLACK;
-    private static final Formatting PILL_ERR_BG = Formatting.RED;
-    private static final Formatting ARROW_COLOR = Formatting.GRAY;
-
-    private static MutableText createChatPrefix() {
-        return WynnPillUtil.create("AvoBridge", PILL_BG, PILL_FG)
-                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
-    }
-
-    private static MutableText createErrorPrefix() {
-        return WynnPillUtil.create("AvoBridge", PILL_ERR_BG, PILL_FG)
-                .append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
-    }
 
     private boolean isGuildMember() {
         Boolean cached = AvoAuthService.getInstance().getCachedGuildMember();
@@ -92,7 +87,7 @@ public class ChatBridgeFeature implements AvoFeature {
                 String message = json.get("message").getAsString();
 
                 if (MinecraftClient.getInstance().player != null) {
-                    MutableText prefix = createChatPrefix();
+                    MutableText prefix = WynnPillUtil.createPrefixedPill("AvoBridge", false);
                     MutableText formatted = prefix
                             .append(Text.literal(username).formatted(Formatting.DARK_AQUA))
                             .append(Text.literal(": ").formatted(Formatting.DARK_AQUA))
@@ -133,6 +128,7 @@ public class ChatBridgeFeature implements AvoFeature {
         String cleaned = PacketTextNormalizer.normalizeForParsing(raw);
         Matcher matcher = CHAT_PATTERN.matcher(cleaned);
         if (!matcher.find()) {
+            handleBankLog(cleaned, message);
             return;
         }
 
@@ -142,33 +138,12 @@ public class ChatBridgeFeature implements AvoFeature {
             return;
         }
 
-        String realUsername = findRealUsername(message);
+        String realUsername = resolveUsername(message, displayedName);
         if (realUsername == null) {
-            String cleanedDisplay = displayedName.replaceAll("[^a-zA-Z0-9_]", "");
-            if (isValidUsername(cleanedDisplay)) {
-                realUsername = cleanedDisplay;
-            } else {
-                return;
-            }
-        }
-
-        if (!isValidUsername(realUsername)) {
-            AvoUtilsMod.LOGGER.warn("[ChatBridge] Dropping guild chat: username '{}' does not match Minecraft pattern", realUsername);
             return;
         }
 
-        if (isDuplicateOutgoing(realUsername, content)) {
-            return;
-        }
-
-        JsonObject payload = new JsonObject();
-        payload.addProperty("username", realUsername);
-        payload.addProperty("message", content);
-
-        String avatarUrl = AVATAR_URL_BASE + realUsername + "/128";
-        payload.addProperty("avatar_url", avatarUrl);
-
-        AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_CHAT, payload);
+        sendBridgeMessage(chatDeduper, EVT_GUILD_CHAT, realUsername, content, AVATAR_URL_BASE + realUsername + "/128");
     }
 
     private static boolean hasLeadingGuildChatColor(Text message) {
@@ -242,15 +217,67 @@ public class ChatBridgeFeature implements AvoFeature {
         return name != null && name.matches("[a-zA-Z0-9_]{3,16}");
     }
 
-    private synchronized boolean isDuplicateOutgoing(String username, String message) {
-        String key = username + "\u0000" + message;
-        long now = System.currentTimeMillis();
-        if (key.equals(lastOutgoingKey) && (now - lastOutgoingTime) < DEDUPE_WINDOW_MS) {
-            return true;
+    private String resolveUsername(Text message, String fallbackDisplayName) {
+        String realUsername = findRealUsername(message);
+        if (realUsername != null) {
+            return isValidUsername(realUsername) ? realUsername : null;
         }
-        lastOutgoingKey = key;
-        lastOutgoingTime = now;
-        return false;
+        String cleaned = fallbackDisplayName.replaceAll("[^a-zA-Z0-9_]", "");
+        if (isValidUsername(cleaned)) {
+            return cleaned;
+        }
+        AvoUtilsMod.LOGGER.warn("[ChatBridge] Could not resolve username from fallback: '{}'", fallbackDisplayName);
+        return null;
+    }
+
+    private void sendBridgeMessage(Deduplicator deduper, String eventType, String username, String message, String avatarUrl) {
+        String key = username + "\u0000" + message;
+        if (deduper.isDuplicate(key)) {
+            return;
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("username", username);
+        payload.addProperty("message", message);
+        payload.addProperty("avatar_url", avatarUrl);
+        AvoWebSocketManager.getInstance().sendEvent(eventType, payload);
+    }
+
+    private void handleBankLog(String cleaned, Text message) {
+        if (!cleaned.contains("Guild") || (!cleaned.contains("deposited") && !cleaned.contains("withdrew"))) {
+            return;
+        }
+
+        Matcher matcher = BANK_PATTERN.matcher(cleaned);
+        String accessTier;
+        if (matcher.matches()) {
+            accessTier = matcher.group(5).trim();
+        } else {
+            matcher = BANK_NO_TIER_PATTERN.matcher(cleaned);
+            if (!matcher.matches()) {
+                return;
+            }
+            accessTier = DEFAULT_ACCESS_TIER;
+        }
+
+        String displayedPlayer = matcher.group(1).trim();
+        String action = matcher.group(2).toLowerCase();
+        String itemBlock = matcher.group(3).trim();
+        if (displayedPlayer.isEmpty() || itemBlock.isEmpty()) {
+            return;
+        }
+
+        String realUsername = resolveUsername(message, displayedPlayer);
+        if (realUsername == null) {
+            return;
+        }
+
+        String formattedMessage = "**" + realUsername + "** " + action + " **" + itemBlock + "**";
+
+        String displayName = DEFAULT_ACCESS_TIER.equals(accessTier)
+                ? "Guild Bank"
+                : "Guild Bank (" + accessTier + ")";
+
+        sendBridgeMessage(bankLogDeduper, EVT_GUILD_BANK, displayName, formattedMessage, BANK_CHEST_AVATAR_URL);
     }
 
     private void registerCommand() {
@@ -260,7 +287,7 @@ public class ChatBridgeFeature implements AvoFeature {
                             .executes(context -> {
                                 // Block enabling the bridge if user is not a guild member
                                 if (!config.chatBridgeEnabled && !isGuildMember()) {
-                                    MutableText blocked = createErrorPrefix()
+                                    MutableText blocked = WynnPillUtil.createPrefixedPill("AvoBridge", true)
                                             .append(Text.literal("Chat bridge is unavailable: you are not in Avicia.").formatted(Formatting.RED));
                                     MinecraftClient.getInstance().player.sendMessage(blocked, false);
                                     return 1;
@@ -271,7 +298,7 @@ public class ChatBridgeFeature implements AvoFeature {
                                 config.save();
                                 Formatting statusColor = config.chatBridgeEnabled ? Formatting.GREEN : Formatting.RED;
                                 String statusWord = config.chatBridgeEnabled ? "enabled" : "disabled";
-                                MutableText formatted = createChatPrefix()
+                                MutableText formatted = WynnPillUtil.createPrefixedPill("AvoBridge", false)
                                         .append(Text.literal("Chat bridge is now ").formatted(Formatting.GRAY))
                                         .append(Text.literal(statusWord).formatted(statusColor))
                                         .append(Text.literal(".").formatted(Formatting.GRAY));
