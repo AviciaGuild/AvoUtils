@@ -44,20 +44,25 @@ public class PartyListScreen extends Screen {
         fetchParties();
     };
 
-    // Scroll state
     private int scrollOffset = 0;
     private static final int ROW_HEIGHT = 42;
     private static final int LIST_TOP = 50;
     private static final int SIDE_PADDING = 20;
 
-    // Active modal overlay (null = none)
     private Screen activeModal = null;
+    private String joinTargetLeaderName;
 
     public PartyListScreen(PartyFinderClient apiClient, ChatPartyDetector chatDetector, InviteHandler inviteHandler) {
+        this(apiClient, chatDetector, inviteHandler, null);
+    }
+
+    public PartyListScreen(PartyFinderClient apiClient, ChatPartyDetector chatDetector,
+                           InviteHandler inviteHandler, String joinTargetLeaderName) {
         super(Text.literal("Party Finder"));
         this.apiClient = apiClient;
         this.chatDetector = chatDetector;
         this.inviteHandler = inviteHandler;
+        this.joinTargetLeaderName = joinTargetLeaderName;
     }
 
     @Override
@@ -148,6 +153,17 @@ public class PartyListScreen extends Screen {
                     createPartyButton.visible = true;
                     viewPartyButton.visible = false;
                     inviteAllButton.visible = false;
+                }
+
+                // Auto-open detail modal for join target
+                if (joinTargetLeaderName != null && activeModal == null) {
+                    for (PartyData p : result) {
+                        if (p.leaderName != null && p.leaderName.equalsIgnoreCase(joinTargetLeaderName)) {
+                            openDetailModal(p);
+                            joinTargetLeaderName = null;
+                            break;
+                        }
+                    }
                 }
             });
         }).exceptionally(ex -> {

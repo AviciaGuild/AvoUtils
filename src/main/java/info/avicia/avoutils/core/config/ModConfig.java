@@ -20,6 +20,8 @@ public class ModConfig {
     public String apiBaseUrl = DEFAULT_API_BASE_URL;
     public boolean chatBridgeEnabled = true;
     public boolean emojiEnabled = true;
+    public boolean newPartyNotifsEnabled = true;
+    public boolean notificationSoundsEnabled = true;
 
     /**
      * Load config from disk, or create a default one if it doesn't exist

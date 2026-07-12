@@ -30,7 +30,7 @@ public class PartyFinderFeature implements AvoFeature {
         // Initialize handlers
         chatDetector = new ChatPartyDetector(apiClient);
         inviteHandler = new InviteHandler(chatDetector);
-        notificationHandler = new PartyFinderNotificationHandler();
+        notificationHandler = new PartyFinderNotificationHandler(config);
         notificationHandler.register();
  
         // Client tick events
@@ -42,7 +42,7 @@ public class PartyFinderFeature implements AvoFeature {
         AvoWebSocketManager.getInstance().registerConnectionDemand("partyfinder", () -> true);
 
         // Register client commands
-        PartyCommand.register(apiClient, chatDetector, inviteHandler);
+        PartyCommand.register(apiClient, chatDetector, inviteHandler, config);
     }
  
     public ChatPartyDetector getChatDetector() {
