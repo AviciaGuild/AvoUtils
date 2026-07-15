@@ -96,15 +96,33 @@ jobs:
           set -euo pipefail
           prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')"
           curr_tag="$(git describe --tags --abbrev=0)"
+
+          compare_url=""
           if [[ -n "$prev_tag" ]]; then
-            changelog="$(git log --pretty='- %s' "$prev_tag..HEAD")"
-            changelog="${changelog}"$'\n\nFull Changelog: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${curr_tag}'
+            compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${curr_tag}"
+          fi
+
+          is_release="${{ steps.determine_version.outputs.version_type == 'release' }}"
+          if [[ "$is_release" == "true" ]]; then
+            if [[ -n "$prev_tag" ]]; then
+              changelog="$(git log --pretty='- %s' "$prev_tag..HEAD")"
+            else
+              changelog="$(git log --pretty='- %s')"
+            fi
+            if [[ -z "$changelog" ]]; then
+              changelog="Initial release"
+            fi
           else
-            changelog="$(git log --pretty='- %s')"
+            changelog=""
           fi
-          if [[ -z "$changelog" ]]; then
-            changelog="Initial release"
+
+          if [[ -n "$compare_url" ]]; then
+            if [[ -n "$changelog" ]]; then
+              changelog="${changelog}"$'\n'
+            fi
+            changelog="${changelog}**Full Changelog**: ${compare_url}"
           fi
+
           echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
           echo "${changelog}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
