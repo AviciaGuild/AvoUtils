@@ -42,10 +42,18 @@ public class PartyFinderFeature implements AvoFeature {
         AvoWebSocketManager.getInstance().registerConnectionDemand("partyfinder", () -> true);
 
         // Register client commands
-        PartyCommand.register(apiClient, chatDetector, inviteHandler, config);
+        PartyCommand.register(apiClient, chatDetector, inviteHandler);
     }
  
     public ChatPartyDetector getChatDetector() {
         return chatDetector;
+    }
+
+    public PartyFinderClient getApiClient() {
+        return apiClient;
+    }
+
+    public InviteHandler getInviteHandler() {
+        return inviteHandler;
     }
 }

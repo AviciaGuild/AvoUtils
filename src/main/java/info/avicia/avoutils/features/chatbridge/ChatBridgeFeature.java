@@ -15,9 +15,6 @@ import net.minecraft.text.Style;
 import net.minecraft.text.TextColor;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.util.Formatting;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
-
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,7 +53,7 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
 
-    private boolean isGuildMember() {
+    public boolean isGuildMember() {
         Boolean cached = AvoAuthService.getInstance().getCachedGuildMember();
         return cached != null && cached;
     }
@@ -109,7 +106,6 @@ public class ChatBridgeFeature implements AvoFeature {
         // Register connection demand lease (only if user has it enabled and is a guild member)
         AvoWebSocketManager.getInstance().registerConnectionDemand("chatbridge", this::isBridgeActive);
 
-        registerCommand();
         AvoUtilsMod.LOGGER.info("[ChatBridge] Initialized.");
     }
 
@@ -280,32 +276,28 @@ public class ChatBridgeFeature implements AvoFeature {
         sendBridgeMessage(bankLogDeduper, EVT_GUILD_BANK, displayName, formattedMessage, BANK_CHEST_AVATAR_URL);
     }
 
-    private void registerCommand() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            dispatcher.register(
-                    ClientCommandManager.literal("avobridge")
-                            .executes(context -> {
-                                // Block enabling the bridge if user is not a guild member
-                                if (!config.chatBridgeEnabled && !isGuildMember()) {
-                                    MutableText blocked = WynnPillUtil.createPrefixedPill("AvoBridge", true)
-                                            .append(Text.literal("Chat bridge is unavailable: you are not in Avicia.").formatted(Formatting.RED));
-                                    MinecraftClient.getInstance().player.sendMessage(blocked, false);
-                                    return 1;
-                                }
+    public void toggleBridge() {
+        // Block enabling the bridge if user is not a guild member
+        if (!config.chatBridgeEnabled && !isGuildMember()) {
+            MutableText blocked = WynnPillUtil.createPrefixedPill("AvoBridge", true)
+                    .append(Text.literal("Chat bridge is unavailable: you are not in Avicia.").formatted(Formatting.RED));
+            if (MinecraftClient.getInstance().player != null) {
+                MinecraftClient.getInstance().player.sendMessage(blocked, false);
+            }
+            return;
+        }
 
-                                // Toggle the chat bridge enabled state and save the config
-                                config.chatBridgeEnabled = !config.chatBridgeEnabled;
-                                config.save();
-                                Formatting statusColor = config.chatBridgeEnabled ? Formatting.GREEN : Formatting.RED;
-                                String statusWord = config.chatBridgeEnabled ? "enabled" : "disabled";
-                                MutableText formatted = WynnPillUtil.createPrefixedPill("AvoBridge", false)
-                                        .append(Text.literal("Chat bridge is now ").formatted(Formatting.GRAY))
-                                        .append(Text.literal(statusWord).formatted(statusColor))
-                                        .append(Text.literal(".").formatted(Formatting.GRAY));
-                                MinecraftClient.getInstance().player.sendMessage(formatted, false);
-                                return 1;
-                            })
-            );
-        });
+        // Toggle the chat bridge enabled state and save the config
+        config.chatBridgeEnabled = !config.chatBridgeEnabled;
+        config.save();
+        Formatting statusColor = config.chatBridgeEnabled ? Formatting.GREEN : Formatting.RED;
+        String statusWord = config.chatBridgeEnabled ? "enabled" : "disabled";
+        MutableText formatted = WynnPillUtil.createPrefixedPill("AvoBridge", false)
+                .append(Text.literal("Chat bridge is now ").formatted(Formatting.GRAY))
+                .append(Text.literal(statusWord).formatted(statusColor))
+                .append(Text.literal(".").formatted(Formatting.GRAY));
+        if (MinecraftClient.getInstance().player != null) {
+            MinecraftClient.getInstance().player.sendMessage(formatted, false);
+        }
     }
 }

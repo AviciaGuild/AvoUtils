@@ -4,6 +4,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
+import info.avicia.avoutils.core.command.AvoCommands;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
@@ -44,6 +45,9 @@ public class AvoUtilsMod implements ClientModInitializer {
             feature.initialize(config);
         }
 
+        // Register commands
+        AvoCommands.register();
+
         LOGGER.info("AvoUtils mod initialized.");
     }
 
@@ -53,6 +57,10 @@ public class AvoUtilsMod implements ClientModInitializer {
 
     public static AvoUtilsMod getInstance() {
         return instance;
+    }
+
+    public ModConfig getConfig() {
+        return config;
     }
 
     public <T extends AvoFeature> T getFeature(Class<T> featureClass) {

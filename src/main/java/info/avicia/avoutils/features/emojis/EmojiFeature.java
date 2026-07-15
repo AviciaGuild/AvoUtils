@@ -9,8 +9,6 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.WynnPillUtil;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.MinecraftClient;
@@ -96,38 +94,28 @@ public class EmojiFeature implements AvoFeature {
                 packsLoaded = isEnabled();
             });
         });
-
-        registerCommand();
     }
 
-    private void registerCommand() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            dispatcher.register(
-                    ClientCommandManager.literal("avoemojis")
-                            .executes(context -> {
-                                config.emojiEnabled = !config.emojiEnabled;
-                                config.save();
+    public void toggleEmojis() {
+        config.emojiEnabled = !config.emojiEnabled;
+        config.save();
 
-                                MinecraftClient client = MinecraftClient.getInstance();
-                                Formatting statusColor = config.emojiEnabled ? Formatting.GREEN : Formatting.RED;
-                                String statusWord = config.emojiEnabled ? "enabled" : "disabled";
+        MinecraftClient client = MinecraftClient.getInstance();
+        Formatting statusColor = config.emojiEnabled ? Formatting.GREEN : Formatting.RED;
+        String statusWord = config.emojiEnabled ? "enabled" : "disabled";
 
-                                MutableText message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                                        .append(Text.literal("Emojis are now ").formatted(Formatting.GRAY))
-                                        .append(Text.literal(statusWord).formatted(statusColor))
-                                        .append(Text.literal(".").formatted(Formatting.GRAY));
+        MutableText message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                .append(Text.literal("Emojis are now ").formatted(Formatting.GRAY))
+                .append(Text.literal(statusWord).formatted(statusColor))
+                .append(Text.literal(".").formatted(Formatting.GRAY));
 
-                                if (client.player != null) {
-                                    client.player.sendMessage(message, false);
-                                    if (config.emojiEnabled && !packsLoaded) {
-                                        client.execute(client::reloadResources);
-                                        packsLoaded = true;
-                                    }
-                                }
-                                return 1;
-                            })
-            );
-        });
+        if (client.player != null) {
+            client.player.sendMessage(message, false);
+            if (config.emojiEnabled && !packsLoaded) {
+                client.execute(client::reloadResources);
+                packsLoaded = true;
+            }
+        }
     }
 
     // ── Custom emoji loading ─────────────────────────────────────────────

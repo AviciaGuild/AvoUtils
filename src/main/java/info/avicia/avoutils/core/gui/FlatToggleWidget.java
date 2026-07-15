@@ -55,17 +55,27 @@ public class FlatToggleWidget extends ClickableWidget {
         int w = getWidth();
         int h = getHeight();
 
+        boolean dimmed = !this.active;
+
         // Draw track
-        int trackColor = checked ? 0xFF8A9CFE : 0xFF222232;
+        int trackColor;
+        if (dimmed) {
+            trackColor = checked ? 0xFF555577 : 0xFF181822;
+        } else {
+            trackColor = checked ? 0xFF8A9CFE : 0xFF222232;
+        }
         context.fill(x + 2, y + h / 2 - 3, x + w - 2, y + h / 2 + 3, trackColor);
-        CompatibilityHelper.drawBorder(context, x + 2, y + h / 2 - 3, w - 4, 6, 0x1A8A9CFE);
+        CompatibilityHelper.drawBorder(context, x + 2, y + h / 2 - 3, w - 4, 6,
+                dimmed ? 0x0A8A9CFE : 0x1A8A9CFE);
 
         // Draw knob
         int knobSize = 10;
         int knobY = y + h / 2 - 5;
         int knobX = checked ? x + w - knobSize - 2 : x + 2;
-        context.fill(knobX, knobY, knobX + knobSize, knobY + knobSize, 0xFFFFFFFF);
-        CompatibilityHelper.drawBorder(context, knobX, knobY, knobSize, knobSize, 0x308A9CFE);
+        int knobColor = dimmed ? 0xFF666666 : 0xFFFFFFFF;
+        context.fill(knobX, knobY, knobX + knobSize, knobY + knobSize, knobColor);
+        CompatibilityHelper.drawBorder(context, knobX, knobY, knobSize, knobSize,
+                dimmed ? 0x15666666 : 0x308A9CFE);
     }
 
     @Override
