@@ -38,13 +38,9 @@ A Minecraft Fabric client mod providing various helper utilities for Avicia guil
 
 ### Configuration
 
-On first run, the mod generates a configuration file at `config/avoutils.json`:
+Most settings can be changed in-game via `/avo config` (or just `/avo`). The config file lives at `config/avoutils.json`.
 
-```json
-{
-  "apiBaseUrl": "https://auth.avicia.info:8443"
-}
-```
+If you're running the backend locally, change the `apiBaseUrl` field to point at your local server.
 
 ---
 
