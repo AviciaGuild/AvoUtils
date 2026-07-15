@@ -89,18 +89,38 @@ jobs:
             !build/libs/avoutils-*-sources.jar
             !build/libs/avoutils-*-dev.jar
 
+      - name: Generate Changelog
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')"
+          curr_tag="$(git describe --tags --abbrev=0)"
+          if [[ -n "$prev_tag" ]]; then
+            changelog="$(git log --pretty='- %s' "$prev_tag..HEAD")"
+            changelog="${changelog}"$'\n\nFull Changelog: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${curr_tag}'
+          else
+            changelog="$(git log --pretty='- %s')"
+          fi
+          if [[ -z "$changelog" ]]; then
+            changelog="Initial release"
+          fi
+          echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
+          echo "${changelog}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         if: steps.determine_version.outputs.should_publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.determine_version.outputs.tag_name }}
+          body: ${{ steps.changelog.outputs.changelog }}
           files: |
             build/libs/avoutils-*.jar
             !build/libs/avoutils-*-sources.jar
             !build/libs/avoutils-*-dev.jar
           draft: false
           prerelease: ${{ contains(steps.determine_version.outputs.version, '-') }}
-          generate_release_notes: true
 
       - name: Resolve Modrinth Metadata
         if: steps.determine_version.outputs.should_publish_modrinth == 'true'
@@ -118,17 +138,9 @@ jobs:
 
           minecraft_version="$(sed -n 's/^minecraft_version=//p' gradle.properties)"
 
-          changelog="$(git tag -l --format='%(contents)' "${{ steps.determine_version.outputs.tag_name }}")"
-          if [[ -z "$changelog" || "$changelog" == "${{ steps.determine_version.outputs.tag_name }}" ]]; then
-            changelog="See https://github.com/${GITHUB_REPOSITORY}/releases/tag/${{ steps.determine_version.outputs.tag_name }}"
-          fi
-
           {
             echo "mod_jar=${release_jars[0]}"
             echo "minecraft_version=${minecraft_version}"
-            echo "changelog<<EOF"
-            echo "${changelog}"
-            echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Publish to Modrinth
@@ -152,7 +164,7 @@ jobs:
           payload="$(jq -cn \
             --arg name "AvoUtils ${{ steps.determine_version.outputs.version }}" \
             --arg version_number "${{ steps.determine_version.outputs.version }}" \
-            --arg changelog "${{ steps.modrinth_meta.outputs.changelog }}" \
+            --arg changelog "${{ steps.changelog.outputs.changelog }}" \
             --arg project_id "${project_id}" \
             --arg minecraft_version "${{ steps.modrinth_meta.outputs.minecraft_version }}" \
             '{
