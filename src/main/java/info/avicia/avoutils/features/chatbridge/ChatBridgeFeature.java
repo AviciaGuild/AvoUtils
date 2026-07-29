@@ -37,6 +37,7 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final Pattern HOVER_REAL_NAME_PATTERN = Pattern.compile(
             "(?:'(?:s)? real name is\\s+|Real Username:\\s*)([a-zA-Z0-9_]{3,16})",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern EMOJI_SHORTCODE_PATTERN = Pattern.compile(":[a-zA-Z0-9_+\\-]+:");
 
     private ModConfig config;
 
@@ -227,7 +228,8 @@ public class ChatBridgeFeature implements AvoFeature {
     }
 
     private void sendBridgeMessage(Deduplicator deduper, String eventType, String username, String message, String avatarUrl) {
-        String key = username + "\u0000" + message;
+        String dedupContent = EMOJI_SHORTCODE_PATTERN.matcher(message).replaceAll("").replaceAll("\\s+", " ").trim();
+        String key = username + "\u0000" + dedupContent;
         if (deduper.isDuplicate(key)) {
             return;
         }
