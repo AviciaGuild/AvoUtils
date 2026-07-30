@@ -44,9 +44,8 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String AVATAR_URL_BASE = "https://mc-heads.net/avatar/";
     private static final String BANK_CHEST_AVATAR_URL = "https://wynncraft.wiki.gg/images/UnidentifiedMythicBox.png";
 
-    private static final long DEDUPE_WINDOW_MS = 750;
+    private static final long DEDUPE_WINDOW_MS = 250;
     private final Deduplicator chatDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
-    private final Deduplicator bankLogDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
 
     private static final String EVT_DISCORD_CHAT = "discord_chat";
     private static final String EVT_GUILD_CHAT = "guild_chat";
@@ -228,10 +227,12 @@ public class ChatBridgeFeature implements AvoFeature {
     }
 
     private void sendBridgeMessage(Deduplicator deduper, String eventType, String username, String message, String avatarUrl) {
-        String dedupContent = EMOJI_SHORTCODE_PATTERN.matcher(message).replaceAll("").replaceAll("\\s+", " ").trim();
-        String key = username + "\u0000" + dedupContent;
-        if (deduper.isDuplicate(key)) {
-            return;
+        if (deduper != null) {
+            String dedupContent = EMOJI_SHORTCODE_PATTERN.matcher(message).replaceAll("").replaceAll("\\s+", " ").trim();
+            String key = username + "\u0000" + dedupContent;
+            if (deduper.isDuplicate(key)) {
+                return;
+            }
         }
         JsonObject payload = new JsonObject();
         payload.addProperty("username", username);
@@ -275,7 +276,7 @@ public class ChatBridgeFeature implements AvoFeature {
                 ? "Guild Bank"
                 : "Guild Bank (" + accessTier + ")";
 
-        sendBridgeMessage(bankLogDeduper, EVT_GUILD_BANK, displayName, formattedMessage, BANK_CHEST_AVATAR_URL);
+        sendBridgeMessage(null, EVT_GUILD_BANK, displayName, formattedMessage, BANK_CHEST_AVATAR_URL);
     }
 
     public void toggleBridge() {
