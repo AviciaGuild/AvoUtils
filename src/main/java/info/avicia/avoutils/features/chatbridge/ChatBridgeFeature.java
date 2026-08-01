@@ -34,10 +34,11 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String BANK_CHEST_AVATAR_URL = "https://wynncraft.wiki.gg/images/UnidentifiedMythicBox.png";
     private static final String AVO_ICON_URL = "https://raw.githubusercontent.com/AviciaGuild/AvoUtils/refs/heads/main/src/main/resources/assets/avoutils/icon.png";
 
-    private static final long DEDUPE_WINDOW_MS = 250;
-    private final Deduplicator chatDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
-    private final Deduplicator raidDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
-    private final Deduplicator warDeduper = new Deduplicator(DEDUPE_WINDOW_MS);
+    private static final long CHAT_DEDUPE_MS = 250;
+    private static final long EVENT_DEDUPE_MS = 5_000;
+    private final Deduplicator chatDeduper = new Deduplicator(CHAT_DEDUPE_MS);
+    private final Deduplicator raidDeduper = new Deduplicator(EVENT_DEDUPE_MS);
+    private final Deduplicator warDeduper = new Deduplicator(EVENT_DEDUPE_MS);
 
     private static final String EVT_DISCORD_CHAT = "discord_chat";
     private static final String EVT_GUILD_CHAT = "guild_chat";
@@ -138,12 +139,8 @@ public class ChatBridgeFeature implements AvoFeature {
 
         String realUsername = UsernameResolver.resolve(message, displayedName);
         if (realUsername == null) {
-            String cleaned2 = displayedName.replaceAll("[^a-zA-Z0-9_]", "");
-            if (!UsernameResolver.isValid(cleaned2)) {
-                AvoUtilsMod.LOGGER.warn("[ChatBridge] Could not resolve username from '{}'", displayedName);
-                return;
-            }
-            realUsername = cleaned2;
+            AvoUtilsMod.LOGGER.warn("[ChatBridge] Could not resolve username from '{}'", displayedName);
+            return;
         }
 
         String dedupContent = EMOJI_SHORTCODE_PATTERN.matcher(content)

@@ -29,8 +29,6 @@ final class WarDetector {
             "❤ Health:\\s*(\\d+)");
     private static final Pattern STAT_DEFENSE = Pattern.compile(
             "⛨ Defense:\\s*([\\d.]+)%");
-    private static final Pattern STAT_TIME = Pattern.compile(
-            "🕑 Time in War:\\s*(\\d+)s");
 
     // Completion message patterns
     private static final Pattern WAR_WIN = Pattern.compile(
@@ -73,22 +71,18 @@ final class WarDetector {
     // Tower Stats parsing
 
     private static PendingWar parseTowerStats(String cleaned) {
-        // Split on the equals separators to find individual stat lines
-        // The block looks like: "...Initial...===... Territory [Guild] stat1 stat2 ...==="
         String territory = null;
         String enemyGuild = null;
         Integer damageLow = null, damageHigh = null;
         Double attackSpeed = null;
         Integer health = null;
         Double defense = null;
-        Integer timeSec = null;
 
         Matcher tgMatcher = TERRITORY_GUILD.matcher(cleaned);
         Matcher damageMatcher = STAT_DAMAGE.matcher(cleaned);
         Matcher atkSpdMatcher = STAT_ATTACK_SPEED.matcher(cleaned);
         Matcher healthMatcher = STAT_HEALTH.matcher(cleaned);
         Matcher defMatcher = STAT_DEFENSE.matcher(cleaned);
-        Matcher timeMatcher = STAT_TIME.matcher(cleaned);
 
         if (damageMatcher.find()) {
             damageLow = Integer.parseInt(damageMatcher.group(1));
@@ -103,9 +97,6 @@ final class WarDetector {
         if (defMatcher.find()) {
             defense = Double.parseDouble(defMatcher.group(1));
         }
-        if (timeMatcher.find()) {
-            timeSec = Integer.parseInt(timeMatcher.group(1));
-        }
 
         // Territory+enemy: find "Name [Guild]" pattern
         // The territory name comes before the stats in the normalized text
@@ -118,11 +109,11 @@ final class WarDetector {
         if (territory == null) return null;
 
         AvoUtilsMod.LOGGER.info(
-                "[ChatBridge/War] Tower stats parsed: territory='{}' enemy='{}' dmg={}-{} atk={}x hp={} def={}% time={}s",
-                territory, enemyGuild, damageLow, damageHigh, attackSpeed, health, defense, timeSec);
+                "[ChatBridge/War] Tower stats parsed: territory='{}' enemy='{}' dmg={}-{} atk={}x hp={} def={}%",
+                territory, enemyGuild, damageLow, damageHigh, attackSpeed, health, defense);
 
         return new PendingWar(territory, enemyGuild,
-                damageLow, damageHigh, attackSpeed, health, defense, timeSec);
+                damageLow, damageHigh, attackSpeed, health, defense);
     }
 
     // Completion detection
@@ -237,7 +228,6 @@ final class WarDetector {
             Integer damageHigh,
             Double attackSpeed,
             Integer health,
-            Double defense,
-            Integer timeSec) {
+            Double defense) {
     }
 }

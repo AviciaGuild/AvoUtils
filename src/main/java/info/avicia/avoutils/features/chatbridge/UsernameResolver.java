@@ -4,12 +4,14 @@ import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.HoverEvent;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Username resolution from Wynncraft chat components.
- * Extracts real Minecraft usernames from hover text ("real name is X").
+ * Resolves displayed names to real Minecraft usernames using hover text
+ * from the chat component tree. Searches for a component whose visible
+ * text contains the displayed name, then extracts hover from it.
  */
 final class UsernameResolver {
 
@@ -19,44 +21,46 @@ final class UsernameResolver {
             "(?:'(?:s)? real name is\\s+|Real Username:\\s*)([a-zA-Z0-9_]{3,16})",
             Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern PARENTHESIZED_USERNAME_PATTERN =
-            Pattern.compile(".*\\(([a-zA-Z0-9_]{3,16})\\)$");
-
     static boolean isValid(String name) {
         return name != null && USERNAME_PATTERN.matcher(name).matches();
     }
 
     /**
-     * Resolves a displayed name (which may be a nickname) to a real username
-     * by searching the component tree for hover text and insertion hints.
+     * Finds the component whose visible text contains displayedName,
+     * extracts hover real name from it. Falls back to displayedName
+     * if it's a valid username and no hover is found.
      */
     static String resolve(Text message, String displayedName) {
-        // Try hover real name
-        String hoverRealName = findHoverRealName(message);
-        if (hoverRealName != null) return hoverRealName;
+        String hover = findHoverForName(message, displayedName);
+        if (hover != null) return hover;
 
-        // Try parenthesized real name (e.g. "Nickname (RealName)")
-        Matcher parenMatcher = PARENTHESIZED_USERNAME_PATTERN.matcher(displayedName);
-        if (parenMatcher.matches()) return parenMatcher.group(1);
-
-        // If displayed name is a valid username, use it
         if (isValid(displayedName)) return displayedName;
-
-        // Try insertion username
-        String insertionName = findInsertionName(message);
-        if (insertionName != null) return insertionName;
 
         return null;
     }
 
-    private static String findHoverRealName(Text text) {
-        if (text == null) return null;
-        String fromStyle = extractHoverRealName(text.getStyle());
-        if (fromStyle != null) return fromStyle;
-        for (Text sibling : text.getSiblings()) {
-            String found = findHoverRealName(sibling);
+    private static String findHoverForName(Text text, String name) {
+        if (text == null || name == null) return null;
+
+        // If this is a leaf (no siblings), check if the displayed name
+        // starts with this component's text. The first leaf that contributes
+        // to the displayed name carries the hover
+        List<Text> siblings = text.getSiblings();
+        if (siblings.isEmpty()) {
+            String visible = text.getString();
+            if (!visible.isEmpty() && name.startsWith(visible)) {
+                String hover = extractHoverRealName(text.getStyle());
+                if (hover != null) return hover;
+            }
+            return null;
+        }
+
+        // Recurse into children
+        for (Text sibling : siblings) {
+            String found = findHoverForName(sibling, name);
             if (found != null) return found;
         }
+
         return null;
     }
 
@@ -71,16 +75,5 @@ final class UsernameResolver {
                 .replace('\u2018', '\'');
         Matcher matcher = HOVER_REAL_NAME_PATTERN.matcher(hoverText);
         return matcher.find() ? matcher.group(1) : null;
-    }
-
-    private static String findInsertionName(Text text) {
-        if (text == null) return null;
-        String insertion = text.getStyle().getInsertion();
-        if (isValid(insertion)) return insertion;
-        for (Text sibling : text.getSiblings()) {
-            String found = findInsertionName(sibling);
-            if (found != null) return found;
-        }
-        return null;
     }
 }

@@ -91,14 +91,16 @@ final class RaidDetector {
     }
 
     private static List<String> resolvePartyMembers(List<String> displayedNames, Text message) {
-        boolean hasInvalid = displayedNames.stream()
-                .anyMatch(n -> !USERNAME_PATTERN.matcher(n).matches());
         Set<String> resolved = new LinkedHashSet<>();
-        for (String name : displayedNames) {
-            if (name.isBlank()) continue;
-            String real = UsernameResolver.resolve(message, name);
-            if (real != null) resolved.add(real);
-            else if (!hasInvalid && USERNAME_PATTERN.matcher(name).matches()) resolved.add(name);
+        for (String displayedName : displayedNames) {
+            if (displayedName.isBlank()) continue;
+
+            String real = UsernameResolver.resolve(message, displayedName);
+            if (real != null) {
+                resolved.add(real);
+            } else if (USERNAME_PATTERN.matcher(displayedName).matches()) {
+                resolved.add(displayedName);
+            }
         }
         return List.copyOf(new ArrayList<>(resolved));
     }
