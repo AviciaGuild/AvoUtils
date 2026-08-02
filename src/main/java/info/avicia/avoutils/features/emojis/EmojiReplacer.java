@@ -1,6 +1,7 @@
 package info.avicia.avoutils.features.emojis;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -91,7 +92,9 @@ public class EmojiReplacer {
                             root.append(Text.literal(text.substring(lastEnd, i)).setStyle(parentStyle));
                         }
 
-                        Style emojiStyle = parentStyle.withColor(EMOJI_COLOR);
+                        String emojiName = text.substring(i + 1, end);
+                        Style emojiStyle = parentStyle.withColor(EMOJI_COLOR)
+                                .withHoverEvent(new HoverEvent.ShowText(Text.literal(":" + emojiName + ":")));
                         root.append(Text.literal(replacement).setStyle(emojiStyle));
 
                         lastEnd = end + 1;
