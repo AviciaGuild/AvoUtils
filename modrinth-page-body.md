@@ -31,6 +31,7 @@ Before most of the mod's features will work, you need to link your Minecraft acc
 - Fabric Loader `>=0.16.14`
 - Fabric API `>=0.141.4`
 - Java `>=21`
+- Wynntils (optional) `>=4.1.10`
 
 ## Commands
 

@@ -3,7 +3,7 @@
   "id": "avoutils",
   "version": "${version}",
   "name": "AvoUtils",
-  "description": "A general utilities mod for Avicia, incorporating the Party Finder system.",
+  "description": "A general utilities mod for Avicia on Wynncraft. Features include a Discord chat bridge, party finder system, and emoji support.",
   "authors": ["Avicia"],
   "contact": {
     "homepage": "https://github.com/AviciaGuild/AvoUtils",
@@ -26,5 +26,8 @@
     "minecraft": "~1.21.11",
     "java": ">=21",
     "fabric-api": "*"
+  },
+  "suggests": {
+    "wynntils": ">=4.1.10"
   }
 }

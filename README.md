@@ -11,7 +11,7 @@ A Minecraft Fabric client mod providing various helper utilities for Avicia guil
 ### Features
 
 - **Party Finder:** Browse, create, and join parties in-game. Integrated with AvoBot's party finder system so parties created in-game sync with Discord and vice versa.
-- **Chat Bridge:** Lets you view the in-game guild chat from Discord, and relays Discord messages back to in-game chat.
+- **Chat Bridge:** Relays the in-game guild chat to Discord. Discord messages are relayed back to in-game chat.
 - **Emoji Support:** Use standard Discord emojis and custom emojis from Avicia's Discord server directly in Minecraft chat.
 
 ---
@@ -33,6 +33,7 @@ A Minecraft Fabric client mod providing various helper utilities for Avicia guil
 | Fabric Loader | `>=0.16.14` |
 | Fabric API | `>=0.141.4` |
 | Java | `>=21` |
+| Wynntils  (optional) | `>=4.1.10` |
 
 ---
 

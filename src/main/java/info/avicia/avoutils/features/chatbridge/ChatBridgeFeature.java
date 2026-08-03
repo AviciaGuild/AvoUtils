@@ -38,7 +38,6 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final long EVENT_DEDUPE_MS = 5_000;
     private final Deduplicator chatDeduper = new Deduplicator(CHAT_DEDUPE_MS);
     private final Deduplicator raidDeduper = new Deduplicator(EVENT_DEDUPE_MS);
-    private final Deduplicator warDeduper = new Deduplicator(EVENT_DEDUPE_MS);
 
     private static final String EVT_DISCORD_CHAT = "discord_chat";
     private static final String EVT_GUILD_CHAT = "guild_chat";
@@ -101,26 +100,25 @@ public class ChatBridgeFeature implements AvoFeature {
         AvoUtilsMod.LOGGER.info("[ChatBridge] Initialized.");
     }
 
+    /** Called by WarDetector when a war completes via Wynntils API. */
+    void sendWarResult(String outcome, String message) {
+        sendEvent(EVT_GUILD_WAR, "War Result", message, AVO_ICON_URL);
+    }
+
+    /** Called when a system message is received. */
     public void onSystemChat(Text message) {
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
         if (!isBridgeActive()) return;
 
-        String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
+        WarDetector.tick();
 
-        // System-level events (raid completions, war captures)
+        String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
 
         String raidMsg = RaidDetector.tryDetect(cleaned, message);
         if (raidMsg != null && !raidDeduper.isDuplicate(raidMsg)) {
             sendEvent(EVT_GUILD_RAID, "Raid Complete", raidMsg, AVO_ICON_URL);
             return;
         }
-        String warMsg = WarDetector.tryDetect(cleaned);
-        if (warMsg != null && !warDeduper.isDuplicate(warMsg)) {
-            sendEvent(EVT_GUILD_WAR, "War Result", warMsg, AVO_ICON_URL);
-            return;
-        }
-
-        // Guild chat relay (guild-colored messages only)
 
         if (!hasLeadingGuildChatColor(message)) return;
 
