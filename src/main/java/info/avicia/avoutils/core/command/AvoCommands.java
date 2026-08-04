@@ -6,6 +6,7 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
+import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
 import info.avicia.avoutils.core.util.WynnPillUtil;
@@ -41,6 +42,15 @@ public class AvoCommands {
                 ChatBridgeFeature feature = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
                 if (feature != null) {
                     feature.toggleBridge();
+                }
+                return 1;
+            };
+
+            // /avo storage → toggle guild storage tracking
+            Command<FabricClientCommandSource> toggleStorageCommand = context -> {
+                GuildStorageNotifier feature = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
+                if (feature != null) {
+                    feature.toggleStorage();
                 }
                 return 1;
             };
@@ -102,6 +112,8 @@ public class AvoCommands {
                                     .executes(openConfigCommand))
                             .then(literal("bridge")
                                     .executes(toggleBridgeCommand))
+                            .then(literal("storage")
+                                    .executes(toggleStorageCommand))
                             .then(literal("emojis")
                                     .executes(toggleEmojisCommand))
                             .then(literal("pf")

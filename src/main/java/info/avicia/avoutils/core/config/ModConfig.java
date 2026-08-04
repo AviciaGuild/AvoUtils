@@ -22,6 +22,9 @@ public class ModConfig {
     public boolean emojiEnabled = true;
     public boolean newPartyNotifsEnabled = true;
     public boolean notificationSoundsEnabled = true;
+    public boolean guildStorageNotifsEnabled = true;
+    public int guildStorageEmeraldThresholdPercent = 90;
+    public int guildStorageAspectThresholdPercent = 90;
 
     /**
      * Load config from disk, or create a default one if it doesn't exist

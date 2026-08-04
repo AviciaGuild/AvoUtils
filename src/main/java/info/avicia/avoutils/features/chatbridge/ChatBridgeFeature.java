@@ -6,6 +6,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import net.minecraft.client.MinecraftClient;
@@ -43,6 +44,7 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_GUILD_CHAT = "guild_chat";
     private static final String EVT_GUILD_BANK = "guild_bank_event";
     private static final String EVT_GUILD_RAID = "guild_raid_completion";
+    private static final String EVT_GUILD_REWARD = "guild_reward";
     private static final String EVT_GUILD_WAR = "guild_war_result";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
@@ -113,15 +115,29 @@ public class ChatBridgeFeature implements AvoFeature {
         WarDetector.tick();
 
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
-
-        String raidMsg = RaidDetector.tryDetect(cleaned, message);
-        if (raidMsg != null && !raidDeduper.isDuplicate(raidMsg)) {
-            sendEvent(EVT_GUILD_RAID, "Raid Complete", raidMsg, AVO_ICON_URL);
-            return;
-        }
+        GuildStorageNotifier storage = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
 
         if (!hasLeadingGuildChatColor(message)) return;
 
+        // ── Raid completions ──────────────────────────────────────────
+        RaidDetector.RaidResult raidResult = RaidDetector.tryDetect(cleaned, message);
+        if (raidResult != null && !raidDeduper.isDuplicate(raidResult.formattedMessage())) {
+            sendEvent(EVT_GUILD_RAID, "Raid Complete", raidResult.formattedMessage(), AVO_ICON_URL);
+        }
+        if (raidResult != null && storage != null) {
+            storage.onRaidDelta(raidResult.emeralds(), raidResult.aspects());
+        }
+
+        // ── Reward grants ─────────────────────────────────────────────
+        RewardDetector.RewardResult rewardResult = RewardDetector.tryDetect(cleaned, message);
+        if (rewardResult != null) {
+            sendEvent(EVT_GUILD_REWARD, "Guild Rewards", rewardResult.formattedMessage(), AVO_ICON_URL);
+        }
+        if (rewardResult != null && storage != null && rewardResult.tomeCount() == 0) {
+            storage.onRewardDelta(-rewardResult.emeraldAmount(), -rewardResult.aspectAmount());
+        }
+
+        // ── Guild chat messages ───────────────────────────────────────
         Matcher matcher = CHAT_PATTERN.matcher(cleaned);
         if (!matcher.find()) {
             BankDetector.Result bankResult = BankDetector.tryDetect(cleaned, message);

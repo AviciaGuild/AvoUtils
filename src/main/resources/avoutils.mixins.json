@@ -5,6 +5,7 @@
   "client": [
     "ClientPlayNetworkHandlerMixin",
     "ChatHudMixin",
+    "HandledScreenMixin",
     "ResourcePackManagerMixin"
   ],
   "injectors": {

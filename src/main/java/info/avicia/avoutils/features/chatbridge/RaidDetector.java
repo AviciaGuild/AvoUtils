@@ -12,8 +12,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Detects raid completions from system chat and formats them
- * for relay to Discord.
+ * Detects raid completions from system chat and returns structured data
+ * for both Discord relay and storage delta tracking.
  */
 final class RaidDetector {
 
@@ -28,7 +28,9 @@ final class RaidDetector {
     private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{3,16}");
     private static final Pattern COMMA_SPACING_PATTERN = Pattern.compile("\\s*,\\s*");
 
-    static String tryDetect(String cleaned, Text message) {
+    record RaidResult(String formattedMessage, int emeralds, int aspects) {}
+
+    static RaidResult tryDetect(String cleaned, Text message) {
         if (!isRaidCandidateText(cleaned)) return null;
         cleaned = cleaned.replace(",and ", ", and ");
 
@@ -76,7 +78,7 @@ final class RaidDetector {
         if (!parts.isEmpty()) sb.append(" — ").append(String.join(", ", parts));
 
         AvoUtilsMod.LOGGER.info("[ChatBridge/Raid] Detected: raid='{}'", raidName);
-        return sb.toString();
+        return new RaidResult(sb.toString(), emeralds, aspects);
     }
 
     private static boolean isRaidCandidateText(String cleaned) {
