@@ -3,6 +3,7 @@ package info.avicia.avoutils.core.gui;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.text.Text;
@@ -90,12 +91,11 @@ public class FlatSliderWidget extends ClickableWidget {
         int y = getY();
         int w = getWidth();
         int h = getHeight();
+        boolean dimmed = !this.active;
 
-        // Detect mouse hover state
         boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
 
-        // GLFW mouse state check for dragging fallback
-        if (this.dragging) {
+        if (this.dragging && !dimmed) {
             long windowHandle = MinecraftClient.getInstance().getWindow().getHandle();
             boolean isPressed = GLFW.glfwGetMouseButton(windowHandle, 0) == GLFW.GLFW_PRESS;
             if (isPressed) {
@@ -105,24 +105,58 @@ public class FlatSliderWidget extends ClickableWidget {
             }
         }
 
-        // Draw track background
-        context.fill(x, y + h / 2 - 2, x + w, y + h / 2 + 2, 0xFF14141E);
-        CompatibilityHelper.drawBorder(context, x, y + h / 2 - 2, w, 4, 0x1A8A9CFE);
+        // Track background
+        int trackBg = dimmed ? 0xFF0E0E18 : 0xFF14141E;
+        context.fill(x, y + h / 2 - 2, x + w, y + h / 2 + 2, trackBg);
+        CompatibilityHelper.drawBorder(context, x, y + h / 2 - 2, w, 4,
+                dimmed ? 0x0A8A9CFE : 0x1A8A9CFE);
 
-        // Calculate progress knob position
         double range = max - min;
         double ratio = range == 0 ? 0 : (value - min) / range;
         int knobX = x + (int) (ratio * (w - 8));
 
-        // Draw fill track
+        // Fill track
         if (knobX > x) {
-            context.fill(x + 1, y + h / 2 - 1, knobX + 4, y + h / 2 + 1, 0xFF8A9CFE);
+            int fillColor = dimmed ? 0xFF444466 : 0xFF8A9CFE;
+            context.fill(x + 1, y + h / 2 - 1, knobX + 4, y + h / 2 + 1, fillColor);
         }
 
-        // Draw knob
-        int knobColor = (hovered || dragging) ? 0xFFFFFFFF : 0xFFD0D4FF;
+        // Knob
+        int knobColor;
+        if (dimmed) {
+            knobColor = 0xFF555566;
+        } else if (hovered || dragging) {
+            knobColor = 0xFFFFFFFF;
+        } else {
+            knobColor = 0xFFD0D4FF;
+        }
         context.fill(knobX, y + h / 2 - 4, knobX + 8, y + h / 2 + 4, knobColor);
-        CompatibilityHelper.drawBorder(context, knobX, y + h / 2 - 4, 8, 8, 0x308A9CFE);
+        CompatibilityHelper.drawBorder(context, knobX, y + h / 2 - 4, 8, 8,
+                dimmed ? 0x15555566 : 0x308A9CFE);
+    }
+
+    public boolean keyPressed(KeyInput keyInput) {
+        if (!this.active || !this.visible || !this.isFocused()) return false;
+
+        int step = (max - min) <= 10 ? 1 : 5;
+        int key = keyInput.key();
+        if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_DOWN) {
+            int newValue = Math.max(min, value - step);
+            if (newValue != value) {
+                value = newValue;
+                if (onChanged != null) onChanged.accept(value);
+            }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_RIGHT || key == GLFW.GLFW_KEY_UP) {
+            int newValue = Math.min(max, value + step);
+            if (newValue != value) {
+                value = newValue;
+                if (onChanged != null) onChanged.accept(value);
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override
