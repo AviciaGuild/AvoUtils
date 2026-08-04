@@ -1,32 +1,34 @@
 package info.avicia.avoutils.features.chatbridge;
 
-import com.wynntils.core.WynntilsMod;
 import com.wynntils.core.components.Models;
-import com.wynntils.models.character.event.CharacterDeathEvent;
 import com.wynntils.models.war.type.WarBattleInfo;
 import com.wynntils.models.war.type.WarTowerState;
 import com.wynntils.utils.type.RangedValue;
 import info.avicia.avoutils.AvoUtilsMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
-import net.neoforged.bus.api.SubscribeEvent;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
- * Detects guild war outcomes using Wynntils tower state API.
+ * Detects guild war stats and outcomes using Wynntils tower state API.
  */
 final class WarDetector {
 
     private static final double TRACKING_RADIUS_SQ = 120.0 * 120.0;
+    private static final long GRACE_PERIOD_MS = 5_000;
+
+    private static final Pattern TERRITORY_CAPTURED = Pattern.compile("(?i)Territory\\s+Captured");
+    private static final Pattern WAR_LOST = Pattern.compile("(?i)lost\\s+the\\s+war\\s+for");
 
     private static String activeBattleId;
     private static WarBattleInfo activeInfo;
     private static List<String> activeWarrers;
     private static boolean submissionSent;
-    private static boolean deathListenerRegistered;
+    private static long warDisappearedAt;
 
     static void tick() {
         try {
@@ -37,22 +39,9 @@ final class WarDetector {
     }
 
     private static void doTick() {
-        if (!deathListenerRegistered) {
-            try {
-                WynntilsMod.registerEventListener(new Object() {
-                    @SubscribeEvent
-                    public void onDeath(CharacterDeathEvent e) {
-                        onCharacterDeath();
-                    }
-                });
-                deathListenerRegistered = true;
-            } catch (Throwable ignored) {
-                return;
-            }
-        }
-
         WarBattleInfo info = Models.GuildWarTower.getWarBattleInfo().orElse(null);
         if (info != null) {
+            warDisappearedAt = 0;
             String battleId = info.getTerritory() + ":" + info.getInitialState().timestamp();
             if (!battleId.equals(activeBattleId)) {
                 activeBattleId = battleId;
@@ -64,26 +53,39 @@ final class WarDetector {
             } else {
                 activeInfo = info;
             }
-
-            // Tower destroyed = win
-            if (!submissionSent && info.getCurrentState().health() <= 0) {
-                submitWar("Captured");
-            }
         } else if (activeBattleId != null && !submissionSent) {
-            // War disappeared = ended, submit if not already sent
-            submitWar("Captured");
-            reset();
+            // War disappeared from API; allow grace period for chat message
+            if (warDisappearedAt == 0) {
+                warDisappearedAt = System.currentTimeMillis();
+            }
+            if (System.currentTimeMillis() - warDisappearedAt > GRACE_PERIOD_MS) {
+                AvoUtilsMod.LOGGER.warn("[ChatBridge/War] War disappeared without outcome chat — resetting");
+                reset();
+            }
         }
     }
 
-    private static void onCharacterDeath() {
-        if (activeBattleId != null && !submissionSent) {
-            submitWar("Failed");
+    /**
+     * Called from {@link ChatBridgeFeature#onSystemChat} for every system message.
+     * Returns a formatted Discord message if a war outcome chat line is detected,
+     * but only when the local player was confirmed to be in the war via Wynntils API.
+     */
+    static String tryDetectOutcome(String cleaned) {
+        if (activeBattleId == null || submissionSent) return null;
+
+        if (TERRITORY_CAPTURED.matcher(cleaned).find()) {
+            return formatWarResult("Captured");
         }
+
+        if (WAR_LOST.matcher(cleaned).find()) {
+            return formatWarResult("Failed");
+        }
+
+        return null;
     }
 
-    private static void submitWar(String outcome) {
-        if (activeInfo == null) return;
+    private static String formatWarResult(String outcome) {
+        if (activeInfo == null) return null;
         submissionSent = true;
 
         WarTowerState initial = activeInfo.getInitialState();
@@ -108,11 +110,7 @@ final class WarDetector {
             sb.append("\n👥 ").append(String.join(", ", activeWarrers));
         }
 
-        // Submit via ChatBridgeFeature
-        ChatBridgeFeature cb = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
-        if (cb != null) {
-            cb.sendWarResult(outcome.equals("Captured") ? "Captured" : "Failed", sb.toString());
-        }
+        return sb.toString();
     }
 
     static void reset() {
@@ -120,6 +118,7 @@ final class WarDetector {
         activeInfo = null;
         activeWarrers = null;
         submissionSent = false;
+        warDisappearedAt = 0;
     }
 
     private static String formatNumber(long value) {

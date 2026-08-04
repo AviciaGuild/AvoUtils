@@ -48,7 +48,6 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_GUILD_WAR = "guild_war_result";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
-
     public boolean isGuildMember() {
         Boolean cached = AvoAuthService.getInstance().getCachedGuildMember();
         return cached != null && cached;
@@ -102,11 +101,6 @@ public class ChatBridgeFeature implements AvoFeature {
         AvoUtilsMod.LOGGER.info("[ChatBridge] Initialized.");
     }
 
-    /** Called by WarDetector when a war completes via Wynntils API. */
-    void sendWarResult(String outcome, String message) {
-        sendEvent(EVT_GUILD_WAR, "War Result", message, AVO_ICON_URL);
-    }
-
     /** Called when a system message is received. */
     public void onSystemChat(Text message) {
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
@@ -116,6 +110,13 @@ public class ChatBridgeFeature implements AvoFeature {
 
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
         GuildStorageNotifier storage = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
+
+        // ── War outcomes (system messages, not guild-colored) ──────────
+        String warMsg = WarDetector.tryDetectOutcome(cleaned);
+        if (warMsg != null) {
+            sendEvent(EVT_GUILD_WAR, "War Result", warMsg, AVO_ICON_URL);
+            return;
+        }
 
         if (!hasLeadingGuildChatColor(message)) return;
 
