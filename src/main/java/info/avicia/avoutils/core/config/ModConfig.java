@@ -23,6 +23,7 @@ public class ModConfig {
     public boolean newPartyNotifsEnabled = true;
     public boolean notificationSoundsEnabled = true;
     public boolean guildStorageNotifsEnabled = true;
+    public boolean guildStorageNotifSoundsEnabled = true;
     public int guildStorageEmeraldThresholdPercent = 90;
     public int guildStorageAspectThresholdPercent = 90;
 
