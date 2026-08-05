@@ -238,8 +238,7 @@ public class GuildStorageNotifier implements AvoFeature {
                 var msg = WynnPillUtil.createPrefixedPill("AvoUtils", false)
                         .append(Text.literal(resourceName).formatted(Formatting.GOLD))
                         .append(Text.literal(" storage reached ").formatted(Formatting.GRAY))
-                        .append(Text.literal(thresholdPercent + "%").formatted(Formatting.GREEN))
-                        .append(Text.literal("!").formatted(Formatting.GRAY));
+                        .append(Text.literal(thresholdPercent + "%").formatted(Formatting.GREEN));
                 MinecraftClient.getInstance().player.sendMessage(msg, false);
             }
         });
