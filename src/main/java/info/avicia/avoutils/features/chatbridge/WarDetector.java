@@ -18,7 +18,13 @@ import java.util.regex.Pattern;
  */
 final class WarDetector {
 
-    record WarResult(String outcome, String territory, String stats, String warrers) {}
+    record WarResult(String outcome, String territory, String stats, String warrers) {
+        String formattedMessage() {
+            return "**" + outcome + ": " + territory + "**\n"
+                    + stats
+                    + (warrers.isEmpty() ? "" : "\n👥 " + warrers);
+        }
+    }
 
     private static final double TRACKING_RADIUS_SQ = 120.0 * 120.0;
     private static final long GRACE_PERIOD_MS = 5_000;
