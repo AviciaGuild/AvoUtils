@@ -45,7 +45,7 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_GUILD_BANK = "guild_bank_event";
     private static final String EVT_GUILD_RAID = "guild_raid_completion";
     private static final String EVT_GUILD_REWARD = "guild_reward";
-    private static final String EVT_MOD_WAR_STATS = "mod_war_stats";
+    private static final String EVT_GUILD_WAR = "guild_war_result";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
     public boolean isGuildMember() {
@@ -191,7 +191,7 @@ public class ChatBridgeFeature implements AvoFeature {
         payload.addProperty("territory", warResult.territory());
         payload.addProperty("stats", warResult.stats());
         payload.addProperty("warrers", warResult.warrers());
-        AvoWebSocketManager.getInstance().sendEvent(EVT_MOD_WAR_STATS, payload);
+        AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_WAR, payload);
     }
 
     public void toggleBridge() {
