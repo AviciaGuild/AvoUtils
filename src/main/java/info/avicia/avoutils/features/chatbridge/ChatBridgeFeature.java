@@ -45,7 +45,7 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_GUILD_BANK = "guild_bank_event";
     private static final String EVT_GUILD_RAID = "guild_raid_completion";
     private static final String EVT_GUILD_REWARD = "guild_reward";
-    private static final String EVT_GUILD_WAR = "guild_war_result";
+    private static final String EVT_MOD_WAR_STATS = "mod_war_stats";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
     public boolean isGuildMember() {
@@ -112,9 +112,9 @@ public class ChatBridgeFeature implements AvoFeature {
         GuildStorageNotifier storage = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
 
         // ── War outcomes (system messages, not guild-colored) ──────────
-        String warMsg = WarDetector.tryDetectOutcome(cleaned);
-        if (warMsg != null) {
-            sendEvent(EVT_GUILD_WAR, "War Result", warMsg, AVO_ICON_URL);
+        WarDetector.WarResult warResult = WarDetector.tryDetectOutcome(cleaned);
+        if (warResult != null) {
+            sendWarStats(warResult);
             return;
         }
 
@@ -184,6 +184,14 @@ public class ChatBridgeFeature implements AvoFeature {
         payload.addProperty("message", message);
         payload.addProperty("avatar_url", avatarUrl);
         AvoWebSocketManager.getInstance().sendEvent(eventType, payload);
+    }
+
+    private void sendWarStats(WarDetector.WarResult warResult) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("territory", warResult.territory());
+        payload.addProperty("stats", warResult.stats());
+        payload.addProperty("warrers", warResult.warrers());
+        AvoWebSocketManager.getInstance().sendEvent(EVT_MOD_WAR_STATS, payload);
     }
 
     public void toggleBridge() {
