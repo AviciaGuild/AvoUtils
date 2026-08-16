@@ -18,6 +18,14 @@ import java.util.regex.Pattern;
  */
 final class WarDetector {
 
+    record WarResult(String outcome, String territory, String stats, String warrers) {
+        String formattedMessage() {
+            return "**" + outcome + ": " + territory + "**\n"
+                    + stats
+                    + (warrers.isEmpty() ? "" : "\n👥 " + warrers);
+        }
+    }
+
     private static final double TRACKING_RADIUS_SQ = 120.0 * 120.0;
     private static final long GRACE_PERIOD_MS = 5_000;
 
@@ -67,10 +75,10 @@ final class WarDetector {
 
     /**
      * Called from {@link ChatBridgeFeature#onSystemChat} for every system message.
-     * Returns a formatted Discord message if a war outcome chat line is detected,
+     * Returns a structured war result if a war outcome chat line is detected,
      * but only when the local player was confirmed to be in the war via Wynntils API.
      */
-    static String tryDetectOutcome(String cleaned) {
+    static WarResult tryDetectOutcome(String cleaned) {
         if (activeBattleId == null || submissionSent) return null;
 
         if (TERRITORY_CAPTURED.matcher(cleaned).find()) {
@@ -84,7 +92,7 @@ final class WarDetector {
         return null;
     }
 
-    private static String formatWarResult(String outcome) {
+    private static WarResult formatWarResult(String outcome) {
         if (activeInfo == null) return null;
         submissionSent = true;
 
@@ -100,17 +108,17 @@ final class WarDetector {
         AvoUtilsMod.LOGGER.info("[ChatBridge/War] {}: territory='{}' hp={} def={}% dmg={}-{} atk={}x warrers={}",
                 outcome, territory, hp, def, dmgLow, dmgHigh, atk, activeWarrers);
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("**").append(outcome).append(": ").append(territory).append("**");
-        sb.append("\n❤ ").append(formatNumber(hp));
-        if (def > 0) sb.append(" (").append(String.format("%.0f", def)).append("%)");
-        sb.append(" · ☠ ").append(formatNumber(dmgLow)).append("-").append(formatNumber(dmgHigh));
-        if (atk > 0) sb.append(" (").append(atk).append("x)");
-        if (activeWarrers != null && !activeWarrers.isEmpty()) {
-            sb.append("\n👥 ").append(String.join(", ", activeWarrers));
-        }
+        StringBuilder stats = new StringBuilder();
+        stats.append("❤ ").append(formatNumber(hp));
+        if (def > 0) stats.append(" (").append(String.format("%.0f", def)).append("%)");
+        stats.append(" · ☠ ").append(formatNumber(dmgLow)).append("-").append(formatNumber(dmgHigh));
+        if (atk > 0) stats.append(" (").append(atk).append("x)");
 
-        return sb.toString();
+        String warrersStr = (activeWarrers != null && !activeWarrers.isEmpty()) 
+                ? String.join(", ", activeWarrers) 
+                : "";
+
+        return new WarResult(outcome, territory, stats.toString(), warrersStr);
     }
 
     static void reset() {
