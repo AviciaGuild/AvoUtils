@@ -194,6 +194,8 @@ public class ChatBridgeFeature implements AvoFeature {
         payload.addProperty("territory", warResult.territory());
         payload.addProperty("stats", warResult.stats());
         payload.addProperty("warrers", warResult.warrers());
+        payload.addProperty("duration_seconds", warResult.durationSeconds());
+        payload.addProperty("dps", warResult.dps());
         AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_WAR, payload);
     }
 

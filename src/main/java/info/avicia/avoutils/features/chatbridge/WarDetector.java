@@ -18,10 +18,13 @@ import java.util.regex.Pattern;
  */
 final class WarDetector {
 
-    record WarResult(String outcome, String territory, String stats, String warrers) {
+    record WarResult(String outcome, String territory, String stats, String warrers,
+                     long durationSeconds, long dps) {
         String formattedMessage() {
             return "**" + outcome + ": " + territory + "**\n"
                     + stats
+                    + "\n⏱ " + formatDuration(durationSeconds)
+                    + (dps > 0 ? " · ⚔ " + formatNumber(dps) + " dps" : "")
                     + (warrers.isEmpty() ? "" : "\n👥 " + warrers);
         }
     }
@@ -31,6 +34,7 @@ final class WarDetector {
 
     private static final Pattern TERRITORY_CAPTURED = Pattern.compile("(?i)Territory\\s+Captured");
     private static final Pattern WAR_LOST = Pattern.compile("(?i)lost\\s+the\\s+war\\s+for");
+    private static final Pattern VALID_USERNAME = Pattern.compile("^[a-zA-Z0-9_]{3,16}$");
 
     private static String activeBattleId;
     private static WarBattleInfo activeInfo;
@@ -101,12 +105,24 @@ final class WarDetector {
         long hp = initial.health();
         double atk = initial.attackSpeed();
         double def = initial.defense();
+
         int dmgLow = dmg != null ? (int) dmg.low() : 0;
         int dmgHigh = dmg != null ? (int) dmg.high() : 0;
+        
         String territory = activeInfo.getTerritory();
+        long durationSeconds = activeInfo.getTotalLengthSeconds();
+        long dps = activeInfo.getDps(Long.MAX_VALUE);
 
-        AvoUtilsMod.LOGGER.info("[ChatBridge/War] {}: territory='{}' hp={} def={}% dmg={}-{} atk={}x warrers={}",
-                outcome, territory, hp, def, dmgLow, dmgHigh, atk, activeWarrers);
+        List<String> warrers = sanitizeWarrers(activeWarrers);
+        if (warrers.isEmpty()) warrers = sanitizeWarrers(collectNearbyPlayers());
+        if (warrers.isEmpty()) {
+            String local = localUsername();
+            if (isValidUsername(local)) warrers = List.of(local);
+        }
+
+        AvoUtilsMod.LOGGER.info(
+                "[ChatBridge/War] {}: territory='{}' hp={} def={}% dmg={}-{} atk={}x duration={}s dps={} warrers={}",
+                outcome, territory, hp, def, dmgLow, dmgHigh, atk, durationSeconds, dps, warrers);
 
         StringBuilder stats = new StringBuilder();
         stats.append("❤ ").append(formatNumber(hp));
@@ -114,11 +130,9 @@ final class WarDetector {
         stats.append(" · ☠ ").append(formatNumber(dmgLow)).append("-").append(formatNumber(dmgHigh));
         if (atk > 0) stats.append(" (").append(atk).append("x)");
 
-        String warrersStr = (activeWarrers != null && !activeWarrers.isEmpty()) 
-                ? String.join(", ", activeWarrers) 
-                : "";
+        String warrersStr = String.join(", ", warrers);
 
-        return new WarResult(outcome, territory, stats.toString(), warrersStr);
+        return new WarResult(outcome, territory, stats.toString(), warrersStr, durationSeconds, dps);
     }
 
     static void reset() {
@@ -135,16 +149,49 @@ final class WarDetector {
         return String.valueOf(value);
     }
 
+    private static String formatDuration(long seconds) {
+        if (seconds <= 0) return "0s";
+        long h = seconds / 3600;
+        long m = (seconds % 3600) / 60;
+        long s = seconds % 60;
+        if (h > 0) return String.format("%dh %dm", h, m);
+        if (m > 0) return String.format("%dm %ds", m, s);
+        return s + "s";
+    }
+
     private static List<String> collectNearbyPlayers() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.world == null) return List.of();
         Set<String> names = new LinkedHashSet<>();
-        String local = mc.player.getName().getString();
-        names.add(local.trim());
+        String local = localUsername();
+        if (isValidUsername(local)) names.add(local.trim());
         for (PlayerEntity other : mc.world.getPlayers()) {
-            if (other == mc.player || mc.player.squaredDistanceTo(other) > TRACKING_RADIUS_SQ) continue;
-            names.add(other.getName().getString().trim());
+            if (other == null || other == mc.player) continue;
+            if (mc.player.squaredDistanceTo(other) > TRACKING_RADIUS_SQ) continue;
+            String name = other.getName().getString();
+            if (isValidUsername(name)) names.add(name.trim());
         }
         return List.copyOf(names);
+    }
+
+    private static String localUsername() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player == null) return null;
+        return mc.player.getName().getString();
+    }
+
+    private static boolean isValidUsername(String name) {
+        if (name == null) return false;
+        String trimmed = name.trim();
+        return !trimmed.isEmpty() && VALID_USERNAME.matcher(trimmed).matches();
+    }
+
+    private static List<String> sanitizeWarrers(List<String> warrers) {
+        if (warrers == null || warrers.isEmpty()) return List.of();
+        Set<String> unique = new LinkedHashSet<>();
+        for (String warrer : warrers) {
+            if (isValidUsername(warrer)) unique.add(warrer.trim());
+        }
+        return List.copyOf(unique);
     }
 }
