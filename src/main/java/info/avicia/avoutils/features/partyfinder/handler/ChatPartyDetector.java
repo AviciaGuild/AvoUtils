@@ -174,10 +174,10 @@ public class ChatPartyDetector {
         if ("party members:".equals(matchedKeyword)) {
             lastPartyListMembers.clear();
             String membersStr = trimmed.substring(keywordIndex + "party members:".length()).trim();
-            String[] parts = membersStr.split(",");
+            membersStr = membersStr.replace(" and ", ",");
+            String[] parts = membersStr.split(" *, *");
             for (String part : parts) {
-                String cleanPart = part.replace("and", "").trim();
-                String name = cleanPlayerName(cleanPart);
+                String name = cleanPlayerName(part);
                 if (!name.isEmpty()) {
                     lastPartyListMembers.add(name);
                 }

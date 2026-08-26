@@ -7,6 +7,8 @@ import info.avicia.avoutils.core.gui.config.ConfigScreen;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
+import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
+import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
 import info.avicia.avoutils.core.util.WynnPillUtil;
@@ -80,6 +82,18 @@ public class AvoCommands {
                 return 1;
             };
 
+            // /avo anni → open anni party screen
+            Command<FabricClientCommandSource> openAnniCommand = context -> {
+                MinecraftClient.getInstance().execute(() -> {
+                    AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
+                    if (anniFeature != null) {
+                        MinecraftClient client = MinecraftClient.getInstance();
+                        client.setScreen(new AnniPartyScreen(anniFeature.getDetector()));
+                    }
+                });
+                return 1;
+            };
+
             // /avo pf togglenotifs
             Command<FabricClientCommandSource> toggleNotifsCommand = toggleNotifsCommand();
 
@@ -116,6 +130,8 @@ public class AvoCommands {
                                     .executes(toggleStorageCommand))
                             .then(literal("emojis")
                                     .executes(toggleEmojisCommand))
+                            .then(literal("anni")
+                                    .executes(openAnniCommand))
                             .then(literal("pf")
                                     .executes(openPfCommand)
                                     .then(literal("togglenotifs")

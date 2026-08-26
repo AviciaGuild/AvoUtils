@@ -1,6 +1,7 @@
 package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
@@ -25,6 +26,12 @@ public class ClientPlayNetworkHandlerMixin {
                     PartyFinderFeature pf = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
                     if (pf != null && pf.getChatDetector() != null) {
                         if (pf.getChatDetector().onChatMessage(text)) {
+                            ci.cancel();
+                        }
+                    }
+                    AnniPartyFeature anni = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
+                    if (anni != null && anni.getDetector() != null) {
+                        if (anni.getDetector().onChatMessage(text)) {
                             ci.cancel();
                         }
                     }
