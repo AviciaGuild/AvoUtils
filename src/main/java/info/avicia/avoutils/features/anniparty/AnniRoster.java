@@ -3,6 +3,7 @@ package info.avicia.avoutils.features.anniparty;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The full Anni party roster as received from the backend {@code anni_roster_sync} event.
@@ -20,10 +21,10 @@ public class AnniRoster {
      */
     public AnniPartyData findPartyContaining(String name) {
         if (name == null) return null;
-        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        String lower = name.toLowerCase(Locale.ROOT);
         for (AnniPartyData party : getParties()) {
             for (AnniMemberData member : party.getMembers()) {
-                if (member.name != null && member.name.toLowerCase(java.util.Locale.ROOT).equals(lower)) {
+                if (member.name != null && member.name.toLowerCase(Locale.ROOT).equals(lower)) {
                     return party;
                 }
             }
@@ -36,12 +37,12 @@ public class AnniRoster {
      */
     public AnniPartyData findLedParty(String name) {
         if (name == null) return null;
-        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        String lower = name.toLowerCase(Locale.ROOT);
         for (AnniPartyData party : getParties()) {
             for (AnniMemberData member : party.getMembers()) {
-                if (member.is_leader
+                if (member.isLeader
                         && member.name != null
-                        && member.name.toLowerCase(java.util.Locale.ROOT).equals(lower)) {
+                        && member.name.toLowerCase(Locale.ROOT).equals(lower)) {
                     return party;
                 }
             }

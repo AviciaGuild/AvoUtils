@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
  */
 public final class PacketTextNormalizer {
     private static final Pattern LEGACY_FORMATTING_PATTERN = Pattern.compile("(?i)§[0-9A-FK-ORX]");
+    private static final Pattern SECTION_ANY_PATTERN = Pattern.compile("§.");
     private static final Pattern AMPERSAND_FORMATTING_PATTERN = Pattern.compile("(?i)&[0-9A-FK-OR]");
     private static final Pattern AMPERSAND_FONT_TAG_PATTERN = Pattern.compile("&\\{[^}]+\\}");
     private static final Pattern SPACE_BEFORE_PUNCTUATION_PATTERN = Pattern.compile("\\s+([,.;!?])");
@@ -55,6 +56,18 @@ public final class PacketTextNormalizer {
         cleaned = SLASH_SPACING_PATTERN.matcher(cleaned).replaceAll("/");
         cleaned = MULTISPACE_PATTERN.matcher(cleaned).replaceAll(" ");
         return cleaned.trim();
+    }
+
+    /**
+     * Strips legacy section-sign codes (§ + one character, including private-use glyphs) used by
+     * Wynncraft chat. Kept separate from {@link #normalizeForParsing(String)} because party-chat
+     * parsing only needs code stripping, not full punctuation normalization.
+     */
+    public static String stripColorCodes(String rawText) {
+        if (rawText == null) {
+            return "";
+        }
+        return SECTION_ANY_PATTERN.matcher(rawText).replaceAll("").trim();
     }
 
     private static boolean isIgnorableForParsing(int codePoint) {

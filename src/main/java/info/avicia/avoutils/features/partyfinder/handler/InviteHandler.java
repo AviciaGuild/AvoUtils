@@ -16,12 +16,12 @@ public class InviteHandler {
 
     private static final int TICKS_BETWEEN_INVITES = 15;
 
-    private final ChatPartyDetector chatDetector;
+    private final PartyFinderPartySyncer partySyncer;
     private final Queue<String> inviteQueue = new ArrayDeque<>();
     private int cooldownTicks = 0;
 
-    public InviteHandler(ChatPartyDetector chatDetector) {
-        this.chatDetector = chatDetector;
+    public InviteHandler(PartyFinderPartySyncer partySyncer) {
+        this.partySyncer = partySyncer;
     }
 
     /**
@@ -36,7 +36,7 @@ public class InviteHandler {
                     && !member.name.equalsIgnoreCase(selfName)) {
 
                 boolean alreadyInGame = false;
-                for (String inGameName : chatDetector.getLastPartyListMembers()) {
+                for (String inGameName : partySyncer.getLastPartyListMembers()) {
                     if (inGameName.equalsIgnoreCase(member.name)) {
                         alreadyInGame = true;
                         break;
@@ -55,11 +55,11 @@ public class InviteHandler {
      * Queue a list of player names to invite via /party invite
      */
     public void queueInvites(List<String> playerNames) {
-        if (!chatDetector.isInParty() && !playerNames.isEmpty()) {
+        if (!partySyncer.isInParty() && !playerNames.isEmpty()) {
             inviteQueue.add("__CREATE__");
         }
         inviteQueue.addAll(playerNames);
-        AvoUtilsMod.LOGGER.info("Queued {} party invites. Need party creation: {}", playerNames.size(), !chatDetector.isInParty());
+        AvoUtilsMod.LOGGER.info("Queued {} party invites. Need party creation: {}", playerNames.size(), !partySyncer.isInParty());
     }
 
     /**

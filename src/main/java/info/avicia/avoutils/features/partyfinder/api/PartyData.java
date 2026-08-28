@@ -3,6 +3,8 @@ package info.avicia.avoutils.features.partyfinder.api;
 import java.util.List;
 import java.util.Map;
 
+import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
+
 public class PartyData {
     public long partyId;
     public long creatorId;
@@ -35,27 +37,13 @@ public class PartyData {
         }
 
         /**
-         * Get the role icon character for a given role string
-         */
-        public static String getStyledRolePrefix(String role) {
-            if (role == null) return "§7\uD83E\uDDE9"; // 🧩
-            return switch (role.toLowerCase()) {
-                case "dps" -> "§c\uD83D\uDDE1"; // 🗡
-                case "healer" -> "§d\u2764"; // ❤
-                case "tank" -> "§9\uD83D\uDEE1"; // 🛡
-                case "other" -> "§7\uD83E\uDDE9"; // 🧩
-                default -> "§7\uD83E\uDDE9"; // 🧩
-            };
-        }
-
-        /**
          * Get the role icon character for this member
          */
         public String getStyledRolePrefix() {
             if (isReserved && role == null) {
                 return "§7\uD83D\uDD12"; // 🔒
             }
-            return getStyledRolePrefix(role);
+            return RoleIconUtil.getStyledRolePrefix(role);
         }
     }
 }

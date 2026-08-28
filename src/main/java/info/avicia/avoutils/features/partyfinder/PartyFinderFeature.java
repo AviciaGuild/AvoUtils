@@ -4,7 +4,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
-import info.avicia.avoutils.features.partyfinder.handler.ChatPartyDetector;
+import info.avicia.avoutils.features.partyfinder.handler.PartyFinderPartySyncer;
 import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
 import info.avicia.avoutils.features.partyfinder.handler.PartyFinderNotificationHandler;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
@@ -16,7 +16,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 public class PartyFinderFeature implements AvoFeature {
     private ModConfig config;
     private PartyFinderClient apiClient;
-    private ChatPartyDetector chatDetector;
+    private PartyFinderPartySyncer partySyncer;
     private InviteHandler inviteHandler;
     private PartyFinderNotificationHandler notificationHandler;
  
@@ -28,8 +28,8 @@ public class PartyFinderFeature implements AvoFeature {
         apiClient = new PartyFinderClient(config);
  
         // Initialize handlers
-        chatDetector = new ChatPartyDetector(apiClient);
-        inviteHandler = new InviteHandler(chatDetector);
+        partySyncer = new PartyFinderPartySyncer(apiClient);
+        inviteHandler = new InviteHandler(partySyncer);
         notificationHandler = new PartyFinderNotificationHandler(config);
         notificationHandler.register();
  
@@ -42,11 +42,11 @@ public class PartyFinderFeature implements AvoFeature {
         AvoWebSocketManager.getInstance().registerConnectionDemand("partyfinder", () -> true);
 
         // Register client commands
-        PartyCommand.register(apiClient, chatDetector, inviteHandler);
+        PartyCommand.register();
     }
  
-    public ChatPartyDetector getChatDetector() {
-        return chatDetector;
+    public PartyFinderPartySyncer getPartySyncer() {
+        return partySyncer;
     }
 
     public PartyFinderClient getApiClient() {
