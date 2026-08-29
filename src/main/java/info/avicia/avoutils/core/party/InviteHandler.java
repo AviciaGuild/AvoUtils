@@ -1,50 +1,51 @@
-package info.avicia.avoutils.features.partyfinder.handler;
+package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import net.minecraft.client.MinecraftClient;
 
-import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Set;
 
 /**
- * Handles sending {@code /party invite <name>} commands in chat
+ * Queues in-game party invitations ({@code /party invite <name>}) and sends them with a cooldown.
  */
 public class InviteHandler {
 
     private static final int TICKS_BETWEEN_INVITES = 15;
 
-    private final PartyFinderPartySyncer partySyncer;
     private final Queue<String> inviteQueue = new ArrayDeque<>();
     private int cooldownTicks = 0;
 
-    public InviteHandler(PartyFinderPartySyncer partySyncer) {
-        this.partySyncer = partySyncer;
+    public InviteHandler() {
     }
 
     /**
-     * Invite all players from a party who are not already in-game, not reserved, and not the current player
+     * Build an invite list from member names, skipping reserved/empty/self entries and anyone
+     * already present in {@code alreadyInGameNames}, then queue the invites.
+     *
+     * @return the names that were queued.
      */
-    public List<String> inviteAll(PartyData party, String selfName) {
+    public List<String> inviteAll(Iterable<String> memberNames, String selfName, Set<String> alreadyInGameNames) {
         List<String> names = new ArrayList<>();
-        for (PartyData.MemberData member : party.members.values()) {
-            if (member.name != null 
-                    && !member.name.isEmpty() 
-                    && !member.name.equalsIgnoreCase("<RESERVED>") 
-                    && !member.name.equalsIgnoreCase(selfName)) {
-
-                boolean alreadyInGame = false;
-                for (String inGameName : partySyncer.getLastPartyListMembers()) {
-                    if (inGameName.equalsIgnoreCase(member.name)) {
-                        alreadyInGame = true;
-                        break;
-                    }
+        for (String name : memberNames) {
+            if (name == null || name.isEmpty() || name.equalsIgnoreCase("<RESERVED>")) {
+                continue;
+            }
+            if (selfName != null && name.equalsIgnoreCase(selfName)) {
+                continue;
+            }
+            boolean alreadyInGame = false;
+            for (String inGameName : alreadyInGameNames) {
+                if (inGameName.equalsIgnoreCase(name)) {
+                    alreadyInGame = true;
+                    break;
                 }
-                if (!alreadyInGame) {
-                    names.add(member.name);
-                }
+            }
+            if (!alreadyInGame) {
+                names.add(name);
             }
         }
         queueInvites(names);
@@ -52,18 +53,19 @@ public class InviteHandler {
     }
 
     /**
-     * Queue a list of player names to invite via /party invite
+     * Queue a list of player names to invite via /party invite.
      */
     public void queueInvites(List<String> playerNames) {
-        if (!partySyncer.isInParty() && !playerNames.isEmpty()) {
+        if (!InGamePartyTracker.getInstance().isInParty() && !playerNames.isEmpty()) {
             inviteQueue.add("__CREATE__");
         }
         inviteQueue.addAll(playerNames);
-        AvoUtilsMod.LOGGER.info("Queued {} party invites. Need party creation: {}", playerNames.size(), !partySyncer.isInParty());
+        AvoUtilsMod.LOGGER.info("Queued {} party invites. Need party creation: {}",
+                playerNames.size(), !InGamePartyTracker.getInstance().isInParty());
     }
 
     /**
-     * Called every client tick to process the invite queue
+     * Called every client tick to process the invite queue.
      */
     public void tick(MinecraftClient client) {
         if (inviteQueue.isEmpty()) return;

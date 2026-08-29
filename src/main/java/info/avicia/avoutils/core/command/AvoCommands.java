@@ -8,6 +8,7 @@ import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
 import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
+import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -70,9 +71,10 @@ public class AvoCommands {
             Command<FabricClientCommandSource> openAnniCommand = context -> {
                 MinecraftClient.getInstance().execute(() -> {
                     AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
-                    if (anniFeature != null) {
+                    PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
+                    if (anniFeature != null && pfFeature != null) {
                         MinecraftClient client = MinecraftClient.getInstance();
-                        client.setScreen(new AnniPartyScreen(anniFeature));
+                        client.setScreen(new AnniPartyScreen(anniFeature, pfFeature.getInviteHandler()));
                     }
                 });
                 return 1;

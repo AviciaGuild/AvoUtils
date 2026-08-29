@@ -6,6 +6,7 @@ import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.core.party.InviteHandler;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
@@ -27,6 +28,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
     private static final String REQ_ANNI_ROSTER = "req_anni_roster";
 
     private final AnniPartyFeature feature;
+    private final InviteHandler inviteHandler;
     private final Consumer<AnniRoster> rosterListener = this::onRosterUpdated;
 
     private static final int LIST_TOP = 42;
@@ -39,9 +41,10 @@ public class AnniPartyScreen extends ScrollableListScreen {
     private final Set<Long> expandedPartyIds = new HashSet<>();
     private final List<HeaderHitbox> headerHitboxes = new ArrayList<>();
 
-    public AnniPartyScreen(AnniPartyFeature feature) {
+    public AnniPartyScreen(AnniPartyFeature feature, InviteHandler inviteHandler) {
         super(Text.literal("Anni Parties"));
         this.feature = feature;
+        this.inviteHandler = inviteHandler;
     }
 
     @Override
@@ -118,6 +121,10 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
         addDrawableChild(new FlatButtonWidget(SIDE_PADDING, 8, 80, 20, Text.literal("⟳ Refresh"), this::requestRoster));
 
+        if (feature.getLedParty() != null) {
+            addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 80, 8, 80, 20, Text.literal("Invite All"), this::inviteAll));
+        }
+
         List<AnniPartyData> parties = activeParties();
         if (parties.isEmpty()) {
             expandedPartyIds.clear();
@@ -144,6 +151,28 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
     private void requestRoster() {
         AvoWebSocketManager.getInstance().sendEvent(REQ_ANNI_ROSTER, new JsonObject());
+    }
+
+    private void inviteAll() {
+        AnniPartyData ledParty = feature.getLedParty();
+        if (ledParty == null) {
+            return;
+        }
+        String selfName = PlayerUtil.selfName();
+        List<String> names = new ArrayList<>();
+        for (AnniMemberData member : ledParty.getMembers()) {
+            if (member.name == null || member.name.isEmpty()) {
+                continue;
+            }
+            if (member.inParty) {
+                continue; // already in the in-game party
+            }
+            if (selfName != null && member.name.equalsIgnoreCase(selfName)) {
+                continue; // skip the leader (self)
+            }
+            names.add(member.name);
+        }
+        inviteHandler.queueInvites(names);
     }
 
     // ── Rendering ────────────────────────────────────────────────────────

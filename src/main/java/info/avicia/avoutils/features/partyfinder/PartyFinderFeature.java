@@ -5,7 +5,7 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
 import info.avicia.avoutils.features.partyfinder.handler.PartyFinderPartySyncer;
-import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.features.partyfinder.handler.PartyFinderNotificationHandler;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -29,7 +29,7 @@ public class PartyFinderFeature implements AvoFeature {
  
         // Initialize handlers
         partySyncer = new PartyFinderPartySyncer(apiClient);
-        inviteHandler = new InviteHandler(partySyncer);
+        inviteHandler = new InviteHandler();
         notificationHandler = new PartyFinderNotificationHandler(config);
         notificationHandler.register();
  

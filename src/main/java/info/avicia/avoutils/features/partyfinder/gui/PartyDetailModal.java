@@ -4,7 +4,8 @@ import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
 import info.avicia.avoutils.core.util.PlayerUtil;
-import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.core.party.InGamePartyTracker;
+import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import net.minecraft.client.MinecraftClient;
@@ -181,7 +182,12 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     // ── Actions ──────────────────────────────────────────────────────────
 
     private void inviteAll() {
-        List<String> names = inviteHandler.inviteAll(party, playerName);
+        List<String> memberNames = party.members.values().stream()
+                .map(m -> m.name)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        List<String> names = inviteHandler.inviteAll(memberNames, playerName,
+                InGamePartyTracker.getInstance().getLastPartyListMembers());
         setStatus("Inviting " + names.size() + " players...", 0x55FF55);
     }
 

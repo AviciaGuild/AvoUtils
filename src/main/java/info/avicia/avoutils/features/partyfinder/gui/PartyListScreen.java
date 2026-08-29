@@ -4,7 +4,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.handler.PartyFinderPartySyncer;
-import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
+import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ModalOverlay;
@@ -91,7 +91,11 @@ public class PartyListScreen extends ScrollableListScreen {
         inviteAllButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 155, buttonY, 70, 20, Text.literal("Invite All"), () -> {
             PartyData ownedParty = getOwnedParty();
             if (ownedParty != null) {
-                inviteHandler.inviteAll(ownedParty, PlayerUtil.selfName());
+                List<String> memberNames = ownedParty.members.values().stream()
+                        .map(m -> m.name)
+                        .filter(java.util.Objects::nonNull)
+                        .toList();
+                inviteHandler.inviteAll(memberNames, PlayerUtil.selfName(), partySyncer.getLastPartyListMembers());
             }
         }));
         inviteAllButton.visible = false;
