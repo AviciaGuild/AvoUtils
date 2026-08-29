@@ -208,7 +208,10 @@ jobs:
               project_id: $project_id,
               game_versions: [$minecraft_version],
               version_type: "${{ steps.determine_version.outputs.version_type }}",
-              dependencies: [],
+              dependencies: [
+                { project_id: "P7dR8mSH", dependency_type: "required" },
+                { project_id: "dU5Gb9Ab", dependency_type: "optional" }
+              ],
               loaders: ["fabric"],
               featured: true,
               status: "listed",
