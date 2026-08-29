@@ -10,6 +10,16 @@ public class CompatibilityHelper {
         context.drawText(textRenderer, text, x, y, color, true);
     }
 
+    public static void drawScreenTitle(DrawContext context, TextRenderer textRenderer, int width, String title) {
+        context.drawCenteredTextWithShadow(textRenderer, Text.literal(title), width / 2, 12, UiStyle.TEXT_WHITE);
+    }
+
+    public static void drawCenteredMessage(DrawContext context, TextRenderer textRenderer, int width, int height, String message) {
+        Text text = Text.literal(message);
+        int textWidth = textRenderer.getWidth(text);
+        drawTextWithShadow(context, textRenderer, text, (width - textWidth) / 2, height / 2, UiStyle.TEXT_WHITE);
+    }
+
     public static void drawBorder(DrawContext context, int x, int y, int w, int h, int color) {
         context.fill(x, y, x + w, y + 1, color); // top
         context.fill(x, y + h - 1, x + w, y + h, color); // bottom
@@ -19,18 +29,18 @@ public class CompatibilityHelper {
 
     public static void drawModalFrame(DrawContext context, int x, int y, int w, int h) {
         // Modal drop shadow
-        context.fill(x + 3, y + 3, x + w + 3, y + h + 3, 0x7F000000);
+        context.fill(x + 3, y + 3, x + w + 3, y + h + 3, UiStyle.MODAL_SHADOW);
 
         // Modal background
-        context.fill(x, y, x + w, y + h, 0xF80D0D12);
+        context.fill(x, y, x + w, y + h, UiStyle.MODAL_BACKGROUND);
 
         // Header background stripe
-        context.fill(x + 1, y + 1, x + w - 1, y + 24, 0xFF1A1A26);
+        context.fill(x + 1, y + 1, x + w - 1, y + 24, UiStyle.MODAL_HEADER);
 
         // Outline border
-        drawBorder(context, x, y, w, h, 0x308A9CFE);
+        drawBorder(context, x, y, w, h, UiStyle.MODAL_OUTLINE);
 
         // Header separator line
-        drawBorder(context, x + 1, y + 24, w - 2, 1, 0x208A9CFE);
+        drawBorder(context, x + 1, y + 24, w - 2, 1, UiStyle.MODAL_SEPARATOR);
     }
 }

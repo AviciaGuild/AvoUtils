@@ -9,6 +9,7 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ModalOverlay;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
+import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -238,26 +239,20 @@ public class PartyListScreen extends ScrollableListScreen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Background
-        context.fill(0, 0, width, height, 0xD80A0A0F);
+        context.fill(0, 0, width, height, UiStyle.SCREEN_BACKGROUND);
         // Title
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal("§b§lAVICIA §f§lPARTY FINDER"), width / 2, 12, 0xFFFFFFFF);
+        CompatibilityHelper.drawScreenTitle(context, textRenderer, width, "§b§lAVICIA §f§lPARTY FINDER");
 
         if (errorMessage != null) {
-            Text text = Text.literal("§c" + errorMessage);
-            int textWidth = textRenderer.getWidth(text);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, text, (width - textWidth) / 2, height / 2, 0xFFFFFFFF);
+            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, "§c" + errorMessage);
             return;
         }
 
         // Render party list or status
         if (loading) {
-            Text text = Text.literal("§7Loading active parties...");
-            int textWidth = textRenderer.getWidth(text);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, text, (width - textWidth) / 2, height / 2, 0xFFFFFFFF);
+            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, "§7Loading active parties...");
         } else if (parties.isEmpty()) {
-            Text text = Text.literal("§7No active parties. Create one to get started!");
-            int textWidth = textRenderer.getWidth(text);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, text, (width - textWidth) / 2, height / 2, 0xFFFFFFFF);
+            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, "§7No active parties. Create one to get started!");
         } else {
             renderPartyList(context, mouseX, mouseY);
         }
@@ -267,7 +262,7 @@ public class PartyListScreen extends ScrollableListScreen {
 
         // Modal overlay on top of everything
         if (activeModal != null) {
-            context.fill(0, 0, width, height, 0x88000000);
+            context.fill(0, 0, width, height, UiStyle.MODAL_OVERLAY);
             activeModal.render(context, mouseX, mouseY, delta);
         }
     }
@@ -283,18 +278,18 @@ public class PartyListScreen extends ScrollableListScreen {
             boolean hovered = isRowHovered(mouseX, mouseY, y);
 
             // Card drop shadow
-            context.fill(SIDE_PADDING + 1, y + 1, width - SIDE_PADDING + 1, y + ROW_HEIGHT - 3, 0x3F000000);
+            context.fill(SIDE_PADDING + 1, y + 1, width - SIDE_PADDING + 1, y + ROW_HEIGHT - 3, UiStyle.CARD_SHADOW);
 
             // Card background
-            int bgColor = hovered ? 0xF2222232 : 0xD5161622;
+            int bgColor = hovered ? UiStyle.CARD_BACKGROUND_HOVERED : UiStyle.CARD_BACKGROUND;
             context.fill(SIDE_PADDING, y, width - SIDE_PADDING, y + ROW_HEIGHT - 4, bgColor);
 
             // Left status accent bar
-            int accentColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+            int accentColor = party.isFull ? UiStyle.ACCENT_RED : UiStyle.ACCENT_GREEN;
             context.fill(SIDE_PADDING + 1, y + 1, SIDE_PADDING + 4, y + ROW_HEIGHT - 5, accentColor);
 
             // Border outline
-            int borderColor = hovered ? 0xFF8A9CFE : 0x1A8A9CFE;
+            int borderColor = hovered ? UiStyle.ACCENT_BLUE : UiStyle.BORDER_FAINT;
             CompatibilityHelper.drawBorder(context, SIDE_PADDING, y, width - 2 * SIDE_PADDING, ROW_HEIGHT - 4, borderColor);
 
             // Card text and badges
@@ -314,15 +309,15 @@ public class PartyListScreen extends ScrollableListScreen {
             int badgeLeft = badgeRight - slotsWidth - 8;
 
             // Fill slots pill background
-            int pillBgColor = party.isFull ? 0x22FF4D4D : 0x2200FF66;
+            int pillBgColor = party.isFull ? UiStyle.PILL_BG_RED : UiStyle.PILL_BG_GREEN;
             context.fill(badgeLeft, y + 6, badgeRight, y + 18, pillBgColor);
 
             // Slots pill border
-            int pillBorderColor = party.isFull ? 0x55FF4D4D : 0x5500FF66;
+            int pillBorderColor = party.isFull ? UiStyle.PILL_BORDER_RED : UiStyle.PILL_BORDER_GREEN;
             CompatibilityHelper.drawBorder(context, badgeLeft, y + 5, badgeRight - badgeLeft, 14, pillBorderColor);
 
             // Slots text inside badge
-            int slotsColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+            int slotsColor = party.isFull ? UiStyle.ACCENT_RED : UiStyle.ACCENT_GREEN;
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsText), badgeLeft + 4, y + 8, slotsColor);
 
             // Region label

@@ -83,18 +83,18 @@ public class FlatButtonWidget extends ClickableWidget {
             if (selected) {
                 bgColor = (selectedBgColor != null) ? selectedBgColor : 0x258A9CFE;
             } else {
-                bgColor = hovered ? 0xF22A2D3C : 0xD5161622;
+                bgColor = hovered ? 0xF22A2D3C : UiStyle.CARD_BACKGROUND;
             }
             context.fill(x, y, x + w, y + h, bgColor);
 
             // Border color
             int borderColor;
             if (selected) {
-                borderColor = (selectedBorderColor != null) ? selectedBorderColor : 0xFF8A9CFE;
+                borderColor = (selectedBorderColor != null) ? selectedBorderColor : UiStyle.ACCENT_BLUE;
             } else if (isDanger) {
-                borderColor = hovered ? 0xFFFF4D4D : 0xAAFF4D4D;
+                borderColor = hovered ? UiStyle.ACCENT_RED : 0xAAFF4D4D;
             } else {
-                borderColor = hovered ? 0xFF8A9CFE : 0x1A8A9CFE;
+                borderColor = hovered ? UiStyle.ACCENT_BLUE : UiStyle.BORDER_FAINT;
             }
 
             // Draw flat borders
@@ -109,9 +109,9 @@ public class FlatButtonWidget extends ClickableWidget {
 
         int textColor;
         if (selected) {
-            textColor = (selectedTextColor != null) ? selectedTextColor : 0xFF8A9CFE;
+            textColor = (selectedTextColor != null) ? selectedTextColor : UiStyle.ACCENT_BLUE;
         } else if (isDanger) {
-            textColor = hovered ? 0xFFFF4D4D : 0xFFAA4444;
+            textColor = hovered ? UiStyle.ACCENT_RED : 0xFFAA4444;
         } else {
             textColor = hovered ? 0xFFFFFFFF : 0xFFA0A5B5;
         }

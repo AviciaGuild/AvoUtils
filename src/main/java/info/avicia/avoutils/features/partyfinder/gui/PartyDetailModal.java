@@ -8,6 +8,7 @@ import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
+import info.avicia.avoutils.core.gui.UiStyle;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -311,10 +312,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         }
 
         // Panel background
-        context.fill(modalX + 8, metaY, modalX + modalW - 8, metaY + cardH, 0xD5161622);
+        context.fill(modalX + 8, metaY, modalX + modalW - 8, metaY + cardH, UiStyle.CARD_BACKGROUND);
 
         // Left accent bar
-        int accentColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+        int accentColor = party.isFull ? UiStyle.ACCENT_RED : UiStyle.ACCENT_GREEN;
         context.fill(modalX + 8, metaY + 1, modalX + 10, metaY + cardH - 1, accentColor);
 
         // Leader and region
@@ -351,10 +352,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int listH = sortedMembers.isEmpty() ? 16 : sortedMembers.size() * 18 - 2;
 
         // Members list background
-        context.fill(modalX + 8, listY, modalX + modalW - 8, listY + listH, 0xD5161622);
+        context.fill(modalX + 8, listY, modalX + modalW - 8, listY + listH, UiStyle.CARD_BACKGROUND);
 
         // Left accent bar
-        accentColor = party.isFull ? 0xFFFF4D4D : 0xFF00FF66;
+        accentColor = party.isFull ? UiStyle.ACCENT_RED : UiStyle.ACCENT_GREEN;
         context.fill(modalX + 8, listY + 1, modalX + 10, listY + listH - 1, accentColor);
 
         for (int i = 0; i < sortedMembers.size(); i++) {

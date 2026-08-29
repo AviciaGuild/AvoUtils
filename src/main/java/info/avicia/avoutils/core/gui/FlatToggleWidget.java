@@ -62,11 +62,11 @@ public class FlatToggleWidget extends ClickableWidget {
         if (dimmed) {
             trackColor = checked ? 0xFF555577 : 0xFF181822;
         } else {
-            trackColor = checked ? 0xFF8A9CFE : 0xFF222232;
+            trackColor = checked ? UiStyle.ACCENT_BLUE : 0xFF222232;
         }
         context.fill(x + 2, y + h / 2 - 3, x + w - 2, y + h / 2 + 3, trackColor);
         CompatibilityHelper.drawBorder(context, x + 2, y + h / 2 - 3, w - 4, 6,
-                dimmed ? 0x0A8A9CFE : 0x1A8A9CFE);
+                dimmed ? 0x0A8A9CFE : UiStyle.BORDER_FAINT);
 
         // Draw knob
         int knobSize = 10;

@@ -6,6 +6,7 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
+import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import net.minecraft.client.MinecraftClient;
@@ -170,11 +171,9 @@ public class ConfigScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, width, height, 0xD80A0A0F);
+        context.fill(0, 0, width, height, UiStyle.SCREEN_BACKGROUND);
 
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.literal("\u00a7b\u00a7lAVOUTILS \u00a7f\u00a7lCONFIGS"),
-                width / 2, 12, 0xFFFFFFFF);
+        CompatibilityHelper.drawScreenTitle(context, textRenderer, width, "\u00a7b\u00a7lAVOUTILS \u00a7f\u00a7lCONFIGS");
 
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
@@ -214,12 +213,12 @@ public class ConfigScreen extends Screen {
                 Text.literal("\u00a77Emerald threshold"),
                 cardLeft + 16, y + 68, 0xFFFFFFFF);
         drawRightText(context, config.guildStorageEmeraldThresholdPercent + "%",
-                cardRight - 13, y + 68, 0xFF8A9CFE);
+                cardRight - 13, y + 68, UiStyle.ACCENT_BLUE);
         CompatibilityHelper.drawTextWithShadow(context, textRenderer,
                 Text.literal("\u00a77Aspect threshold"),
                 cardLeft + 16, y + 86, 0xFFFFFFFF);
         drawRightText(context, config.guildStorageAspectThresholdPercent + "%",
-                cardRight - 13, y + 86, 0xFF8A9CFE);
+                cardRight - 13, y + 86, UiStyle.ACCENT_BLUE);
 
         super.render(context, mouseX, mouseY, delta);
     }
@@ -244,12 +243,12 @@ public class ConfigScreen extends Screen {
         int cardRight = width - SIDE_PADDING;
         int cardY = y + 2;
 
-        context.fill(cardLeft, cardY, cardRight, cardY + cardH, 0xD5161622);
+        context.fill(cardLeft, cardY, cardRight, cardY + cardH, UiStyle.CARD_BACKGROUND);
 
         CompatibilityHelper.drawBorder(context, cardLeft, cardY,
-                cardRight - cardLeft, cardH, 0x1A8A9CFE);
+                cardRight - cardLeft, cardH, UiStyle.BORDER_FAINT);
 
-        context.fill(cardLeft, cardY + 1, cardLeft + 2, cardY + cardH - 1, 0x408A9CFE);
+        context.fill(cardLeft, cardY + 1, cardLeft + 2, cardY + cardH - 1, UiStyle.ACCENT_BAR);
 
         CompatibilityHelper.drawTextWithShadow(context, textRenderer,
                 Text.literal("\u00a7b\u00a7l" + label), cardLeft + 16, cardY + 11, 0xFFFFFFFF);

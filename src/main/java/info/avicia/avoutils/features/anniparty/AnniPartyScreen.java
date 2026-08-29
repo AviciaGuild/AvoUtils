@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
+import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import info.avicia.avoutils.core.party.InviteHandler;
@@ -179,8 +180,8 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, width, height, 0xD80A0A0F);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal("§b§lAVICIA §f§lANNI PARTIES"), width / 2, 12, 0xFFFFFFFF);
+        context.fill(0, 0, width, height, UiStyle.SCREEN_BACKGROUND);
+        CompatibilityHelper.drawScreenTitle(context, textRenderer, width, "§b§lAVICIA §f§lANNI PARTIES");
 
         AnniRoster roster = roster();
         boolean active = roster != null && roster.active;
@@ -188,8 +189,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
         if (parties.isEmpty()) {
             String msg = active ? "§7No parties assigned yet..." : "§7No active Anni event. Parties will appear once generated.";
-            int textWidth = textRenderer.getWidth(Text.literal(msg));
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(msg), (width - textWidth) / 2, height / 2, 0xFFFFFFFF);
+            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, msg);
             super.render(context, mouseX, mouseY, delta);
             return;
         }
@@ -210,10 +210,10 @@ public class AnniPartyScreen extends ScrollableListScreen {
             boolean expanded = isExpanded(party);
 
             // Header card
-            context.fill(SIDE_PADDING + 1, top + 1, width - SIDE_PADDING + 1, headerBottom - 3, 0x3F000000);
-            context.fill(SIDE_PADDING, top, width - SIDE_PADDING, headerBottom - 2, isMine ? 0xF2253530 : 0xD5161622);
-            context.fill(SIDE_PADDING + 1, top + 1, SIDE_PADDING + 4, headerBottom - 3, isMine ? 0xFF00FF66 : 0xFF8A9CFE);
-            CompatibilityHelper.drawBorder(context, SIDE_PADDING, top, width - 2 * SIDE_PADDING, HEADER_HEIGHT - 2, isMine ? 0x6600FF66 : 0x1A8A9CFE);
+            context.fill(SIDE_PADDING + 1, top + 1, width - SIDE_PADDING + 1, headerBottom - 3, UiStyle.CARD_SHADOW);
+            context.fill(SIDE_PADDING, top, width - SIDE_PADDING, headerBottom - 2, isMine ? UiStyle.CARD_BACKGROUND_ACTIVE : UiStyle.CARD_BACKGROUND);
+            context.fill(SIDE_PADDING + 1, top + 1, SIDE_PADDING + 4, headerBottom - 3, isMine ? UiStyle.ACCENT_GREEN : UiStyle.ACCENT_BLUE);
+            CompatibilityHelper.drawBorder(context, SIDE_PADDING, top, width - 2 * SIDE_PADDING, HEADER_HEIGHT - 2, isMine ? UiStyle.BORDER_GREEN : UiStyle.BORDER_FAINT);
 
             int leftTextX = SIDE_PADDING + 12;
             String indicator = expanded ? "§b▼" : "§b▶";
@@ -245,7 +245,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
                     if (lineY + MEMBER_ROW_HEIGHT < LIST_TOP || lineY > listBottom) {
                         continue;
                     }
-                    String check = member.inParty ? "§a✓" : "§c✗";
+                    String check = member.inParty ? "§a✔" : "§c✕";
                     String role = member.role != null && !member.role.isBlank() ? member.role : "No role";
                     String line = check + " §f" + member.getDisplayName() + " §7(" + role + ")";
                     if (member.isLeader) {

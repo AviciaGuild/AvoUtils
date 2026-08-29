@@ -4,6 +4,7 @@ import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
+import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
@@ -400,14 +401,14 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         int cardY = y + 2;
         
         // Card background
-        context.fill(modalX + 8, cardY, modalX + modalW - 8, cardY + cardH, 0xD5161622);
-        
+        context.fill(modalX + 8, cardY, modalX + modalW - 8, cardY + cardH, UiStyle.CARD_BACKGROUND);
+
         // Card border
-        int borderColor = highlightBorder ? 0xFF8A9CFE : 0x1A8A9CFE;
+        int borderColor = highlightBorder ? UiStyle.ACCENT_BLUE : UiStyle.BORDER_FAINT;
         CompatibilityHelper.drawBorder(context, modalX + 8, cardY, modalW - 16, cardH, borderColor);
-        
+
         // Left accent bar
-        context.fill(modalX + 8, cardY + 1, modalX + 10, cardY + cardH - 1, 0x408A9CFE);
+        context.fill(modalX + 8, cardY + 1, modalX + 10, cardY + cardH - 1, UiStyle.ACCENT_BAR);
         
         // Section label text
         int textOffset = (cardH == 30) ? 11 : 6;

@@ -109,7 +109,7 @@ public class FlatSliderWidget extends ClickableWidget {
         int trackBg = dimmed ? 0xFF0E0E18 : 0xFF14141E;
         context.fill(x, y + h / 2 - 2, x + w, y + h / 2 + 2, trackBg);
         CompatibilityHelper.drawBorder(context, x, y + h / 2 - 2, w, 4,
-                dimmed ? 0x0A8A9CFE : 0x1A8A9CFE);
+                dimmed ? 0x0A8A9CFE : UiStyle.BORDER_FAINT);
 
         double range = max - min;
         double ratio = range == 0 ? 0 : (value - min) / range;
@@ -117,7 +117,7 @@ public class FlatSliderWidget extends ClickableWidget {
 
         // Fill track
         if (knobX > x) {
-            int fillColor = dimmed ? 0xFF444466 : 0xFF8A9CFE;
+            int fillColor = dimmed ? 0xFF444466 : UiStyle.ACCENT_BLUE;
             context.fill(x + 1, y + h / 2 - 1, knobX + 4, y + h / 2 + 1, fillColor);
         }
 
