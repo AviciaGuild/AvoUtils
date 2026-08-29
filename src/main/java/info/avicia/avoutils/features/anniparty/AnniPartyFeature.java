@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
+import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
@@ -34,10 +35,13 @@ public class AnniPartyFeature implements AvoFeature {
         AvoWebSocketManager.getInstance().registerListener(EVT_ANNI_ROSTER_SYNC, this::onRosterEvent);
 
         // Register a connection demand so that the backend will send us the roster when we connect
-        AvoWebSocketManager.getInstance().registerConnectionDemand("anniparty", () -> true);
+        AvoWebSocketManager.getInstance().registerConnectionDemand("anniparty", this::isGuildMember);
     }
 
     private void onRosterEvent(JsonObject json) {
+        if (!isGuildMember()) {
+            return;
+        }
         AnniRoster parsed = gson.fromJson(json, AnniRoster.class);
         if (parsed == null) {
             return;
@@ -56,6 +60,10 @@ public class AnniPartyFeature implements AvoFeature {
 
     public boolean isActive() {
         return active;
+    }
+
+    private boolean isGuildMember() {
+        return AvoAuthService.getInstance().isGuildMember();
     }
 
     /**

@@ -62,8 +62,7 @@ public class GuildStorageNotifier implements AvoFeature {
     private long lastObservedLocallyAtMs;
 
     public boolean isGuildMember() {
-        Boolean cached = AvoAuthService.getInstance().getCachedGuildMember();
-        return cached != null && cached;
+        return AvoAuthService.getInstance().isGuildMember();
     }
 
     private boolean isActive() {

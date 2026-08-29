@@ -83,6 +83,13 @@ public class AvoAuthService {
         cachedGuildMember = guildMember;
     }
 
+    /**
+     * Whether the linked account is currently a member of the Avicia guild.
+     */
+    public boolean isGuildMember() {
+        return cachedGuildMember != null && cachedGuildMember;
+    }
+
     public CompletableFuture<String> getSessionToken() {
         synchronized (authLock) {
             if (sessionToken != null && System.currentTimeMillis() < sessionTokenExpiry) {

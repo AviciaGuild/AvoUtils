@@ -49,8 +49,7 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
     public boolean isGuildMember() {
-        Boolean cached = AvoAuthService.getInstance().getCachedGuildMember();
-        return cached != null && cached;
+        return AvoAuthService.getInstance().isGuildMember();
     }
 
     public boolean isEnabled() {
