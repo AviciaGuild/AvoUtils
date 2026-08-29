@@ -7,6 +7,7 @@ This is not a general-purpose mod; you would need to link your Minecraft account
 ### Features
 
 - **Party Finder:** Browse, create, and join parties in-game. Syncs with AvoBot's party finder system, so parties created in Minecraft or Discord appear on both.
+- **Annihilation Parties:** See the live Anni party roster while the event is active; integrates with AvoBot's Annihilation system.
 - **Chat Bridge:** View the in-game guild chat from Discord, and send Discord messages to the in-game guild chat.
 - **Emojis:** Use standard Discord emojis and custom emojis from Avicia's Discord server.
 
@@ -45,3 +46,4 @@ Before most of the mod's features will work, you need to link your Minecraft acc
 | `/avo bridge` | Toggles the chat bridge on/off (requires guild membership) |
 | `/avo storage` | Toggles storage threshold notifications on/off (requires guild membership) |
 | `/avo emojis` | Toggles emoji rendering on/off |
+| `/avo anni` | Opens the Annihilation menu |

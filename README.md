@@ -1,6 +1,6 @@
 # AvoUtils
 
-A Minecraft Fabric client mod providing various helper utilities for Avicia guild members, including Party Finder, Chat Bridge, and Emoji support.
+A Minecraft Fabric client mod providing various helper utilities for Avicia guild members, including a guild raid party finder, Annihilation parties, chat bridge, and emoji support.
 
 [![GitHub Release](https://img.shields.io/github/v/release/AviciaGuild/AvoUtils?label=latest)](https://github.com/AviciaGuild/AvoUtils/releases/latest)
 [![Modrinth](https://img.shields.io/badge/modrinth-AvoUtils-00AF5C?logo=modrinth)](https://modrinth.com/mod/avoutils)
@@ -10,9 +10,10 @@ A Minecraft Fabric client mod providing various helper utilities for Avicia guil
 
 ### Features
 
-- **Party Finder:** Browse, create, and join parties in-game. Integrated with AvoBot's party finder system so parties created in-game sync with Discord and vice versa.
-- **Chat Bridge:** Relays the in-game guild chat to Discord. Discord messages are relayed back to in-game chat.
-- **Emoji Support:** Use standard Discord emojis and custom emojis from Avicia's Discord server directly in Minecraft chat.
+- **Party Finder:** Browse, create, and join parties in-game. Syncs with AvoBot's party finder system, so parties created in Minecraft or Discord appear on both.
+- **Annihilation Parties:** See the live Anni party roster while the event is active; integrates with AvoBot's Annihilation system.
+- **Chat Bridge:** View the in-game guild chat from Discord, and send Discord messages to the in-game guild chat.
+- **Emojis:** Use standard Discord emojis and custom emojis from Avicia's Discord server.
 
 ---
 
