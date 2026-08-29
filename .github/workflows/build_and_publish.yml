@@ -175,14 +175,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          project_id="$(curl --fail --show-error --silent \
+          echo "Resolving Modrinth project ID for slug '${MODRINTH_PROJECT_SLUG}'..."
+          if ! project_response="$(curl --fail-with-body --show-error --silent \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: AviciaGuild/AvoUtils-release-workflow" \
-            "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_SLUG}" | jq -r '.id')"
-
-          if [[ -z "${project_id}" || "${project_id}" == "null" ]]; then
-            echo "Failed to resolve Modrinth project ID for slug ${MODRINTH_PROJECT_SLUG}." >&2
+            "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_SLUG}")"; then
+            echo "Failed to resolve Modrinth project for slug '${MODRINTH_PROJECT_SLUG}'." >&2
+            echo "Modrinth response body:" >&2
+            printf '%s\n' "${project_response}" >&2
             exit 1
           fi
+
+          project_id="$(jq -r '.id' <<<"${project_response}")"
+          if [[ -z "${project_id}" || "${project_id}" == "null" ]]; then
+            echo "Modrinth project response did not contain an id. Response:" >&2
+            printf '%s\n' "${project_response}" >&2
+            exit 1
+          fi
+
+          echo "Resolved project_id=${project_id}"
 
           payload="$(jq -cn \
             --arg name "AvoUtils ${{ steps.determine_version.outputs.version }}" \
@@ -206,9 +217,18 @@ jobs:
             }'
           )"
 
-          curl --fail-with-body --show-error --silent \
+          echo "Creating Modrinth version ${{ steps.determine_version.outputs.version }}..."
+          if ! response="$(curl --fail-with-body --show-error --silent \
             -X POST "https://api.modrinth.com/v2/version" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: AviciaGuild/AvoUtils-release-workflow" \
             --form-string "data=${payload}" \
-            -F "primary=@${{ steps.modrinth_meta.outputs.mod_jar }}"
+            -F "primary=@${{ steps.modrinth_meta.outputs.mod_jar }}")"; then
+            echo "Failed to create Modrinth version." >&2
+            echo "Modrinth response body:" >&2
+            printf '%s\n' "${response}" >&2
+            exit 1
+          fi
+
+          echo "Published to Modrinth successfully:"
+          jq -r '"  version_id: \(.id)\n  version_number: \(.version_number)"' <<<"${response}"
