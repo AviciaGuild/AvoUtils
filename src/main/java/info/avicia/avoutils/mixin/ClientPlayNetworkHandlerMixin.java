@@ -1,7 +1,7 @@
 package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
-import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
+import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
@@ -22,11 +22,8 @@ public class ClientPlayNetworkHandlerMixin {
             if (packet.content() != null && AvoUtilsMod.getInstance() != null) {
                 String text = packet.content().getString();
                 if (text != null) {
-                    PartyFinderFeature pf = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
-                    if (pf != null && pf.getChatDetector() != null) {
-                        if (pf.getChatDetector().onChatMessage(text)) {
-                            ci.cancel();
-                        }
+                    if (InGamePartyTracker.getInstance().onChatMessage(text)) {
+                        ci.cancel();
                     }
                 }
                 ChatBridgeFeature cb = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);

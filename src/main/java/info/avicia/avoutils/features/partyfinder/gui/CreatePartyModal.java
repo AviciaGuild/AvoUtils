@@ -2,7 +2,9 @@ package info.avicia.avoutils.features.partyfinder.gui;
 
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
@@ -81,7 +83,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             }
             this.ping = partyToEdit.ping;
 
-            String selfName = MinecraftClient.getInstance().getSession().getUsername();
+            String selfName = PlayerUtil.selfName();
             if (partyToEdit.members != null) {
                 for (PartyData.MemberData member : partyToEdit.members.values()) {
                     if (member.name != null && member.name.equalsIgnoreCase(selfName)) {
@@ -130,7 +132,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         roleButtons.clear();
         for (int i = 0; i < ROLES.length; i++) {
             final String roleVal = ROLE_VALUES[i];
-            String icon = PartyData.MemberData.getStyledRolePrefix(roleVal);
+            String icon = RoleIconUtil.getStyledRolePrefix(roleVal);
             FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 55, 18, Text.literal(icon + " " + ROLES[i]), () -> selectRole(roleVal));
             switch (roleVal) {
                 case "dps" -> btn.setSelectedColors(0xFFFF4D4D, 0x25FF4D4D, 0xFFFF4D4D);
@@ -261,7 +263,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     submitting = false;
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
-                            parent.getChatDetector().setTrackedPartyId(resp.data.partyId);
+                            parent.getPartySyncer().setTrackedPartyId(resp.data.partyId);
                         }
                         parent.closeModal();
                     } else {
@@ -283,14 +285,14 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
                             long newPartyId = resp.data.partyId;
-                            parent.getChatDetector().setTrackedPartyId(newPartyId);
+                            parent.getPartySyncer().setTrackedPartyId(newPartyId);
                             // Pre-reserve slots for all other in-game party members
-                            String selfName = MinecraftClient.getInstance().getSession().getUsername();
-                            for (String memberName : parent.getChatDetector().getLastPartyListMembers()) {
+                            String selfName = PlayerUtil.selfName();
+                            for (String memberName : parent.getPartySyncer().getLastPartyListMembers()) {
                                 if (!memberName.equalsIgnoreCase(selfName)) {
                                     apiClient.reserveIngame(newPartyId, memberName).thenAccept(reserveResp -> {
                                         if (reserveResp.ok) {
-                                            parent.getChatDetector().addKnownMembers(List.of(memberName));
+                                            parent.getPartySyncer().addKnownMembers(List.of(memberName));
                                         }
                                     });
                                 }
@@ -314,9 +316,9 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
     /** Returns the number of in-game party members who are not the local player. */
     private int countOtherInGameMembers() {
-        String selfName = MinecraftClient.getInstance().getSession().getUsername();
+        String selfName = PlayerUtil.selfName();
         int count = 0;
-        for (String name : parent.getChatDetector().getLastPartyListMembers()) {
+        for (String name : parent.getPartySyncer().getLastPartyListMembers()) {
             if (!name.equalsIgnoreCase(selfName)) count++;
         }
         return count;
@@ -383,7 +385,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean boolean_arg) {
+    public boolean mouseClicked(Click click, boolean doubleClick) {
         double mouseX = click.x();
         double mouseY = click.y();
         // Click outside modal closes it
@@ -391,7 +393,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             parent.closeModal();
             return true;
         }
-        return super.mouseClicked(click, boolean_arg);
+        return super.mouseClicked(click, doubleClick);
     }
 
     private void drawSectionCard(DrawContext context, String label, int y, int cardH, boolean highlightBorder) {

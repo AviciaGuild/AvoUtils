@@ -11,6 +11,7 @@ import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
 import net.minecraft.text.MutableText;
 import net.minecraft.util.Formatting;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 
 import java.util.ArrayList;
@@ -33,7 +34,7 @@ public class PartyFinderNotificationHandler {
 
     private static boolean isSelf(String leaderName) {
         MinecraftClient mc = MinecraftClient.getInstance();
-        return mc.player != null && leaderName.equalsIgnoreCase(mc.getSession().getUsername());
+        return mc.player != null && leaderName.equalsIgnoreCase(PlayerUtil.selfName());
     }
 
     public void register() {

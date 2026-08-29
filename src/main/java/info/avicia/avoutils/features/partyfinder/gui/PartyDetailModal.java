@@ -2,6 +2,8 @@ package info.avicia.avoutils.features.partyfinder.gui;
 
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
@@ -15,6 +17,7 @@ import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 import com.google.gson.JsonObject;
@@ -88,7 +91,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         // Determine player state
         MinecraftClient mc = MinecraftClient.getInstance();
         // Use session username as fallback
-        playerName = mc.getSession().getUsername();
+        playerName = PlayerUtil.selfName();
 
         // Check if player is in the party (by name)
         for (PartyData.MemberData member : party.members.values()) {
@@ -149,16 +152,16 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             btnX += 65;
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
-                String icon = PartyData.MemberData.getStyledRolePrefix(r);
-                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> changeRole(r.toLowerCase())));
+                String icon = RoleIconUtil.getStyledRolePrefix(r);
+                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> changeRole(r.toLowerCase(Locale.ROOT))));
                 btnX += 65;
             }
         } else if (!party.isFull) {
             // Join buttons
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
-                String icon = PartyData.MemberData.getStyledRolePrefix(r);
-                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> joinParty(r.toLowerCase())));
+                String icon = RoleIconUtil.getStyledRolePrefix(r);
+                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> joinParty(r.toLowerCase(Locale.ROOT))));
                 btnX += 65;
             }
         }
@@ -398,7 +401,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean boolean_arg) {
+    public boolean mouseClicked(Click click, boolean doubleClick) {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
@@ -432,7 +435,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             return true;
         }
 
-        return super.mouseClicked(click, boolean_arg);
+        return super.mouseClicked(click, doubleClick);
     }
 
     private boolean isKickButtonHovered(double mouseX, double mouseY, int kickX, int rowY) {

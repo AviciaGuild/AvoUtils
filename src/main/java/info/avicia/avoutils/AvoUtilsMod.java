@@ -2,6 +2,7 @@ package info.avicia.avoutils;
 
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.core.command.AvoCommands;
@@ -38,6 +39,7 @@ public class AvoUtilsMod implements ClientModInitializer {
 
         // Register mod features
         registerFeature(new PartyFinderFeature());
+        registerFeature(new AnniPartyFeature());
         registerFeature(new EmojiFeature());
         registerFeature(new ChatBridgeFeature());
         registerFeature(new GuildStorageNotifier());

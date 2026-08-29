@@ -3,11 +3,13 @@ package info.avicia.avoutils.features.partyfinder.gui;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
-import info.avicia.avoutils.features.partyfinder.handler.ChatPartyDetector;
+import info.avicia.avoutils.features.partyfinder.handler.PartyFinderPartySyncer;
 import info.avicia.avoutils.features.partyfinder.handler.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ModalOverlay;
+import info.avicia.avoutils.core.gui.ScrollableListScreen;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.Click;
@@ -26,10 +28,10 @@ import com.google.gson.JsonObject;
  * Clicking a party opens a {@link PartyDetailModal} as an overlay.
  * The "Create Party" button opens a {@link CreatePartyModal}.
  */
-public class PartyListScreen extends Screen {
+public class PartyListScreen extends ScrollableListScreen {
 
     private final PartyFinderClient apiClient;
-    private final ChatPartyDetector chatDetector;
+    private final PartyFinderPartySyncer partySyncer;
     private final InviteHandler inviteHandler;
 
     private List<PartyData> parties = new ArrayList<>();
@@ -44,7 +46,6 @@ public class PartyListScreen extends Screen {
         fetchParties();
     };
 
-    private int scrollOffset = 0;
     private static final int ROW_HEIGHT = 42;
     private static final int LIST_TOP = 50;
     private static final int SIDE_PADDING = 20;
@@ -52,15 +53,15 @@ public class PartyListScreen extends Screen {
     private Screen activeModal = null;
     private String joinTargetLeaderName;
 
-    public PartyListScreen(PartyFinderClient apiClient, ChatPartyDetector chatDetector, InviteHandler inviteHandler) {
-        this(apiClient, chatDetector, inviteHandler, null);
+    public PartyListScreen(PartyFinderClient apiClient, PartyFinderPartySyncer partySyncer, InviteHandler inviteHandler) {
+        this(apiClient, partySyncer, inviteHandler, null);
     }
 
-    public PartyListScreen(PartyFinderClient apiClient, ChatPartyDetector chatDetector,
+    public PartyListScreen(PartyFinderClient apiClient, PartyFinderPartySyncer partySyncer,
                            InviteHandler inviteHandler, String joinTargetLeaderName) {
         super(Text.literal("Party Finder"));
         this.apiClient = apiClient;
-        this.chatDetector = chatDetector;
+        this.partySyncer = partySyncer;
         this.inviteHandler = inviteHandler;
         this.joinTargetLeaderName = joinTargetLeaderName;
     }
@@ -90,7 +91,7 @@ public class PartyListScreen extends Screen {
         inviteAllButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 155, buttonY, 70, 20, Text.literal("Invite All"), () -> {
             PartyData ownedParty = getOwnedParty();
             if (ownedParty != null) {
-                inviteHandler.inviteAll(ownedParty, client.getSession().getUsername());
+                inviteHandler.inviteAll(ownedParty, PlayerUtil.selfName());
             }
         }));
         inviteAllButton.visible = false;
@@ -108,7 +109,7 @@ public class PartyListScreen extends Screen {
         AvoWebSocketManager.getInstance().registerListener("party_list_updated", partyListListener);
 
         // Run `/party list` automatically to sync in-game party members
-        chatDetector.triggerPartyList();
+        partySyncer.triggerPartyList();
     }
 
     // ── Data fetching ────────────────────────────────────────────────────
@@ -122,18 +123,18 @@ public class PartyListScreen extends Screen {
                 loading = false;
 
                 // Track if we are leading any active party
-                String selfName = client.getSession().getUsername();
+                String selfName = PlayerUtil.selfName();
                 boolean isLeadingAny = false;
                 PartyData ownedParty = null;
                 for (PartyData p : result) {
                     if (p.leaderName != null && p.leaderName.equalsIgnoreCase(selfName)) {
-                        chatDetector.setTrackedPartyId(p.partyId);
+                        partySyncer.setTrackedPartyId(p.partyId);
                         if (p.members != null) {
                             List<String> memberNames = p.members.values().stream()
                                     .map(m -> m.name)
                                     .filter(java.util.Objects::nonNull)
                                     .toList();
-                            chatDetector.addKnownMembers(memberNames);
+                            partySyncer.addKnownMembers(memberNames);
                         }
                         isLeadingAny = true;
                         ownedParty = p;
@@ -141,7 +142,7 @@ public class PartyListScreen extends Screen {
                     }
                 }
                 if (!isLeadingAny) {
-                    chatDetector.clearTracking();
+                    partySyncer.clearTracking();
                 }
 
                 // Update button visibilities
@@ -178,7 +179,7 @@ public class PartyListScreen extends Screen {
     }
 
     private PartyData getOwnedParty() {
-        String selfName = client.getSession().getUsername();
+        String selfName = PlayerUtil.selfName();
         for (PartyData p : parties) {
             if (p.leaderName != null && p.leaderName.equalsIgnoreCase(selfName)) {
                 return p;
@@ -331,7 +332,7 @@ public class PartyListScreen extends Screen {
     // ── Input handling ───────────────────────────────────────────────────
 
     @Override
-    public boolean mouseClicked(Click click, boolean boolean_arg) {
+    public boolean mouseClicked(Click click, boolean doubleClick) {
         if (errorMessage != null) {
             return false;
         }
@@ -340,7 +341,7 @@ public class PartyListScreen extends Screen {
         double mouseY = click.y();
         int button = click.button();
         if (activeModal != null) {
-            return activeModal.mouseClicked(click, boolean_arg);
+            return activeModal.mouseClicked(click, doubleClick);
         }
 
         // Check if a party row was clicked
@@ -354,7 +355,7 @@ public class PartyListScreen extends Screen {
             }
         }
 
-        return super.mouseClicked(click, boolean_arg);
+        return super.mouseClicked(click, doubleClick);
     }
 
     @Override
@@ -365,8 +366,7 @@ public class PartyListScreen extends Screen {
         if (activeModal != null) {
             return activeModal.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
-        int maxScroll = Math.max(0, (parties.size() * ROW_HEIGHT) - (height - LIST_TOP - 10));
-        scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) (verticalAmount * 20)));
+        applyScroll(parties.size() * ROW_HEIGHT, LIST_TOP, verticalAmount);
         return true;
     }
 
@@ -409,8 +409,8 @@ public class PartyListScreen extends Screen {
         }
     }
 
-    public ChatPartyDetector getChatDetector() {
-        return chatDetector;
+    public PartyFinderPartySyncer getPartySyncer() {
+        return partySyncer;
     }
 
     private boolean isRowHovered(double mouseX, double mouseY, int rowY) {
