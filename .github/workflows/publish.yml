@@ -1,18 +1,30 @@
-name: Build and Publish Mod
+name: Publish
 
 on:
   push:
     branches:
-      - '**'
+      - main
     tags:
       - 'v*'
-  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      version: ${{ steps.determine_version.outputs.version }}
+      tag_name: ${{ steps.determine_version.outputs.tag_name }}
+      version_type: ${{ steps.determine_version.outputs.version_type }}
+      should_publish: ${{ steps.determine_version.outputs.should_publish }}
+      should_publish_modrinth: ${{ steps.determine_version.outputs.should_publish_modrinth }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      minecraft_version: ${{ steps.determine_version.outputs.minecraft_version }}
 
     steps:
       - name: Checkout Repository
@@ -44,7 +56,7 @@ jobs:
           git fetch --tags --force
           LATEST_TAG=$(git describe --tags --abbrev=0 --match "v[0-9]*.[0-9]*.[0-9]" 2>/dev/null || echo "v1.0.0")
           BASE_VERSION="${LATEST_TAG#v}"
-          
+
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION="${{ github.ref_name }}"
             VERSION="${VERSION#v}"
@@ -53,27 +65,21 @@ jobs:
             SHOULD_PUBLISH_MODRINTH="true"
             VERSION_TYPE="release"
             echo "Publishing release version: $VERSION from tag"
-          elif [[ "${{ github.ref }}" == refs/heads/main && "${{ github.event_name }}" == "push" ]]; then
+          else
             VERSION="${BASE_VERSION}-beta.${{ github.run_number }}"
             TAG_NAME="v${VERSION}"
             SHOULD_PUBLISH="true"
             SHOULD_PUBLISH_MODRINTH="true"
             VERSION_TYPE="beta"
             echo "Publishing beta version: $VERSION from main push"
-          else
-            VERSION="${BASE_VERSION}-dev.${{ github.run_number }}"
-            TAG_NAME=""
-            SHOULD_PUBLISH="false"
-            SHOULD_PUBLISH_MODRINTH="false"
-            VERSION_TYPE="alpha"
-            echo "Building dev version: $VERSION (no publishing)"
           fi
-          
+
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "should_publish=${SHOULD_PUBLISH}" >> $GITHUB_OUTPUT
           echo "should_publish_modrinth=${SHOULD_PUBLISH_MODRINTH}" >> $GITHUB_OUTPUT
           echo "version_type=${VERSION_TYPE}" >> $GITHUB_OUTPUT
+          echo "minecraft_version=$(sed -n 's/^minecraft_version=//p' gradle.properties)" >> $GITHUB_OUTPUT
 
       - name: Build Mod with Gradle
         run: |
@@ -132,21 +138,46 @@ jobs:
           echo "${changelog}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
+  github-release:
+    needs: build
+    if: needs.build.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: avo-utils-mod
+          path: .
+
       - name: Create GitHub Release
-        if: steps.determine_version.outputs.should_publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.determine_version.outputs.tag_name }}
-          body: ${{ steps.changelog.outputs.changelog }}
+          tag_name: ${{ needs.build.outputs.tag_name }}
+          body: ${{ needs.build.outputs.changelog }}
           files: |
             build/libs/avoutils-*.jar
             !build/libs/avoutils-*-sources.jar
             !build/libs/avoutils-*-dev.jar
           draft: false
-          prerelease: ${{ contains(steps.determine_version.outputs.version, '-') }}
+          prerelease: ${{ contains(needs.build.outputs.version, '-') }}
+
+  modrinth-publish:
+    needs: build
+    if: needs.build.outputs.should_publish_modrinth == 'true'
+    runs-on: ubuntu-latest
+    env:
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      MODRINTH_PROJECT_SLUG: ${{ secrets.MODRINTH_PROJECT_SLUG }}
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: avo-utils-mod
+          path: .
 
       - name: Resolve Modrinth Metadata
-        if: steps.determine_version.outputs.should_publish_modrinth == 'true'
         id: modrinth_meta
         shell: bash
         run: |
@@ -159,18 +190,9 @@ jobs:
             exit 1
           fi
 
-          minecraft_version="$(sed -n 's/^minecraft_version=//p' gradle.properties)"
-
-          {
-            echo "mod_jar=${release_jars[0]}"
-            echo "minecraft_version=${minecraft_version}"
-          } >> "$GITHUB_OUTPUT"
+          echo "mod_jar=${release_jars[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Publish to Modrinth
-        if: steps.determine_version.outputs.should_publish_modrinth == 'true'
-        env:
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-          MODRINTH_PROJECT_SLUG: ${{ secrets.MODRINTH_PROJECT_SLUG }}
         shell: bash
         run: |
           set -euo pipefail
@@ -196,18 +218,18 @@ jobs:
           echo "Resolved project_id=${project_id}"
 
           payload="$(jq -cn \
-            --arg name "AvoUtils ${{ steps.determine_version.outputs.version }}" \
-            --arg version_number "${{ steps.determine_version.outputs.version }}" \
-            --arg changelog "${{ steps.changelog.outputs.changelog }}" \
+            --arg name "AvoUtils ${{ needs.build.outputs.version }}" \
+            --arg version_number "${{ needs.build.outputs.version }}" \
+            --arg changelog "${{ needs.build.outputs.changelog }}" \
             --arg project_id "${project_id}" \
-            --arg minecraft_version "${{ steps.modrinth_meta.outputs.minecraft_version }}" \
+            --arg minecraft_version "${{ needs.build.outputs.minecraft_version }}" \
             '{
               name: $name,
               version_number: $version_number,
               changelog: $changelog,
               project_id: $project_id,
               game_versions: [$minecraft_version],
-              version_type: "${{ steps.determine_version.outputs.version_type }}",
+              version_type: "${{ needs.build.outputs.version_type }}",
               dependencies: [
                 { project_id: "P7dR8mSH", dependency_type: "required" },
                 { project_id: "dU5Gb9Ab", dependency_type: "optional" }
@@ -220,7 +242,7 @@ jobs:
             }'
           )"
 
-          echo "Creating Modrinth version ${{ steps.determine_version.outputs.version }}..."
+          echo "Creating Modrinth version ${{ needs.build.outputs.version }}..."
           if ! response="$(curl --fail-with-body --show-error --silent \
             -X POST "https://api.modrinth.com/v2/version" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
