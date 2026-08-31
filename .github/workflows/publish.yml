@@ -148,17 +148,29 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: avo-utils-mod
-          path: .
+          path: dist
+
+      - name: Locate Release Jar
+        id: locate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t release_jars < <(find dist -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | sort)
+          if [[ "${#release_jars[@]}" -ne 1 ]]; then
+            echo "Expected exactly one release jar, found ${#release_jars[@]}" >&2
+            printf 'Found jars:\n%s\n' "${release_jars[@]}" >&2
+            exit 1
+          fi
+
+          echo "jar=${release_jars[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build.outputs.tag_name }}
           body: ${{ needs.build.outputs.changelog }}
-          files: |
-            build/libs/avoutils-*.jar
-            !build/libs/avoutils-*-sources.jar
-            !build/libs/avoutils-*-dev.jar
+          files: ${{ steps.locate.outputs.jar }}
           draft: false
           prerelease: ${{ contains(needs.build.outputs.version, '-') }}
 
@@ -175,7 +187,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: avo-utils-mod
-          path: .
+          path: dist
 
       - name: Resolve Modrinth Metadata
         id: modrinth_meta
@@ -183,7 +195,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          mapfile -t release_jars < <(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | sort)
+          mapfile -t release_jars < <(find dist -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' | sort)
           if [[ "${#release_jars[@]}" -ne 1 ]]; then
             echo "Expected exactly one release jar, found ${#release_jars[@]}" >&2
             printf 'Found jars:\n%s\n' "${release_jars[@]}" >&2
