@@ -39,7 +39,7 @@ public final class PartyMessageParser {
             "(?:\\[.+?\\] )?(.+?) has been kicked from the party!", Pattern.CASE_INSENSITIVE);
     private static final Pattern PARTY_LEAVE_PATTERN = Pattern.compile(
             "(?:\\[.+?\\] )?(.+?) has left the party!", Pattern.CASE_INSENSITIVE);
-    private static final Pattern NON_NAME_CHARS_PATTERN = Pattern.compile("[^A-Za-z0-9_]");
+    private static final Pattern MC_USERNAME_PATTERN = Pattern.compile("^[A-Za-z0-9_]{3,16}$");
 
     private static final String[] EVENT_KEYWORDS = {
             "party members:",
@@ -116,14 +116,6 @@ public final class PartyMessageParser {
         return null;
     }
 
-    public static String cleanPlayerName(String rawName) {
-        if (rawName == null) {
-            return "";
-        }
-        String name = PacketTextNormalizer.stripColorCodes(rawName);
-        return NON_NAME_CHARS_PATTERN.matcher(name).replaceAll("").trim();
-    }
-
     private static Event eventFor(String keyword) {
         return switch (keyword) {
             case "party members:" -> Event.PARTY_LIST;
@@ -139,13 +131,16 @@ public final class PartyMessageParser {
     }
 
     private static List<String> parsePartyList(String trimmed, int keywordIndex) {
+        String membersTail = trimmed.substring(keywordIndex + "party members:".length()).trim();
+        if (membersTail.isEmpty()) {
+            return List.of();
+        }
+
+        String[] tokens = membersTail.split("\\s*,\\s*(?:and\\s+)?|\\s+and\\s+");
         List<String> members = new ArrayList<>();
-        String membersStr = trimmed.substring(keywordIndex + "party members:".length()).trim();
-        membersStr = membersStr.replace(" and ", ",");
-        String[] parts = membersStr.split(" *, *");
-        for (String part : parts) {
-            String name = cleanPlayerName(part);
-            if (!name.isEmpty()) {
+        for (String token : tokens) {
+            String name = token == null ? "" : token.trim();
+            if (MC_USERNAME_PATTERN.matcher(name).matches()) {
                 members.add(name);
             }
         }
