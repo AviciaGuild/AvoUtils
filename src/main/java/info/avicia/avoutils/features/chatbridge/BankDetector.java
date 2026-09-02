@@ -51,7 +51,7 @@ final class BankDetector {
                 ? "Guild Bank"
                 : "Guild Bank (" + accessTier + ")";
 
-        String formattedMessage = "**" + realUsername + "** " + action + " **" + itemBlock + "**";
+        String formattedMessage = "**" + DiscordMarkdown.escapeUsername(realUsername) + "** " + action + " **" + itemBlock + "**";
 
         AvoUtilsMod.LOGGER.info("[ChatBridge/Bank] Detected: {} {} {}", realUsername, action, itemBlock);
 

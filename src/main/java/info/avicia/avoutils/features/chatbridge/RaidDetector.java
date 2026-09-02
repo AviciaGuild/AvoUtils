@@ -109,12 +109,12 @@ final class RaidDetector {
     }
 
     private static String formatPlayerList(List<String> members) {
-        if (members.size() == 1) return members.get(0);
-        if (members.size() == 2) return members.get(0) + " and " + members.get(1);
+        if (members.size() == 1) return DiscordMarkdown.escapeUsername(members.get(0));
+        if (members.size() == 2) return DiscordMarkdown.escapeUsername(members.get(0)) + " and " + DiscordMarkdown.escapeUsername(members.get(1));
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < members.size(); i++) {
             if (i > 0) sb.append(i == members.size() - 1 ? ", and " : ", ");
-            sb.append(members.get(i));
+            sb.append(DiscordMarkdown.escapeUsername(members.get(i)));
         }
         return sb.toString();
     }

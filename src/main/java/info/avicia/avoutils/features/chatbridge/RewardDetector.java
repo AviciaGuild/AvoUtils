@@ -31,6 +31,8 @@ final class RewardDetector {
         if (sender == null) sender = senderDisplay;
         String recipient = UsernameResolver.resolve(message, recipientDisplay);
         if (recipient == null) recipient = recipientDisplay;
+        sender = DiscordMarkdown.escapeUsername(sender);
+        recipient = DiscordMarkdown.escapeUsername(recipient);
 
         String emeraldAmount = m.group("emeraldAmount");
         if (emeraldAmount != null) {

@@ -131,7 +131,12 @@ final class WarDetector {
         stats.append(" · ☠ ").append(formatNumber(dmgLow)).append("-").append(formatNumber(dmgHigh));
         if (atk > 0) stats.append(" (").append(atk).append("x)");
 
-        String warrersStr = String.join(", ", warrers);
+        StringBuilder warrersBuilder = new StringBuilder();
+        for (String warrer : warrers) {
+            if (warrersBuilder.length() > 0) warrersBuilder.append(", ");
+            warrersBuilder.append(DiscordMarkdown.escapeUsername(warrer));
+        }
+        String warrersStr = warrersBuilder.toString();
 
         return new WarResult(outcome, territory, stats.toString(), warrersStr, durationSeconds, dps);
     }
