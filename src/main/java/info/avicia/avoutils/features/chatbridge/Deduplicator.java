@@ -1,13 +1,16 @@
 package info.avicia.avoutils.features.chatbridge;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Thread-safe, time-windowed deduplication helper.
- * Drops a key if it was last seen within the configured window.
+ * Tracks every key seen within the window, so
+ * interleaved duplicate deliveries are still caught.
  */
 public class Deduplicator {
     private final long windowMs;
-    private String lastKey;
-    private long lastTime;
+    private final Map<String, Long> lastSeen = new HashMap<>();
 
     public Deduplicator(long windowMs) {
         this.windowMs = windowMs;
@@ -15,11 +18,9 @@ public class Deduplicator {
 
     public synchronized boolean isDuplicate(String key) {
         long now = System.currentTimeMillis();
-        if (key.equals(lastKey) && (now - lastTime) < windowMs) {
-            return true;
-        }
-        lastKey = key;
-        lastTime = now;
-        return false;
+        lastSeen.entrySet().removeIf(entry -> (now - entry.getValue()) >= windowMs);
+        Long previous = lastSeen.get(key);
+        lastSeen.put(key, now);
+        return previous != null;
     }
 }
