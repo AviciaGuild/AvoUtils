@@ -31,7 +31,10 @@ public class ModConfig {
      * Load config from disk, or create a default one if it doesn't exist
      */
     public static ModConfig load() {
-        Path configPath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE);
+        return load(FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE));
+    }
+
+    static ModConfig load(Path configPath) {
         if (Files.exists(configPath)) {
             try {
                 String json = Files.readString(configPath);
@@ -46,7 +49,7 @@ public class ModConfig {
         }
         // Create default config
         ModConfig config = new ModConfig();
-        config.save();
+        config.save(configPath);
         return config;
     }
 
@@ -69,7 +72,10 @@ public class ModConfig {
      * Save config to disk
      */
     public void save() {
-        Path configPath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE);
+        save(FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE));
+    }
+
+    void save(Path configPath) {
         try {
             Files.createDirectories(configPath.getParent());
             Files.writeString(configPath, GSON.toJson(this));

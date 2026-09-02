@@ -28,10 +28,14 @@ public class PartyFinderClient {
     private final HttpClient httpClient;
 
     public PartyFinderClient(ModConfig config) {
-        this.config = config;
-        this.httpClient = HttpClient.newBuilder()
+        this(config, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
-                .build();
+                .build());
+    }
+
+    PartyFinderClient(ModConfig config, HttpClient httpClient) {
+        this.config = config;
+        this.httpClient = httpClient;
     }
 
     // ── Auth ──────────────────────────────────────────────────────────────

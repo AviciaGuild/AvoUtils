@@ -14,6 +14,7 @@ bin/
 # Fabric
 run/
 *.log
+logs/
 
 # OS
 .DS_Store

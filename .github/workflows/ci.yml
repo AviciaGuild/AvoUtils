@@ -51,10 +51,24 @@ jobs:
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Build Mod with Gradle
+      - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew build -Pmod_version="${{ steps.determine_version.outputs.version }}"
+          ./gradlew test -Pmod_version="${{ steps.determine_version.outputs.version }}" --console=plain
+
+      - name: Build Mod with Gradle
+        run: |
+          ./gradlew build -x test -Pmod_version="${{ steps.determine_version.outputs.version }}"
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/test/
+            build/test-results/test/
+          if-no-files-found: ignore
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

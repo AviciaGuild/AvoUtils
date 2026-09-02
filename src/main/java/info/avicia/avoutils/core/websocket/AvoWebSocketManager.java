@@ -125,7 +125,7 @@ public class AvoWebSocketManager {
             return;
         }
         long now = System.currentTimeMillis();
-        long baseBackoff = Math.min(BASE_RETRY_MS * (1L << Math.min(consecutiveFailures, 5)), MAX_RETRY_MS);
+        long baseBackoff = baseBackoffForFailures(consecutiveFailures);
         long jitter = (long)(ThreadLocalRandom.current().nextDouble() * baseBackoff * 0.3);
         long backoff = baseBackoff + jitter;
         if (now - lastConnectAttempt < backoff) {
@@ -167,9 +167,7 @@ public class AvoWebSocketManager {
                 }
             }
 
-            URI base = new URI(config.apiBaseUrl);
-            String wsScheme = "https".equalsIgnoreCase(base.getScheme()) ? "wss" : "ws";
-            URI wsUri = new URI(wsScheme, null, base.getHost(), base.getPort(), "/ws", null, null);
+            URI wsUri = wsUriFor(config.apiBaseUrl);
 
             AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connecting to: {}", wsUri);
 
@@ -225,5 +223,17 @@ public class AvoWebSocketManager {
         }
         isConnecting.set(false);
         consecutiveFailures = 0;
+    }
+
+    // Builds the gateway WebSocket URI from the HTTP API base URL
+    static URI wsUriFor(String apiBaseUrl) throws Exception {
+        URI base = new URI(apiBaseUrl);
+        String wsScheme = "https".equalsIgnoreCase(base.getScheme()) ? "wss" : "ws";
+        return new URI(wsScheme, null, base.getHost(), base.getPort(), "/ws", null, null);
+    }
+
+    // Exponential backoff base (before jitter) for the given consecutive failure count
+    static long baseBackoffForFailures(int failures) {
+        return Math.min(BASE_RETRY_MS * (1L << Math.min(failures, 5)), MAX_RETRY_MS);
     }
 }

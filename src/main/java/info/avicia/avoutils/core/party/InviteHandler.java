@@ -78,16 +78,18 @@ public class InviteHandler {
 
         String action = inviteQueue.poll();
         if (action != null) {
-            String command;
-            if (action.equals("__CREATE__")) {
-                command = "party create";
-            } else {
-                command = "party invite " + action;
-            }
+            String command = commandFor(action);
             AvoUtilsMod.LOGGER.info("Sending: /{}", command);
             client.player.networkHandler.sendChatCommand(command);
             cooldownTicks = TICKS_BETWEEN_INVITES;
         }
+    }
+
+    /**
+     * Builds the chat command for a queued action.
+     */
+    static String commandFor(String action) {
+        return "__CREATE__".equals(action) ? "party create" : "party invite " + action;
     }
 
     public void clear() {

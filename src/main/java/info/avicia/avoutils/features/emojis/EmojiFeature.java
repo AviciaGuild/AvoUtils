@@ -215,8 +215,12 @@ public class EmojiFeature implements AvoFeature {
     }
 
     private void rebuildActiveEmojis() {
+        this.activeTrie = buildTrie(twemojiManager.standardEmojis, customEmojis);
+    }
+
+    static EmojiTrie buildTrie(Map<String, String> standardEmojis, Map<String, String> customEmojis) {
         EmojiTrie newTrie = new EmojiTrie();
-        for (Map.Entry<String, String> entry : twemojiManager.standardEmojis.entrySet()) {
+        for (Map.Entry<String, String> entry : standardEmojis.entrySet()) {
             newTrie.insert(entry.getKey(), entry.getValue());
         }
         synchronized (customEmojis) {
@@ -224,7 +228,7 @@ public class EmojiFeature implements AvoFeature {
                 newTrie.insert(entry.getKey(), entry.getValue());
             }
         }
-        this.activeTrie = newTrie;
+        return newTrie;
     }
 
     // ── Resource pack structure ──────────────────────────────────────────
@@ -316,6 +320,11 @@ public class EmojiFeature implements AvoFeature {
     // ── Image download ───────────────────────────────────────────────────
 
     private String getSafeName(String name) {
+        return safeNameFor(name);
+    }
+
+    // Sanitizes an emoji name for use as a resource-pack file name
+    static String safeNameFor(String name) {
         return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase();
     }
 
@@ -338,7 +347,10 @@ public class EmojiFeature implements AvoFeature {
     // ── Unicode → PUA replacement ────────────────────────────────────────
 
     public String replaceUnicodeEmojisWithPua(String text) {
-        Map<Integer, String> charToPua = twemojiManager.standardCharToPua;
+        return replaceUnicodeEmojisWithPua(text, twemojiManager.standardCharToPua);
+    }
+
+    static String replaceUnicodeEmojisWithPua(String text, Map<Integer, String> charToPua) {
         if (text == null || text.isEmpty() || charToPua.isEmpty()) {
             return text;
         }

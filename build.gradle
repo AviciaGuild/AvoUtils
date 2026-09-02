@@ -2,6 +2,7 @@ plugins {
     id 'fabric-loom' version '1.15.5'
     id 'maven-publish'
     id 'java'
+    id 'jacoco'
 }
 
 version = project.mod_version
@@ -28,6 +29,43 @@ dependencies {
     modCompileOnly "maven.modrinth:wynntils:v4.1.10-fabric"
     implementation "org.java-websocket:Java-WebSocket:1.6.0"
     include "org.java-websocket:Java-WebSocket:1.6.0"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
+    testImplementation "org.mockito:mockito-core:5.14.2"
+    testImplementation "org.mockito:mockito-junit-jupiter:5.14.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "failed", "skipped"
+        exceptionFormat "full"
+    }
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+
+    // Exclude code that only runs inside a live Minecraft client (rendering,
+    // mixins, Brigadier command registration, and the mod entry point) so the
+    // report reflects unit-testable logic only.
+    classDirectories.setFrom(files(classDirectories.files.collect { dir ->
+        fileTree(dir: dir, exclude: [
+            'info/avicia/avoutils/AvoUtilsMod*',
+            'info/avicia/avoutils/core/gui/**',
+            'info/avicia/avoutils/core/command/**',
+            'info/avicia/avoutils/mixin/**',
+            'info/avicia/avoutils/features/partyfinder/gui/**',
+            'info/avicia/avoutils/features/partyfinder/command/**',
+            'info/avicia/avoutils/features/anniparty/AnniPartyScreen*'
+        ])
+    }))
 }
 
 processResources {
