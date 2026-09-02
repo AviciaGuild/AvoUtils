@@ -10,6 +10,7 @@ import net.minecraft.entity.player.PlayerEntity;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -126,7 +127,7 @@ final class WarDetector {
 
         StringBuilder stats = new StringBuilder();
         stats.append("❤ ").append(formatNumber(hp));
-        if (def > 0) stats.append(" (").append(String.format("%.0f", def)).append("%)");
+        if (def > 0) stats.append(" (").append(String.format(Locale.US, "%.0f", def)).append("%)");
         stats.append(" · ☠ ").append(formatNumber(dmgLow)).append("-").append(formatNumber(dmgHigh));
         if (atk > 0) stats.append(" (").append(atk).append("x)");
 
@@ -144,8 +145,8 @@ final class WarDetector {
     }
 
     private static String formatNumber(long value) {
-        if (value >= 1_000_000) return String.format("%.1fM", value / 1_000_000.0);
-        if (value >= 1_000) return String.format("%.1fk", value / 1_000.0);
+        if (value >= 1_000_000) return String.format(Locale.US, "%.1fM", value / 1_000_000.0);
+        if (value >= 1_000) return String.format(Locale.US, "%.1fk", value / 1_000.0);
         return String.valueOf(value);
     }
 

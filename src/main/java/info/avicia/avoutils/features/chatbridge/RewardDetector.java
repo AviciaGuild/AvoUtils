@@ -1,6 +1,7 @@
 package info.avicia.avoutils.features.chatbridge;
 
 import net.minecraft.text.Text;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,7 +35,7 @@ final class RewardDetector {
         String emeraldAmount = m.group("emeraldAmount");
         if (emeraldAmount != null) {
             long amount = parseNumber(emeraldAmount);
-            String formatted = "**" + sender + "** rewarded **" + String.format("%,d", amount)
+            String formatted = "**" + sender + "** rewarded **" + String.format(Locale.US, "%,d", amount)
                     + " Emeralds** to **" + recipient + "**";
             return new RewardResult(formatted, sender, recipient, amount, 0, 0);
         }

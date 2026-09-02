@@ -6,6 +6,7 @@ import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -73,7 +74,7 @@ final class RaidDetector {
         List<String> parts = new ArrayList<>();
         if (aspects > 0) parts.add(aspects + "x Aspects");
         if (emeralds > 0) parts.add(emeralds + "x Emeralds");
-        parts.add(String.format("+%.3fm Guild XP", guildExp));
+        parts.add(String.format(Locale.US, "+%.3fm Guild XP", guildExp));
         if (sr > 0) parts.add("+" + sr + " SR");
         if (!parts.isEmpty()) sb.append(" — ").append(String.join(", ", parts));
 
