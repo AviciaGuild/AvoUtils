@@ -35,19 +35,4 @@ class EmojiFeatureTest {
         assertEquals("PUA-2", trie.search(":avicia:", 0, 8));
         assertFalse(trie.isEmpty());
     }
-
-    @Test
-    void replaceUnicodeEmojisWithPuaMapsCodePoints() {
-        Map<Integer, String> charToPua = new HashMap<>();
-        charToPua.put(0x1F600, "\uE200");
-
-        assertEquals("a\uE200b", EmojiFeature.replaceUnicodeEmojisWithPua("a\uD83D\uDE00b", charToPua));
-    }
-
-    @Test
-    void replaceUnicodeEmojisWithPuaReturnsInputWhenNoMapping() {
-        assertEquals("abc", EmojiFeature.replaceUnicodeEmojisWithPua("abc", new HashMap<>()));
-        assertNull(EmojiFeature.replaceUnicodeEmojisWithPua(null, new HashMap<>()));
-        assertEquals("", EmojiFeature.replaceUnicodeEmojisWithPua("", new HashMap<>()));
-    }
 }
