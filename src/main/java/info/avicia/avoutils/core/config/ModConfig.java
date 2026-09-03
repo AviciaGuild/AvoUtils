@@ -20,6 +20,7 @@ public class ModConfig {
     public String apiBaseUrl = DEFAULT_API_BASE_URL;
     public boolean chatBridgeEnabled = true;
     public boolean emojiEnabled = true;
+    public boolean emojiAutocompleteEnabled = true;
     public boolean newPartyNotifsEnabled = true;
     public boolean notificationSoundsEnabled = true;
     public boolean guildStorageNotifsEnabled = true;

@@ -17,23 +17,41 @@ public class EmojiReplacer {
     private static final TextColor EMOJI_COLOR = TextColor.fromRgb(0xFFFFFF);
 
     private static boolean isValidShortcodeChar(char c) {
-        return (c >= 'a' && c <= 'z')
-            || (c >= 'A' && c <= 'Z')
-            || (c >= '0' && c <= '9')
-            || c == '_' || c == '+' || c == '-';
+        return EmojiFeature.isValidShortcodeChar(c);
     }
 
     public static Text replace(Text text) {
         if (text == null)
             return null;
 
-        EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+        String raw = text.getString();
+        int firstColon = raw.indexOf(':');
+        if (firstColon == -1 || firstColon == raw.length() - 1 || raw.indexOf(':', firstColon + 1) == -1) {
+            return text;
+        }
+
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        if (mod == null)
+            return text;
+
+        EmojiFeature feature = mod.getFeature(EmojiFeature.class);
         if (feature == null || !feature.isEnabled())
             return text;
 
-        EmojiTrie trie = feature.getActiveTrie();
-        if (trie.isEmpty())
+        return replace(text, feature.getActiveTrie());
+    }
+
+    static Text replace(Text text, EmojiTrie trie) {
+        if (text == null)
+            return null;
+        if (trie == null || trie.isEmpty())
             return text;
+
+        String raw = text.getString();
+        int firstColon = raw.indexOf(':');
+        if (firstColon == -1 || firstColon == raw.length() - 1 || raw.indexOf(':', firstColon + 1) == -1) {
+            return text;
+        }
 
         MutableText result = Text.empty();
         boolean[] modified = { false };
@@ -42,13 +60,12 @@ public class EmojiReplacer {
             if (str.isEmpty())
                 return Optional.empty();
 
-            String converted = feature.replaceUnicodeEmojisWithPua(str);
-            MutableText replaced = replaceShortcodes(converted, trie, style);
+            MutableText replaced = replaceShortcodes(str, trie, style);
             if (replaced != null) {
                 result.append(replaced);
                 modified[0] = true;
             } else {
-                result.append(Text.literal(converted).setStyle(style));
+                result.append(Text.literal(str).setStyle(style));
             }
             return Optional.empty();
         }, Style.EMPTY);
@@ -94,7 +111,7 @@ public class EmojiReplacer {
 
                         String emojiName = text.substring(i + 1, end);
                         Style emojiStyle = parentStyle.withColor(EMOJI_COLOR)
-                                .withHoverEvent(new HoverEvent.ShowText(Text.literal(":" + emojiName + ":")));
+                                .withHoverEvent(EmojiTooltipHelper.createEmojiHover(replacement, emojiName));
                         root.append(Text.literal(replacement).setStyle(emojiStyle));
 
                         lastEnd = end + 1;
@@ -103,6 +120,7 @@ public class EmojiReplacer {
                     }
                 }
                 i = end;
+                continue;
             }
             i++;
         }

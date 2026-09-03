@@ -5,6 +5,8 @@
   "client": [
     "ClientPlayNetworkHandlerMixin",
     "ChatHudMixin",
+    "ChatInputSuggestorMixin",
+    "DrawContextMixin",
     "HandledScreenMixin",
     "ResourcePackManagerMixin"
   ],

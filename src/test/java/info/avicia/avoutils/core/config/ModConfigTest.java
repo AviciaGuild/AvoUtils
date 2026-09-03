@@ -71,6 +71,7 @@ class ModConfigTest {
         assertEquals("https://auth.avicia.info:8443", config.apiBaseUrl);
         assertTrue(config.chatBridgeEnabled);
         assertTrue(config.emojiEnabled);
+        assertTrue(config.emojiAutocompleteEnabled);
         assertTrue(config.guildStorageNotifsEnabled);
         assertEquals(90, config.guildStorageEmeraldThresholdPercent);
         assertEquals(90, config.guildStorageAspectThresholdPercent);

@@ -8,8 +8,8 @@ import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -61,12 +61,33 @@ public class ConfigScreen extends Screen {
         y += CARD_SINGLE_H + CARD_GAP;
 
         // ── Emojis ──────────────────────────────────────────────────────
+        EmojiFeature emojiFeature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+        FlatToggleWidget[] emojiAutocompleteToggle = new FlatToggleWidget[1];
+        emojiAutocompleteToggle[0] = new FlatToggleWidget(
+                cardRight - 40, y + 46, 30, 16,
+                config.emojiAutocompleteEnabled,
+                checked -> {
+                    config.emojiAutocompleteEnabled = checked;
+                    config.save();
+                }
+        );
         addDrawableChild(new FlatToggleWidget(
                 cardRight - 40, y + 28, 30, 16,
                 config.emojiEnabled,
-                checked -> { config.emojiEnabled = checked; config.save(); }
+                checked -> {
+                    config.emojiEnabled = checked;
+                    config.save();
+                    emojiAutocompleteToggle[0].active = checked;
+                    if (checked && emojiFeature != null) {
+                        emojiFeature.ensurePacksLoaded();
+                    }
+                }
         ));
-        y += CARD_SINGLE_H + CARD_GAP;
+        if (!config.emojiEnabled) {
+            emojiAutocompleteToggle[0].active = false;
+        }
+        addDrawableChild(emojiAutocompleteToggle[0]);
+        y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Party Finder ────────────────────────────────────────────────
         FlatToggleWidget[] pfSoundsToggle = new FlatToggleWidget[1];
@@ -155,15 +176,7 @@ public class ConfigScreen extends Screen {
         // ── Bottom buttons ──────────────────────────────────────────────
         int btnY = y + 16;
         addDrawableChild(new FlatButtonWidget(
-                width / 2 - 100, btnY, 90, 20,
-                Text.literal("\u27f3 Reload Packs"),
-                () -> {
-                    MinecraftClient client = MinecraftClient.getInstance();
-                    if (client != null) client.reloadResources();
-                }
-        ));
-        addDrawableChild(new FlatButtonWidget(
-                width / 2 + 10, btnY, 90, 20,
+                width / 2 - 50, btnY, 100, 20,
                 Text.literal("Done"),
                 this::close
         ));
@@ -186,10 +199,12 @@ public class ConfigScreen extends Screen {
         y += CARD_SINGLE_H + CARD_GAP;
 
         // ── Emojis ──────────────────────────────────────────────────────
-        drawSectionCard(context, y, CARD_SINGLE_H, "Emojis");
+        drawSectionCard(context, y, CARD_DOUBLE_H, "Emojis");
         CompatibilityHelper.drawTextWithShadow(context, textRenderer,
                 Text.literal("\u00a77Enabled"), cardLeft + 16, y + 32, 0xFFFFFFFF);
-        y += CARD_SINGLE_H + CARD_GAP;
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
+                Text.literal("\u00a77Emoji Autocomplete"), cardLeft + 16, y + 50, 0xFFFFFFFF);
+        y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Party Finder ────────────────────────────────────────────────
         drawSectionCard(context, y, CARD_DOUBLE_H, "Party Finder");
