@@ -20,7 +20,7 @@ public class ChatHudMixin {
             at = @At("HEAD"),
             argsOnly = true
     )
-    private Text replaceEmojis(Text message) {
+    private Text avoutils$replaceEmojis(Text message) {
         if (message == null) {
             return null;
         }

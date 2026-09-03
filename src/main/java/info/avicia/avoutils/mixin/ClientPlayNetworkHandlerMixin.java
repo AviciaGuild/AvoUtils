@@ -14,9 +14,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class ClientPlayNetworkHandlerMixin {
 
     @Inject(method = "onGameMessage", at = @At("HEAD"), cancellable = true)
-    private void onOnGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
+    private void avoutils$onGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
         try {
             if (!net.minecraft.client.MinecraftClient.getInstance().isOnThread()) {
+                return;
+            }
+            if (packet.overlay()) {
                 return;
             }
             if (packet.content() != null && AvoUtilsMod.getInstance() != null) {

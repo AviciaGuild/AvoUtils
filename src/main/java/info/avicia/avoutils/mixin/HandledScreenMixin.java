@@ -22,7 +22,7 @@ public abstract class HandledScreenMixin {
     protected abstract ScreenHandler getScreenHandler();
 
     @Inject(method = "render", at = @At("TAIL"))
-    private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    private void avoutils$onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         try {
             GuildStorageNotifier notifier = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
             if (notifier != null) {

@@ -24,7 +24,7 @@ public class ResourcePackManagerMixin {
     private Set<ResourcePackProvider> providers;
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void onInit(CallbackInfo ci) {
+    private void avoutils$onInit(CallbackInfo ci) {
         Set<ResourcePackProvider> newProviders = new HashSet<>(providers);
         newProviders.add(new EmojiResourcePackProvider());
         providers = newProviders;
