@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.emojis;
 
+import info.avicia.avoutils.features.emojis.models.FontProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

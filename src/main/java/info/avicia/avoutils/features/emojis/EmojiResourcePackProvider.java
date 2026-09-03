@@ -2,7 +2,14 @@ package info.avicia.avoutils.features.emojis;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.resource.*;
+import net.minecraft.resource.DirectoryResourcePack;
+import net.minecraft.resource.ResourcePackInfo;
+import net.minecraft.resource.ResourcePackPosition;
+import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.resource.ResourcePackProvider;
+import net.minecraft.resource.ResourcePackSource;
+import net.minecraft.resource.ResourceType;
+import net.minecraft.resource.ZipResourcePack;
 import net.minecraft.text.Text;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,7 +25,12 @@ public class EmojiResourcePackProvider implements ResourcePackProvider {
 
     @Override
     public void register(Consumer<ResourcePackProfile> profileAdder) {
-        EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        if (mod == null) {
+            return;
+        }
+
+        EmojiFeature feature = mod.getFeature(EmojiFeature.class);
         if (feature == null || !feature.isEnabled()) {
             return;
         }
