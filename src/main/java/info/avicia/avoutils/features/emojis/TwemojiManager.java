@@ -5,6 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.features.emojis.models.FontConfig;
+import info.avicia.avoutils.features.emojis.models.FontProvider;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,9 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntConsumer;
@@ -35,6 +35,7 @@ import java.util.zip.ZipOutputStream;
  */
 class TwemojiManager {
 
+    private static final Gson GSON = new Gson();
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
@@ -127,7 +128,7 @@ class TwemojiManager {
 
         try (InputStream is = zip.getInputStream(entry);
                 InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-            standardFontConfig = new Gson().fromJson(isr, FontConfig.class);
+            standardFontConfig = GSON.fromJson(isr, FontConfig.class);
             if (standardFontConfig != null && standardFontConfig.providers != null) {
                 for (FontProvider prov : standardFontConfig.providers) {
                     walkProviderChars(prov, codePoint -> {
@@ -162,7 +163,7 @@ class TwemojiManager {
                         puaBuilder.append(puaChar);
                     }
                 });
-                if (puaBuilder.length() > 0) {
+                if (!puaBuilder.isEmpty()) {
                     standardEmojis.put(shortcode, puaBuilder.toString());
                 }
             }
@@ -179,7 +180,6 @@ class TwemojiManager {
         try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(source));
                 ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(destination))) {
             ZipEntry entry;
-            byte[] buffer = new byte[16384];
             while ((entry = zis.getNextEntry()) != null) {
                 String name = entry.getName();
 
@@ -198,7 +198,7 @@ class TwemojiManager {
                             packObj.addProperty("max_format", packFormat);
                             packObj.remove("supported_formats");
                         }
-                        raw = new Gson().toJson(rootObj);
+                        raw = GSON.toJson(rootObj);
                     } catch (Exception ignored) {
                     }
 
@@ -211,10 +211,7 @@ class TwemojiManager {
 
                 ZipEntry newEntry = new ZipEntry(name);
                 zos.putNextEntry(newEntry);
-                int len;
-                while ((len = zis.read(buffer)) > 0) {
-                    zos.write(buffer, 0, len);
-                }
+                zis.transferTo(zos);
                 zos.closeEntry();
             }
         }
@@ -239,18 +236,4 @@ class TwemojiManager {
             i += charCount;
         }
     }
-}
-
-// ── Font JSON structures ─────────────────────────────────────────────
-
-class FontConfig {
-    List<FontProvider> providers = new ArrayList<>();
-}
-
-class FontProvider {
-    String type = "bitmap";
-    String file;
-    int ascent = 7;
-    int height = 8;
-    List<String> chars = new ArrayList<>();
 }
