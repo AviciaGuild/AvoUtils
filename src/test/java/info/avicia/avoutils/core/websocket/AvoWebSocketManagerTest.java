@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -100,6 +101,27 @@ class AvoWebSocketManagerTest {
         assertEquals(80_000L, AvoWebSocketManager.baseBackoffForFailures(4));
         assertEquals(120_000L, AvoWebSocketManager.baseBackoffForFailures(5));
         assertEquals(120_000L, AvoWebSocketManager.baseBackoffForFailures(100));
+    }
+
+    @Test
+    void versionUnsupportedSuppressesTickConnection() {
+        AvoWebSocketManager.initialize(new ModConfig());
+        AvoWebSocketManager manager = AvoWebSocketManager.getInstance();
+
+        assertFalse(manager.isVersionUnsupported());
+        manager.setVersionUnsupported(true);
+        assertTrue(manager.isVersionUnsupported());
+
+        try {
+            Method method = AvoWebSocketManager.class.getDeclaredMethod("tickConnection");
+            method.setAccessible(true);
+            method.invoke(manager);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+
+        assertFalse(manager.isConnected());
+        manager.setVersionUnsupported(false);
     }
 
     private static void invokeHandleIncomingEvent(AvoWebSocketManager manager, String type, JsonObject json) {

@@ -18,8 +18,9 @@ import java.util.function.IntConsumer;
 public class AvoWebSocketClient extends WebSocketClient {
     private static final Gson GSON = new Gson();
     private static final int MAX_MESSAGE_SIZE = 256 * 1024; // 256 KB
-    public static final int AUTH_FAILURE_CLOSE_CODE = 4001;
     private static final int PROTOCOL_ERROR_CLOSE_CODE = 1002;
+    public static final int AUTH_FAILURE_CLOSE_CODE = 4001;
+    public static final int UNSUPPORTED_VERSION_CLOSE_CODE = 4026;
 
     private final BiConsumer<String, JsonObject> eventHandler;
     private final Runnable onOpenCallback;

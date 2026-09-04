@@ -7,7 +7,12 @@ import info.avicia.avoutils.core.auth.AvoAuthService;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import info.avicia.avoutils.core.util.ClientVersion;
+import info.avicia.avoutils.core.util.WynnPillUtil;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.net.URI;
 import java.util.List;
@@ -32,6 +37,7 @@ public class AvoWebSocketManager {
 
     private volatile AvoWebSocketClient client;
     private final AtomicBoolean isConnecting = new AtomicBoolean(false);
+    private volatile boolean versionUnsupported = false;
     private volatile long lastConnectAttempt = 0;
     private int tickCounter = 0;
     private volatile int consecutiveFailures = 0;
@@ -111,6 +117,10 @@ public class AvoWebSocketManager {
     }
 
     private void tickConnection() {
+        if (versionUnsupported) {
+            return;
+        }
+
         // Connect if any registered feature demands a connection
         if (connectionDemands.values().stream().noneMatch(BooleanSupplier::getAsBoolean)) {
             disconnect();
@@ -173,6 +183,7 @@ public class AvoWebSocketManager {
 
             Map<String, String> headers = new java.util.HashMap<>();
             headers.put("Authorization", "Bearer " + token);
+            headers.put(ClientVersion.MOD_VERSION_HEADER, ClientVersion.resolveInstalledVersion());
 
             client = new AvoWebSocketClient(wsUri, headers,
                     this::handleIncomingEvent,
@@ -185,6 +196,9 @@ public class AvoWebSocketManager {
                         isConnecting.set(false);
                         if (code == 1000 || code == 1001) {
                             consecutiveFailures = 0;
+                        } else if (code == AvoWebSocketClient.UNSUPPORTED_VERSION_CLOSE_CODE) {
+                            versionUnsupported = true;
+                            notifyVersionUnsupported();
                         }
                         AvoUtilsMod.LOGGER.info("[AvoWebSocket] Disconnected (code={}).", code);
                     }
@@ -210,6 +224,34 @@ public class AvoWebSocketManager {
                 }
             }
         });
+    }
+
+    private void notifyVersionUnsupported() {
+        try {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc != null) {
+                mc.execute(() -> {
+                    try {
+                        if (mc.player != null) {
+                            MutableText warning = WynnPillUtil.createPrefixedPill("AvoUtils", true)
+                                    .append(Text.literal(" Your AvoUtils mod is outdated! Please update to use online features.")
+                                            .formatted(Formatting.RED));
+                            mc.player.sendMessage(warning, false);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                });
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public boolean isVersionUnsupported() {
+        return versionUnsupported;
+    }
+
+    public void setVersionUnsupported(boolean unsupported) {
+        this.versionUnsupported = unsupported;
     }
 
     public void disconnect() {

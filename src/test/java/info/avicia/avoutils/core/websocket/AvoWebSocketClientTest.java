@@ -111,6 +111,22 @@ class AvoWebSocketClientTest {
     }
 
     @Test
+    void onCloseDoesNotInvalidateTokenOnUnsupportedVersion() {
+        try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class)) {
+            AvoAuthService authService = mock(AvoAuthService.class);
+            auth.when(AvoAuthService::getInstance).thenReturn(authService);
+
+            IntConsumer onClose = mock(IntConsumer.class);
+            AvoWebSocketClient client = client((t, j) -> { }, () -> { }, onClose);
+
+            client.onClose(AvoWebSocketClient.UNSUPPORTED_VERSION_CLOSE_CODE, "Upgrade Required", true);
+
+            verify(authService, never()).invalidateToken();
+            verify(onClose).accept(AvoWebSocketClient.UNSUPPORTED_VERSION_CLOSE_CODE);
+        }
+    }
+
+    @Test
     void onErrorLogsWithoutThrowing() {
         AvoWebSocketClient client = client((t, j) -> { }, () -> { }, code -> { });
 
