@@ -70,7 +70,7 @@ To create a new release:
 
 ```bash
 git tag v1.0.0
-git push --follow-tags
+git push --tags
 ```
 
 ---
