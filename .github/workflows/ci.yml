@@ -3,8 +3,6 @@ name: CI Build
 on:
   pull_request:
   push:
-    branches-ignore:
-      - main
 
 permissions:
   contents: read
@@ -22,6 +20,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Test Release Scripts
+        shell: bash
+        run: |
+          chmod +x .github/scripts/*.sh
+          ./.github/scripts/test-release-scripts.sh
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4

@@ -58,20 +58,13 @@ The compiled jar will be at `build/libs/avoutils-<version>.jar`.
 
 ### Release Workflow
 
-This project uses GitHub Actions to automate builds and publishing:
+Publishing is manually triggered via GitHub Actions:
 
-| Trigger | Version Format | Published To |
+| Release Type | Options / Behavior | Version Format |
 |---|---|---|
-| `git tag v1.0.0` and push | `1.0.0` | GitHub Releases + Modrinth |
-| Push to `main` | `1.0.0-beta.N` | GitHub Releases (pre-release) |
-| Push to other branches | `1.0.0-dev.N` | Build only (artifact) |
-
-To create a new release:
-
-```bash
-git tag v1.0.0
-git push --tags
-```
+| **Beta Release** | Monotonically increments build number; resets to `1` when the base version changes | `<base>-beta.N`<br>*(e.g. `1.0.0-beta.1`)* |
+| **Main Release** | Select bump type: `patch`, `minor`, or `major` | `<major>.<minor>.<patch>`<br> |
+| **Tag Push** | Push tag `v<version>` directly | `<version>` |
 
 ---
 
