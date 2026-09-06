@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Unset GITHUB_OUTPUT in test runner so tests do not write to the GitHub step output file
+unset GITHUB_OUTPUT
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DETERMINE_SCRIPT="${SCRIPT_DIR}/determine-version.sh"
 CHANGELOG_SCRIPT="${SCRIPT_DIR}/generate-changelog.sh"
@@ -167,4 +170,3 @@ echo "----------------------------------------"
 if [[ "$FAILED" -ne 0 ]]; then
   exit 1
 fi
-

@@ -43,11 +43,10 @@ if [[ -n "$compare_url" ]]; then
   changelog="${changelog}**Full Changelog**: ${compare_url}"
 fi
 
+echo "${changelog}"
+
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
   echo "${changelog}" >> "$GITHUB_OUTPUT"
   echo "EOF" >> "$GITHUB_OUTPUT"
-else
-  echo "${changelog}"
 fi
-

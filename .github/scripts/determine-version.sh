@@ -88,4 +88,3 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "base_version=${BASE_VERSION}"
   } >> "$GITHUB_OUTPUT"
 fi
-
