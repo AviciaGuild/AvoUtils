@@ -3,6 +3,7 @@
 
 # Ensure gradlew always uses LF line endings
 gradlew text eol=lf
+*.sh text eol=lf
 
 # Ensure Windows batch files always use CRLF line endings
 *.bat text eol=crlf
