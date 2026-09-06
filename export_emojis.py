@@ -16,16 +16,21 @@ def export_emojis(guild_id, bot_token, output_file='src/main/resources/assets/av
             if response.status == 200:
                 data = json.loads(response.read().decode())
                 emojis_map = {}
+                animated_count = 0
                 for emoji in data:
                     emoji_id = emoji['id']
                     emoji_name = emoji['name']
-                    emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.png?size=32"
+                    is_animated = emoji.get('animated', False)
+                    if is_animated:
+                        animated_count += 1
+                    ext = 'gif' if is_animated else 'png'
+                    emoji_url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}?size=32"
                     emojis_map[emoji_name] = emoji_url
                 
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(emojis_map, f, indent=2)
                 
-                print(f"Successfully exported {len(emojis_map)} emojis to {output_file}!")
+                print(f"Successfully exported {len(emojis_map)} emojis ({animated_count} animated) to {output_file}!")
             else:
                 print(f"Failed to fetch emojis. HTTP status code: {response.status}")
     except Exception as e:
