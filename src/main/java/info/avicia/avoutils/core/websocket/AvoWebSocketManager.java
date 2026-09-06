@@ -234,7 +234,8 @@ public class AvoWebSocketManager {
                     try {
                         if (mc.player != null) {
                             MutableText warning = WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                                    .append(Text.literal(" Your AvoUtils mod is outdated! Please update to use online features.")
+                                    .append(Text.literal("WARNING: ").formatted(Formatting.DARK_RED, Formatting.BOLD))
+                                    .append(Text.literal("Your AvoUtils mod is outdated! Please update to use online features.")
                                             .formatted(Formatting.RED));
                             mc.player.sendMessage(warning, false);
                         }
