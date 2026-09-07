@@ -22,6 +22,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntConsumer;
 import java.util.zip.ZipEntry;
@@ -48,7 +49,7 @@ class TwemojiManager {
     private final int packFormat;
     private final AtomicBoolean downloading = new AtomicBoolean(false);
 
-    final Map<String, String> standardEmojis = new HashMap<>();
+    final Map<String, String> standardEmojis = new ConcurrentHashMap<>();
     final Map<Integer, String> standardCharToPua = new HashMap<>();
     FontConfig standardFontConfig;
 
@@ -72,6 +73,7 @@ class TwemojiManager {
         }
 
         Path tempPath = twemojiPath.resolveSibling("avoutils-twemoji.tmp");
+        Path sanitizedTemp = twemojiPath.resolveSibling("avoutils-twemoji-sanitized.tmp");
         AvoUtilsMod.LOGGER.info("Downloading Twemoji resource pack for high-quality color emojis...");
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -86,8 +88,8 @@ class TwemojiManager {
                 try (InputStream in = response.body()) {
                     Files.copy(in, tempPath, StandardCopyOption.REPLACE_EXISTING);
                 }
-                sanitize(tempPath, twemojiPath);
-                Files.deleteIfExists(tempPath);
+                sanitize(tempPath, sanitizedTemp);
+                Files.move(sanitizedTemp, twemojiPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
                 AvoUtilsMod.LOGGER.info("Twemoji resource pack downloaded and sanitized successfully.");
             } else {
                 AvoUtilsMod.LOGGER.error("Failed to download Twemoji pack. HTTP code: {}",
@@ -95,11 +97,15 @@ class TwemojiManager {
             }
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("Error downloading Twemoji resource pack", e);
+        } finally {
             try {
                 Files.deleteIfExists(tempPath);
             } catch (IOException ignored) {
             }
-        } finally {
+            try {
+                Files.deleteIfExists(sanitizedTemp);
+            } catch (IOException ignored) {
+            }
             downloading.set(false);
         }
     }
@@ -151,6 +157,7 @@ class TwemojiManager {
         try (InputStream is = zip.getInputStream(entry);
                 InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8)) {
             JsonObject root = JsonParser.parseReader(isr).getAsJsonObject();
+            Map<String, String> newStandardEmojis = new HashMap<>();
             for (Map.Entry<String, JsonElement> entrySet : root.entrySet()) {
                 String shortcode = entrySet.getKey();
                 String value = entrySet.getValue().getAsString();
@@ -164,9 +171,11 @@ class TwemojiManager {
                     }
                 });
                 if (!puaBuilder.isEmpty()) {
-                    standardEmojis.put(shortcode, puaBuilder.toString());
+                    newStandardEmojis.put(shortcode, puaBuilder.toString());
                 }
             }
+            standardEmojis.clear();
+            standardEmojis.putAll(newStandardEmojis);
             AvoUtilsMod.LOGGER.info("Successfully loaded {} standard Twemoji shortcodes from ZIP.",
                     standardEmojis.size());
         } catch (Exception e) {

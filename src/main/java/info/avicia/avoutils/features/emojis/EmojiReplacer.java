@@ -1,7 +1,6 @@
 package info.avicia.avoutils.features.emojis;
 
 import info.avicia.avoutils.AvoUtilsMod;
-import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -23,12 +22,6 @@ public class EmojiReplacer {
     public static Text replace(Text text) {
         if (text == null)
             return null;
-
-        String raw = text.getString();
-        int firstColon = raw.indexOf(':');
-        if (firstColon == -1 || firstColon == raw.length() - 1 || raw.indexOf(':', firstColon + 1) == -1) {
-            return text;
-        }
 
         AvoUtilsMod mod = AvoUtilsMod.getInstance();
         if (mod == null)

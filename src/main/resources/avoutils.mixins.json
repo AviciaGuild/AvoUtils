@@ -8,7 +8,9 @@
     "ChatInputSuggestorMixin",
     "DrawContextMixin",
     "HandledScreenMixin",
-    "ResourcePackManagerMixin"
+    "ResourcePackManagerMixin",
+    "ResourcePackOrganizerMixin",
+    "TextRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

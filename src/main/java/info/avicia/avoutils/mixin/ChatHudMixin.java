@@ -24,7 +24,11 @@ public class ChatHudMixin {
         if (message == null) {
             return null;
         }
-        EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        if (mod == null) {
+            return message;
+        }
+        EmojiFeature feature = mod.getFeature(EmojiFeature.class);
         if (feature == null || !feature.isEnabled()) {
             return message;
         }

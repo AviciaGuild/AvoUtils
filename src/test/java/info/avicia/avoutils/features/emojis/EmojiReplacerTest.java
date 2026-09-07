@@ -1,6 +1,5 @@
 package info.avicia.avoutils.features.emojis;
 
-import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
 import org.junit.jupiter.api.Test;
 

@@ -9,6 +9,9 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.features.emojis.animation.AnimatedImageDecoder;
+import info.avicia.avoutils.features.emojis.animation.AnimationFrame;
+import info.avicia.avoutils.features.emojis.animation.AnimationMeta;
 import info.avicia.avoutils.features.emojis.models.FontConfig;
 import info.avicia.avoutils.features.emojis.models.FontProvider;
 import net.fabricmc.loader.api.FabricLoader;
@@ -18,6 +21,10 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -30,14 +37,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
@@ -54,10 +66,14 @@ public class EmojiFeature implements AvoFeature {
     private static final Pattern SAFE_NAME_PATTERN = Pattern.compile("[^a-zA-Z0-9_.-]");
 
     private final TwemojiManager twemojiManager;
-    private final Path packDir = FabricLoader.getInstance().getGameDir().resolve("avoutils/emojis/avoutils-emojis");
-    private final int packFormat = resolvePackFormat();
+    private final Path packDir;
+    private final int packFormat;
 
     private final Map<String, String> customEmojis = new ConcurrentHashMap<>();
+    private final Map<Integer, AnimationMeta> animatedEmojis = new ConcurrentHashMap<>();
+    private final Map<String, AnimationCacheEntry> animationCache = new ConcurrentHashMap<>();
+    private final Path animationCachePath;
+    private final Path manifestPath;
     private ModConfig config;
 
     private final AtomicBoolean loadingEmojis = new AtomicBoolean(false);
@@ -65,9 +81,58 @@ public class EmojiFeature implements AvoFeature {
     private volatile EmojiTrie activeTrie = new EmojiTrie();
     private volatile boolean packsLoaded = false;
 
+    public record AnimationCacheEntry(int frameCount, int[] frameDelays) {
+    }
+
+    public record EmojiManifest(String hash, Map<String, String> urls) {
+    }
+
     public EmojiFeature() {
-        this.twemojiManager = new TwemojiManager(
-                FabricLoader.getInstance().getGameDir(), packFormat);
+        this(resolvePackFormat());
+    }
+
+    private EmojiFeature(int packFormat) {
+        this(
+                new TwemojiManager(FabricLoader.getInstance().getGameDir(), packFormat),
+                FabricLoader.getInstance().getGameDir().resolve("avoutils/emojis/avoutils-emojis"),
+                packFormat
+        );
+    }
+
+    EmojiFeature(TwemojiManager twemojiManager, Path packDir, int packFormat) {
+        this.twemojiManager = twemojiManager;
+        this.packDir = packDir;
+        this.packFormat = packFormat;
+        this.animationCachePath = packDir.resolve("assets/avoutils/animations.json");
+        this.manifestPath = packDir.resolve("assets/avoutils/manifest.json");
+    }
+
+    void setConfig(ModConfig config) {
+        this.config = config;
+    }
+
+    Map<String, String> getCustomEmojis() {
+        return customEmojis;
+    }
+
+    Map<String, AnimationCacheEntry> getAnimationCache() {
+        return animationCache;
+    }
+
+    boolean writeFontJsonForTesting() throws IOException {
+        return writeFontJson();
+    }
+
+    Path getManifestPath() {
+        return manifestPath;
+    }
+
+    EmojiManifest loadManifestForTesting() {
+        return loadManifest();
+    }
+
+    void saveManifestForTesting(EmojiManifest manifest) {
+        saveManifest(manifest);
     }
 
     public EmojiTrie getActiveTrie() {
@@ -80,6 +145,21 @@ public class EmojiFeature implements AvoFeature {
 
     public boolean isAutocompleteEnabled() {
         return config != null && config.emojiEnabled && config.emojiAutocompleteEnabled;
+    }
+
+    public int getAnimatedFrameCodePoint(int codePoint) {
+        if (!isEnabled()) {
+            return codePoint;
+        }
+        AnimationMeta meta = animatedEmojis.get(codePoint);
+        if (meta != null) {
+            return meta.getActiveCodePoint(System.currentTimeMillis());
+        }
+        return codePoint;
+    }
+
+    public Map<Integer, AnimationMeta> getAnimatedEmojis() {
+        return animatedEmojis;
     }
 
     public record AutocompletePrefix(int startIndex, String prefix) {
@@ -142,41 +222,64 @@ public class EmojiFeature implements AvoFeature {
         if (prefix == null || prefix.isEmpty()) {
             return Collections.emptyList();
         }
-        String lower = prefix.toLowerCase(Locale.ROOT);
+        int prefixLen = prefix.length();
         List<String> matches = new ArrayList<>();
 
         if (customKeys != null) {
             for (String key : customKeys) {
-                if (key.toLowerCase(Locale.ROOT).startsWith(lower)) {
+                if (key.length() >= prefixLen && key.regionMatches(true, 0, prefix, 0, prefixLen)) {
                     matches.add(key);
                 }
             }
         }
         Collections.sort(matches);
 
+        if (matches.size() >= 50) {
+            return matches.subList(0, 50);
+        }
+
         List<String> twemojiMatches = new ArrayList<>();
         if (standardKeys != null) {
             for (String key : standardKeys) {
-                if (key.toLowerCase(Locale.ROOT).startsWith(lower)) {
+                if (customKeys != null && customKeys.contains(key)) {
+                    continue;
+                }
+                if (key.length() >= prefixLen && key.regionMatches(true, 0, prefix, 0, prefixLen)) {
                     twemojiMatches.add(key);
                 }
             }
         }
         Collections.sort(twemojiMatches);
-        matches.addAll(twemojiMatches);
 
-        if (matches.size() > 50) {
-            return matches.subList(0, 50);
+        int remaining = 50 - matches.size();
+        if (twemojiMatches.size() > remaining) {
+            matches.addAll(twemojiMatches.subList(0, remaining));
+        } else {
+            matches.addAll(twemojiMatches);
         }
+
         return matches;
     }
 
     public String getEmojiReplacement(String shortcode) {
+        if (shortcode == null) return null;
         String custom = customEmojis.get(shortcode);
         if (custom != null) {
             return custom;
         }
-        return twemojiManager.standardEmojis.get(shortcode);
+        String twemoji = twemojiManager.standardEmojis.get(shortcode);
+        if (twemoji != null) {
+            return twemoji;
+        }
+        if (!shortcode.startsWith(":") || !shortcode.endsWith(":")) {
+            String wrapped = ":" + shortcode + ":";
+            custom = customEmojis.get(wrapped);
+            if (custom != null) {
+                return custom;
+            }
+            return twemojiManager.standardEmojis.get(wrapped);
+        }
+        return null;
     }
 
     @Override
@@ -196,10 +299,25 @@ public class EmojiFeature implements AvoFeature {
                 twemojiManager.loadResources();
                 boolean customChanged = loadAndCacheEmojis();
                 if (twemojiChanged || customChanged) {
-                    client.execute(client::reloadResources);
+                    reloadResourcesWithPacks(client);
                 }
                 packsLoaded = isEnabled();
             });
+        });
+    }
+
+    public CompletableFuture<Void> reloadEmojis() {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                Files.deleteIfExists(manifestPath);
+            } catch (Exception ignored) {
+            }
+            twemojiManager.loadResources();
+            loadAndCacheEmojis();
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client != null) {
+                reloadResourcesWithPacks(client);
+            }
         });
     }
 
@@ -222,11 +340,28 @@ public class EmojiFeature implements AvoFeature {
         }
     }
 
+    public static void reloadResourcesWithPacks(MinecraftClient client) {
+        if (client == null) return;
+        client.execute(() -> {
+            if (client.getResourcePackManager() == null) return;
+            client.getResourcePackManager().scanPacks();
+            List<String> enabled = new ArrayList<>(client.getResourcePackManager().getEnabledIds());
+            if (client.getResourcePackManager().hasProfile("avoutils/twemoji") && !enabled.contains("avoutils/twemoji")) {
+                enabled.add("avoutils/twemoji");
+            }
+            if (client.getResourcePackManager().hasProfile("avoutils/emojis") && !enabled.contains("avoutils/emojis")) {
+                enabled.add("avoutils/emojis");
+            }
+            client.getResourcePackManager().setEnabledProfiles(enabled);
+            client.reloadResources();
+        });
+    }
+
     public void ensurePacksLoaded() {
         if (config != null && config.emojiEnabled && !packsLoaded) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null) {
-                client.execute(client::reloadResources);
+                reloadResourcesWithPacks(client);
                 packsLoaded = true;
             }
         }
@@ -241,11 +376,21 @@ public class EmojiFeature implements AvoFeature {
         boolean changed = false;
         try {
             AvoUtilsMod.LOGGER.info("Starting loading and caching emojis...");
+            loadAnimationCache();
+
             Map<String, String> allEmojis = new HashMap<>();
+            String currentHash = "";
 
             try (InputStream is = EmojiFeature.class.getResourceAsStream("/assets/avoutils/custom_emojis.json")) {
                 if (is != null) {
-                    try (InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+                    byte[] rawBytes = is.readAllBytes();
+                    try {
+                        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                        currentHash = HexFormat.of().formatHex(digest.digest(rawBytes));
+                    } catch (Exception ignored) {
+                    }
+
+                    try (InputStreamReader isr = new InputStreamReader(new ByteArrayInputStream(rawBytes), StandardCharsets.UTF_8)) {
                         Type type = new TypeToken<Map<String, String>>() {
                         }.getType();
                         Map<String, String> setEmojis = GSON.fromJson(isr, type);
@@ -264,6 +409,25 @@ public class EmojiFeature implements AvoFeature {
                 Path texturesDir = packDir.resolve("assets/avoutils/textures/font");
                 Files.createDirectories(texturesDir);
 
+                EmojiManifest existingManifest = loadManifest();
+                boolean manifestChanged = existingManifest == null || !Objects.equals(currentHash, existingManifest.hash());
+                Map<String, String> cachedUrls = (existingManifest != null && existingManifest.urls() != null)
+                        ? existingManifest.urls()
+                        : Collections.emptyMap();
+
+                // Clean up any old images that were removed from custom_emojis.json
+                for (String cachedName : new ArrayList<>(cachedUrls.keySet())) {
+                    if (!allEmojis.containsKey(cachedName)) {
+                        try {
+                            Files.deleteIfExists(texturesDir.resolve(safeNameFor(cachedName) + ".png"));
+                        } catch (Exception ignored) {
+                        }
+                        animationCache.remove(cachedName);
+                        changed = true;
+                    }
+                }
+
+                Map<String, String> currentUrls = new ConcurrentHashMap<>();
                 List<Map.Entry<String, String>> entries = new ArrayList<>(allEmojis.entrySet());
                 Set<String> downloadedEmojis = ConcurrentHashMap.newKeySet();
                 AtomicBoolean anyNewImage = new AtomicBoolean(false);
@@ -279,16 +443,90 @@ public class EmojiFeature implements AvoFeature {
                             Path imagePath = texturesDir.resolve(safeName + ".png");
 
                             try {
-                                if (!Files.exists(imagePath)) {
-                                    downloadImage(imageUrl, imagePath);
-                                    anyNewImage.set(true);
+                                boolean needsProcessing = false;
+                                BufferedImage existingImg = null;
+
+                                boolean urlChanged = cachedUrls.containsKey(emojiName)
+                                        && !Objects.equals(cachedUrls.get(emojiName), imageUrl);
+
+                                if (!Files.exists(imagePath) || urlChanged) {
+                                    needsProcessing = true;
+                                } else {
+                                    try {
+                                        existingImg = ImageIO.read(imagePath.toFile());
+                                        if (existingImg == null || existingImg.getWidth() != 32 || existingImg.getHeight() % 32 != 0) {
+                                            needsProcessing = true;
+                                        } else if (imageUrl.contains(".gif") && (!animationCache.containsKey(emojiName) || existingImg.getHeight() == 32)) {
+                                            needsProcessing = true;
+                                        } else if (animationCache.containsKey(emojiName) && existingImg.getHeight() != animationCache.get(emojiName).frameCount() * 32) {
+                                            needsProcessing = true;
+                                        }
+                                    } catch (Exception e) {
+                                        needsProcessing = true;
+                                    }
+                                }
+
+                                if (needsProcessing) {
+                                    try {
+                                        AnimationCacheEntry anim = processAndSaveEmojiImage(imageUrl, imagePath);
+                                        if (anim != null) {
+                                            animationCache.put(emojiName, anim);
+                                        } else {
+                                            animationCache.remove(emojiName);
+                                        }
+                                        anyNewImage.set(true);
+                                        currentUrls.put(emojiName, imageUrl);
+                                    } catch (IOException downloadEx) {
+                                        // Offline fallback: if image exists on disk but was non-square, normalize it locally
+                                        if (existingImg != null && (existingImg.getWidth() != 32 || existingImg.getHeight() % 32 != 0)) {
+                                            BufferedImage normalized = AnimatedImageDecoder.scaleToTarget(existingImg, 32);
+                                            Path temp = imagePath.resolveSibling(imagePath.getFileName().toString() + "." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
+                                            try {
+                                                ImageIO.write(normalized, "png", temp.toFile());
+                                                Files.move(temp, imagePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                                                anyNewImage.set(true);
+                                                currentUrls.put(emojiName, imageUrl);
+                                            } finally {
+                                                try {
+                                                    Files.deleteIfExists(temp);
+                                                } catch (Exception ignored) {
+                                                }
+                                            }
+                                        } else {
+                                            throw downloadEx;
+                                        }
+                                    }
+                                } else {
+                                    currentUrls.put(emojiName, imageUrl);
+                                    if (existingImg != null && existingImg.getHeight() > existingImg.getWidth()) {
+                                        int frameCount = existingImg.getHeight() / existingImg.getWidth();
+                                        if (!animationCache.containsKey(emojiName)) {
+                                            int[] delays = new int[frameCount];
+                                            Arrays.fill(delays, 100);
+                                            animationCache.put(emojiName, new AnimationCacheEntry(frameCount, delays));
+                                            anyNewImage.set(true);
+                                        }
+                                        if (AnimatedImageDecoder.normalizeFrameAdvances(existingImg, frameCount)) {
+                                            Path temp = imagePath.resolveSibling(imagePath.getFileName().toString() + "." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
+                                            try {
+                                                ImageIO.write(existingImg, "png", temp.toFile());
+                                                Files.move(temp, imagePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                                                anyNewImage.set(true);
+                                            } finally {
+                                                try {
+                                                    Files.deleteIfExists(temp);
+                                                } catch (Exception ignored) {
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 downloadedEmojis.add(emojiName);
-                            } catch (IOException e) {
-                                AvoUtilsMod.LOGGER.error("Failed to download emoji image for {} from {}",
-                                        emojiName, imageUrl, e);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
+                            } catch (Exception e) {
+                                AvoUtilsMod.LOGGER.error("Failed to process emoji image for {} from {}",
+                                        emojiName, imageUrl, e);
                             }
                         }, downloadExecutor));
                     }
@@ -306,19 +544,38 @@ public class EmojiFeature implements AvoFeature {
                     return false;
                 }
 
+                if (anyNewImage.get() || manifestChanged) {
+                    saveManifest(new EmojiManifest(currentHash, currentUrls));
+                    saveAnimationCache();
+                }
+                changed = changed || anyNewImage.get() || manifestChanged;
+
                 List<String> sortedNames = new ArrayList<>(downloadedEmojis);
                 Collections.sort(sortedNames);
 
-                synchronized (customEmojis) {
-                    customEmojis.clear();
-                    int currentCodePoint = 0xF0000;
-                    for (String name : sortedNames) {
-                        customEmojis.put(":" + name + ":", Character.toString(currentCodePoint));
+                Map<String, String> newCustomEmojis = new HashMap<>();
+                Map<Integer, AnimationMeta> newAnimatedEmojis = new HashMap<>();
+                int currentCodePoint = 0xF0000;
+                for (String name : sortedNames) {
+                    newCustomEmojis.put(":" + name + ":", Character.toString(currentCodePoint));
+                    AnimationCacheEntry anim = animationCache.get(name);
+                    if (anim != null && anim.frameCount() > 1) {
+                        AnimationMeta meta = new AnimationMeta(currentCodePoint, anim.frameDelays());
+                        newAnimatedEmojis.put(currentCodePoint, meta);
+                        currentCodePoint += anim.frameCount();
+                    } else {
                         currentCodePoint++;
                     }
                 }
-                AvoUtilsMod.LOGGER.info("Successfully loaded {} custom emojis.", downloadedEmojis.size());
-                changed = anyNewImage.get();
+
+                synchronized (customEmojis) {
+                    customEmojis.clear();
+                    customEmojis.putAll(newCustomEmojis);
+                    animatedEmojis.putAll(newAnimatedEmojis);
+                    animatedEmojis.keySet().removeIf(k -> !newAnimatedEmojis.containsKey(k));
+                }
+                AvoUtilsMod.LOGGER.info("Successfully loaded {} custom emojis ({} animated).",
+                        downloadedEmojis.size(), animatedEmojis.size());
             }
 
             rebuildActiveEmojis();
@@ -373,10 +630,6 @@ public class EmojiFeature implements AvoFeature {
             PackMetadata pack = new PackMetadata(PackInfo.uniform(packFormat, "Dynamic emojis for AvoUtils"));
             Files.writeString(mcmetaPath, GSON.toJson(pack));
         }
-
-        if (!twemojiManager.exists()) {
-            Files.deleteIfExists(packDir.resolve("assets/minecraft/font/default.json"));
-        }
     }
 
     private boolean writeFontJson() throws IOException {
@@ -386,15 +639,27 @@ public class EmojiFeature implements AvoFeature {
         FontConfig defaultFontConfig = new FontConfig();
 
         synchronized (customEmojis) {
-            for (Map.Entry<String, String> entry : customEmojis.entrySet()) {
+            List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(customEmojis.entrySet());
+            sortedEntries.sort(Map.Entry.comparingByKey());
+
+            for (Map.Entry<String, String> entry : sortedEntries) {
                 String fullTrigger = entry.getKey();
                 String name = fullTrigger.substring(1, fullTrigger.length() - 1);
                 String safeName = safeNameFor(name);
                 String unicodeStr = entry.getValue();
+                int baseCp = unicodeStr.codePointAt(0);
 
                 FontProvider provider = new FontProvider();
                 provider.file = "avoutils:font/" + safeName + ".png";
-                provider.chars.add(unicodeStr);
+
+                AnimationMeta anim = animatedEmojis.get(baseCp);
+                if (anim != null && anim.frameCount() > 1) {
+                    for (int f = 0; f < anim.frameCount(); f++) {
+                        provider.chars.add(Character.toString(baseCp + f));
+                    }
+                } else {
+                    provider.chars.add(unicodeStr);
+                }
                 defaultFontConfig.providers.add(provider);
             }
         }
@@ -447,8 +712,15 @@ public class EmojiFeature implements AvoFeature {
 
         if (contentChanged) {
             Path tempPath = defaultFontPath.resolveSibling("default.json.tmp");
-            Files.writeString(tempPath, newJson, StandardCharsets.UTF_8);
-            Files.move(tempPath, defaultFontPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.writeString(tempPath, newJson, StandardCharsets.UTF_8);
+                Files.move(tempPath, defaultFontPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } finally {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (Exception ignored) {
+                }
+            }
         }
         return contentChanged;
     }
@@ -457,10 +729,73 @@ public class EmojiFeature implements AvoFeature {
 
     // Sanitizes an emoji name for use as a resource-pack file name
     static String safeNameFor(String name) {
-        return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase();
+        return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase(Locale.ROOT);
     }
 
-    private void downloadImage(String imageUrl, Path destination) throws IOException, InterruptedException {
+    private void loadAnimationCache() {
+        if (!Files.exists(animationCachePath)) {
+            return;
+        }
+        try {
+            String json = Files.readString(animationCachePath, StandardCharsets.UTF_8);
+            Type type = new TypeToken<Map<String, AnimationCacheEntry>>() {}.getType();
+            Map<String, AnimationCacheEntry> map = GSON.fromJson(json, type);
+            if (map != null) {
+                animationCache.putAll(map);
+            }
+        } catch (Exception e) {
+            AvoUtilsMod.LOGGER.error("Failed to load animation cache from {}", animationCachePath, e);
+        }
+    }
+
+    private void saveAnimationCache() {
+        Path temp = animationCachePath.resolveSibling("animations.json.tmp");
+        try {
+            Files.createDirectories(animationCachePath.getParent());
+            String json = GSON.toJson(animationCache);
+            Files.writeString(temp, json, StandardCharsets.UTF_8);
+            Files.move(temp, animationCachePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
+            AvoUtilsMod.LOGGER.error("Failed to save animation cache to {}", animationCachePath, e);
+        } finally {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private EmojiManifest loadManifest() {
+        if (!Files.exists(manifestPath)) {
+            return null;
+        }
+        try {
+            String json = Files.readString(manifestPath, StandardCharsets.UTF_8);
+            return GSON.fromJson(json, EmojiManifest.class);
+        } catch (Exception e) {
+            AvoUtilsMod.LOGGER.error("Failed to load emoji manifest from {}", manifestPath, e);
+            return null;
+        }
+    }
+
+    private void saveManifest(EmojiManifest manifest) {
+        Path temp = manifestPath.resolveSibling("manifest.json.tmp");
+        try {
+            Files.createDirectories(manifestPath.getParent());
+            String json = GSON.toJson(manifest);
+            Files.writeString(temp, json, StandardCharsets.UTF_8);
+            Files.move(temp, manifestPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
+            AvoUtilsMod.LOGGER.error("Failed to save emoji manifest to {}", manifestPath, e);
+        } finally {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private AnimationCacheEntry processAndSaveEmojiImage(String imageUrl, Path destination) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(imageUrl))
                 .timeout(Duration.ofSeconds(15))
@@ -470,9 +805,37 @@ public class EmojiFeature implements AvoFeature {
         if (response.statusCode() != 200) {
             throw new IOException("HTTP status " + response.statusCode() + " for Image URL: " + imageUrl);
         }
-        Files.createDirectories(destination.getParent());
+        byte[] bytes;
         try (InputStream in = response.body()) {
-            Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
+            bytes = in.readAllBytes();
+        }
+        Files.createDirectories(destination.getParent());
+        Path tempPath = destination.resolveSibling(destination.getFileName().toString() + "." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
+
+        try {
+            List<AnimationFrame> frames = AnimatedImageDecoder.decode(bytes);
+            if (frames.isEmpty()) {
+                throw new IOException("Failed to decode image data for " + imageUrl);
+            }
+
+            AnimationCacheEntry result;
+            if (frames.size() > 1) {
+                BufferedImage sheet = AnimatedImageDecoder.stitchVertically(frames);
+                ImageIO.write(sheet, "png", tempPath.toFile());
+                int[] delays = frames.stream().mapToInt(AnimationFrame::delayMs).toArray();
+                result = new AnimationCacheEntry(frames.size(), delays);
+            } else {
+                ImageIO.write(frames.get(0).image(), "png", tempPath.toFile());
+                result = null;
+            }
+
+            Files.move(tempPath, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            return result;
+        } finally {
+            try {
+                Files.deleteIfExists(tempPath);
+            } catch (Exception ignored) {
+            }
         }
     }
 

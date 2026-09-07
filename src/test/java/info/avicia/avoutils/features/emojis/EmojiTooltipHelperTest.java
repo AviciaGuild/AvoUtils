@@ -68,4 +68,10 @@ class EmojiTooltipHelperTest {
         HoverEvent leadingColon = new HoverEvent.ShowText(Text.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + ":noname"));
         assertNull(EmojiTooltipHelper.parseEmojiHover(leadingColon));
     }
+
+    @Test
+    void parseEmojiHoverReturnsNullForNullShowTextValue() {
+        HoverEvent hover = new HoverEvent.ShowText(null);
+        assertNull(EmojiTooltipHelper.parseEmojiHover(hover));
+    }
 }

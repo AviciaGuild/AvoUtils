@@ -22,6 +22,9 @@ public final class EmojiTooltipHelper {
 
     public static EmojiHoverData parseEmojiHover(HoverEvent hoverEvent) {
         if (hoverEvent instanceof HoverEvent.ShowText showText) {
+            if (showText.value() == null) {
+                return null;
+            }
             String raw = showText.value().getString();
             if (raw.startsWith(EMOJI_HOVER_PREFIX)) {
                 String payload = raw.substring(EMOJI_HOVER_PREFIX.length());

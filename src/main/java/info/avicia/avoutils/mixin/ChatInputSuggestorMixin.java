@@ -40,8 +40,16 @@ public abstract class ChatInputSuggestorMixin {
             return;
         }
 
-        EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        if (mod == null) {
+            return;
+        }
+        EmojiFeature feature = mod.getFeature(EmojiFeature.class);
         if (feature == null || !feature.isAutocompleteEnabled()) {
+            return;
+        }
+
+        if (this.textField == null) {
             return;
         }
 
