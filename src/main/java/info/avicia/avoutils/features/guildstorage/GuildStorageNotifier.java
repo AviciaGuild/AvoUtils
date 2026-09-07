@@ -6,6 +6,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -304,7 +305,7 @@ public class GuildStorageNotifier implements AvoFeature {
         for (String rawLine : rawLines) {
             String line = PacketTextNormalizer.normalizeForParsing(rawLine);
             if (line.isEmpty()) continue;
-            if (line.toLowerCase().contains(REWARDS_UNAVAILABLE)) return null;
+            if (PlayerUtil.containsIgnoreCase(line, REWARDS_UNAVAILABLE)) return null;
             Matcher em = EMERALDS_PATTERN.matcher(line);
             if (em.matches()) { emCur = parseNumber(em.group(1)); emMax = parseNumber(em.group(2)); continue; }
             Matcher as = ASPECTS_PATTERN.matcher(line);
@@ -315,7 +316,14 @@ public class GuildStorageNotifier implements AvoFeature {
     }
 
     private static long parseNumber(String raw) {
-        return Long.parseLong(raw.replace(",", "").replace(" ", "").trim());
+        if (raw == null) return -1;
+        try {
+            String stripped = raw.replace(",", "").replace(" ", "").trim();
+            if (stripped.isEmpty()) return -1;
+            return Long.parseLong(stripped);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     record StorageSnapshot(long emeraldCurrent, long emeraldMax, long aspectCurrent, long aspectMax) {}

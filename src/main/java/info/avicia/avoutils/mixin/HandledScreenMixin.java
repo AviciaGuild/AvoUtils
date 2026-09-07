@@ -24,9 +24,12 @@ public abstract class HandledScreenMixin {
     @Inject(method = "render", at = @At("TAIL"))
     private void avoutils$onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         try {
-            GuildStorageNotifier notifier = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
-            if (notifier != null) {
-                notifier.onContainerRender(getScreenHandler());
+            AvoUtilsMod mod = AvoUtilsMod.getInstance();
+            if (mod != null) {
+                GuildStorageNotifier notifier = mod.getFeature(GuildStorageNotifier.class);
+                if (notifier != null) {
+                    notifier.onContainerRender(getScreenHandler());
+                }
             }
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("[GuildStorageNotifier] Error in render hook", e);

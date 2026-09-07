@@ -46,6 +46,12 @@ class GuildStorageNotifierTest {
     }
 
     @Test
+    void parseSnapshotLinesHandlesMalformedNumbers() {
+        assertNull(GuildStorageNotifier.parseSnapshotLines(
+                List.of("Emeralds: , / ,", "Aspects: 100 / 200")));
+    }
+
+    @Test
     void onRaidDeltaIncreasesCounts() {
         try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class);
              MockedStatic<AvoWebSocketManager> ws = mockStatic(AvoWebSocketManager.class)) {
