@@ -30,10 +30,11 @@ public class PartyData {
          * Get a display string for this member (e.g. "PlayerName [TAG]")
          */
         public String displayName() {
+            String baseName = name != null ? name : "<RESERVED>";
             if (guildTag != null && !guildTag.isEmpty()) {
-                return name + " §7[" + guildTag + "]";
+                return baseName + " §7[" + guildTag + "]";
             }
-            return name;
+            return baseName;
         }
 
         /**

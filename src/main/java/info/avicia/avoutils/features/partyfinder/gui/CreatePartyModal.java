@@ -14,13 +14,17 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import net.minecraft.text.OrderedText;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import org.lwjgl.glfw.GLFW;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
 
@@ -54,6 +58,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
     private String statusMessage = null;
     private int statusColor = 0xFFFFFF;
+    private List<OrderedText> wrappedStatus = null;
     private boolean submitting = false;
 
     // Button references for visual toggling
@@ -73,7 +78,9 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         this.partyToEdit = partyToEdit;
 
         if (partyToEdit != null) {
-            this.selectedActivities.addAll(partyToEdit.activities);
+            if (partyToEdit.activities != null) {
+                this.selectedActivities.addAll(partyToEdit.activities);
+            }
             if (partyToEdit.region != null && !partyToEdit.region.isEmpty()) {
                 for (String part : partyToEdit.region.split("/")) {
                     String trimmed = part.trim().toUpperCase();
@@ -84,12 +91,11 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             }
             this.ping = partyToEdit.ping;
 
-            String selfName = PlayerUtil.selfName();
             if (partyToEdit.members != null) {
                 for (PartyData.MemberData member : partyToEdit.members.values()) {
-                    if (member.name != null && member.name.equalsIgnoreCase(selfName)) {
-                        this.selectedRole = member.role;
-                        this.initialRole = member.role;
+                    if (member != null && PlayerUtil.isSelf(member.name)) {
+                        this.selectedRole = member.role != null ? member.role.toLowerCase(Locale.ROOT) : "dps";
+                        this.initialRole = this.selectedRole;
                         break;
                     }
                 }
@@ -97,10 +103,11 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         }
     }
 
+    @Override
     public void initModal(MinecraftClient client, int width, int height) {
         this.width = width;
         this.height = height;
-        this.init();
+        this.clearAndInit();
     }
 
     @Override
@@ -160,12 +167,16 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         y += 38;
 
         // Note field
+        String currentNote = (noteField != null) ? noteField.getText() : (partyToEdit != null && partyToEdit.note != null ? partyToEdit.note : "");
+        boolean wasFocused = (noteField != null && noteField.isFocused());
         noteField = new TextFieldWidget(textRenderer, modalX + 16, y + 24, modalW - 32, 10, Text.literal("Note"));
         noteField.setPlaceholder(Text.literal("Note (optional)"));
         noteField.setMaxLength(100);
         noteField.setDrawsBackground(false);
-        if (partyToEdit != null) {
-            noteField.setText(partyToEdit.note != null ? partyToEdit.note : "");
+        noteField.setText(currentNote);
+        noteField.setFocused(wasFocused);
+        if (wasFocused) {
+            setFocused(noteField);
         }
         addDrawableChild(noteField);
         y += 50;
@@ -193,6 +204,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         // Submit
         FlatButtonWidget saveBtn = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
         addDrawableChild(saveBtn);
+        updateWrappedStatus();
     }
 
     // ── Form actions ─────────────────────────────────────────────────────
@@ -257,10 +269,10 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                 if (resp.ok && !selectedRole.equalsIgnoreCase(initialRole)) {
                     return apiClient.joinParty(partyToEdit.partyId, selectedRole);
                 } else {
-                    return java.util.concurrent.CompletableFuture.completedFuture(resp);
+                    return CompletableFuture.completedFuture(resp);
                 }
             }).thenAccept(resp -> {
-                MinecraftClient.getInstance().execute(() -> {
+                runOnClient(() -> {
                     submitting = false;
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
@@ -271,6 +283,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                         setStatus(resp.error != null ? resp.error : "Failed to edit party.", 0xFFFF5555);
                     }
                 });
+            }).exceptionally(ex -> {
+                runOnClient(() -> {
+                    submitting = false;
+                    setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+                });
+                return null;
             });
         } else {
             apiClient.createParty(
@@ -281,21 +299,20 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     reservedSlots,
                     ping
             ).thenAccept(resp -> {
-                MinecraftClient.getInstance().execute(() -> {
+                runOnClient(() -> {
                     submitting = false;
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
                             long newPartyId = resp.data.partyId;
                             parent.getPartySyncer().setTrackedPartyId(newPartyId);
                             // Pre-reserve slots for all other in-game party members
-                            String selfName = PlayerUtil.selfName();
                             for (String memberName : parent.getPartySyncer().getLastPartyListMembers()) {
-                                if (!memberName.equalsIgnoreCase(selfName)) {
+                                if (!PlayerUtil.isSelf(memberName)) {
                                     apiClient.reserveIngame(newPartyId, memberName).thenAccept(reserveResp -> {
                                         if (reserveResp.ok) {
                                             parent.getPartySyncer().addKnownMembers(List.of(memberName));
                                         }
-                                    });
+                                    }).exceptionally(reserveEx -> null);
                                 }
                             }
                         }
@@ -304,23 +321,44 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                         setStatus(resp.error != null ? resp.error : "Failed to create party.", 0xFFFF5555);
                     }
                 });
+            }).exceptionally(ex -> {
+                runOnClient(() -> {
+                    submitting = false;
+                    setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+                });
+                return null;
             });
+        }
+    }
+
+    private void runOnClient(Runnable action) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc != null) {
+            mc.execute(action);
         }
     }
 
     private void setStatus(String msg, int color) {
         statusMessage = msg;
-        statusColor = color;
+        statusColor = (color & 0xFF000000) == 0 ? (color | 0xFF000000) : color;
+        updateWrappedStatus();
+    }
+
+    private void updateWrappedStatus() {
+        if (statusMessage != null && textRenderer != null) {
+            wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+        } else {
+            wrappedStatus = null;
+        }
     }
 
     // ── Rendering ────────────────────────────────────────────────────────
 
     /** Returns the number of in-game party members who are not the local player. */
     private int countOtherInGameMembers() {
-        String selfName = PlayerUtil.selfName();
         int count = 0;
         for (String name : parent.getPartySyncer().getLastPartyListMembers()) {
-            if (!name.equalsIgnoreCase(selfName)) count++;
+            if (!PlayerUtil.isSelf(name)) count++;
         }
         return count;
     }
@@ -372,13 +410,17 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
         // Status message
         if (statusMessage != null) {
-            List<OrderedText> wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
-            int statusBottomY = modalY + modalH - 32;
-            int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
-            int currentY = statusStartY;
-            for (OrderedText line : wrappedStatus) {
-                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
-                currentY += 10;
+            if (wrappedStatus == null && textRenderer != null) {
+                updateWrappedStatus();
+            }
+            if (wrappedStatus != null) {
+                int statusBottomY = modalY + modalH - 32;
+                int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
+                int currentY = statusStartY;
+                for (OrderedText line : wrappedStatus) {
+                    context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+                    currentY += 10;
+                }
             }
         }
 
@@ -395,6 +437,15 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             return true;
         }
         return super.mouseClicked(click, doubleClick);
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput keyInput) {
+        if (keyInput.key() == GLFW.GLFW_KEY_ENTER || keyInput.key() == GLFW.GLFW_KEY_KP_ENTER) {
+            submit();
+            return true;
+        }
+        return super.keyPressed(keyInput);
     }
 
     private void drawSectionCard(DrawContext context, String label, int y, int cardH, boolean highlightBorder) {

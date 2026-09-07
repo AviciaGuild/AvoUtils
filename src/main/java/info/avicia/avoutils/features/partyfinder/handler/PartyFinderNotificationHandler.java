@@ -32,11 +32,6 @@ public class PartyFinderNotificationHandler {
         this.config = config;
     }
 
-    private static boolean isSelf(String leaderName) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        return mc.player != null && leaderName.equalsIgnoreCase(PlayerUtil.selfName());
-    }
-
     public void register() {
         AvoWebSocketManager.getInstance().registerListener(EVT_PARTY_MEMBER_JOINED, json -> {
             if (json.has("leader_name") && json.has("username")) {
@@ -44,7 +39,7 @@ public class PartyFinderNotificationHandler {
                 String username = json.get("username").getAsString();
 
                 MinecraftClient mc = MinecraftClient.getInstance();
-                if (mc.player != null && isSelf(leaderName) && !isSelf(username)) {
+                if (mc.player != null && PlayerUtil.isSelf(leaderName) && !PlayerUtil.isSelf(username)) {
                     MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
                             .append(Text.literal(username).formatted(Formatting.WHITE))
                             .append(Text.literal(" has joined your party!").formatted(Formatting.GRAY));
@@ -61,7 +56,7 @@ public class PartyFinderNotificationHandler {
                 String leaderName = json.get("leader_name").getAsString();
 
                 MinecraftClient mc = MinecraftClient.getInstance();
-                if (isSelf(leaderName) && mc.player != null) {
+                if (PlayerUtil.isSelf(leaderName) && mc.player != null) {
                     MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
                             .append(Text.literal("Your party is now full!").formatted(Formatting.GREEN));
                     mc.player.sendMessage(formatted, false);
@@ -84,7 +79,7 @@ public class PartyFinderNotificationHandler {
             JsonArray activitiesArr = json.getAsJsonArray("activities");
 
             MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.player == null || isSelf(leaderName)) {
+            if (mc.player == null || PlayerUtil.isSelf(leaderName)) {
                 return;
             }
 

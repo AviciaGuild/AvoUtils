@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * HTTP client for the pfinder API
@@ -69,7 +70,7 @@ public class PartyFinderClient {
             String path,
             String method,
             HttpRequest.BodyPublisher bodyPublisher,
-            java.util.function.Function<HttpResponse<String>, T> parser
+            Function<HttpResponse<String>, T> parser
     ) {
         return getSessionToken().thenCompose(token -> {
             HttpRequest request = buildRequest(path, token, method, bodyPublisher);
@@ -123,7 +124,7 @@ public class PartyFinderClient {
         return executeAuthenticated("/api/parties", "GET", null, response -> {
             throwOnError(response, "listParties", "Failed to fetch parties");
             ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-            return apiResp.parties != null ? apiResp.parties : List.of();
+            return (apiResp != null && apiResp.parties != null) ? apiResp.parties : List.of();
         });
     }
 

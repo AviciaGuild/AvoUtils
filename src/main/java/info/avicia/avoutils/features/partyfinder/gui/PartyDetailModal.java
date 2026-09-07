@@ -18,9 +18,11 @@ import net.minecraft.text.OrderedText;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import com.google.gson.JsonObject;
 
@@ -54,6 +56,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     // Cached note wrapping layout calculations to avoid per-frame text wrapping overhead
     private List<OrderedText> wrappedNote = null;
     private int noteLinesCount = 0;
+    private List<OrderedText> wrappedStatus = null;
 
     private final Consumer<JsonObject> partyUpdateListener;
 
@@ -73,10 +76,11 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         refreshPartyState();
     }
 
+    @Override
     public void initModal(MinecraftClient client, int width, int height) {
         this.width = width;
         this.height = height;
-        this.init();
+        this.clearAndInit();
     }
 
     @Override
@@ -91,22 +95,24 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         AvoWebSocketManager.getInstance().registerListener("party_updated", partyUpdateListener);
 
         // Determine player state
-        MinecraftClient mc = MinecraftClient.getInstance();
-        // Use session username as fallback
         playerName = PlayerUtil.selfName();
+        isLeader = false;
+        isInParty = false;
 
         // Check if player is in the party (by name)
-        for (PartyData.MemberData member : party.members.values()) {
-            if (member.name.equalsIgnoreCase(playerName)) {
-                isInParty = true;
-                if (member.name.equalsIgnoreCase(party.leaderName)) {
-                    isLeader = true;
+        if (party.members != null) {
+            for (PartyData.MemberData member : party.members.values()) {
+                if (member != null && PlayerUtil.isSelf(member.name)) {
+                    isInParty = true;
+                    if (PlayerUtil.namesEqual(member.name, party.leaderName)) {
+                        isLeader = true;
+                    }
+                    break;
                 }
-                break;
             }
         }
         // Also check leader name directly
-        if (playerName.equalsIgnoreCase(party.leaderName)) {
+        if (PlayerUtil.isSelf(party.leaderName)) {
             isLeader = true;
             isInParty = true;
         }
@@ -168,8 +174,17 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             }
         }
         updateWrappedNote();
+        updateWrappedStatus();
     }
- 
+
+    private void updateWrappedStatus() {
+        if (statusMessage != null && textRenderer != null) {
+            wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+        } else {
+            wrappedStatus = null;
+        }
+    }
+
     private void updateWrappedNote() {
         if (party.note != null && !party.note.isEmpty()) {
             wrappedNote = textRenderer.wrapLines(Text.literal("§7Note: §8§o" + party.note), modalW - 24);
@@ -183,18 +198,27 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     // ── Actions ──────────────────────────────────────────────────────────
 
     private void inviteAll() {
+        if (party.members == null) return;
         List<String> memberNames = party.members.values().stream()
+                .filter(Objects::nonNull)
                 .map(m -> m.name)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
         List<String> names = inviteHandler.inviteAll(memberNames, playerName,
                 InGamePartyTracker.getInstance().getLastPartyListMembers());
-        setStatus("Inviting " + names.size() + " players...", 0x55FF55);
+        setStatus("Inviting " + names.size() + " players...", 0xFF55FF55);
+    }
+
+    private void runOnClient(Runnable action) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc != null) {
+            mc.execute(action);
+        }
     }
 
     private void reserveSlot() {
         apiClient.reserveSlot(party.partyId, null, null).thenAccept(resp -> {
-            MinecraftClient.getInstance().execute(() -> {
+            runOnClient(() -> {
                 if (resp.ok) {
                     setStatus("Slot reserved!", 0xFF55FF55);
                     refreshPartyState();
@@ -202,36 +226,51 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                     setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
                 }
             });
+        }).exceptionally(ex -> {
+            runOnClient(() -> {
+                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+            });
+            return null;
         });
     }
 
     private void confirmDisband() {
         apiClient.disbandParty(party.partyId).thenAccept(resp -> {
-            MinecraftClient.getInstance().execute(() -> {
+            runOnClient(() -> {
                 if (resp.ok) {
                     parent.closeModal();
                 } else {
                     setStatus(resp.error != null ? resp.error : "Failed to disband.", 0xFFFF5555);
                 }
             });
+        }).exceptionally(ex -> {
+            runOnClient(() -> {
+                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+            });
+            return null;
         });
     }
 
     private void leaveParty() {
         apiClient.leaveParty(party.partyId).thenAccept(resp -> {
-            MinecraftClient.getInstance().execute(() -> {
+            runOnClient(() -> {
                 if (resp.ok) {
                     parent.closeModal();
                 } else {
                     setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
                 }
             });
+        }).exceptionally(ex -> {
+            runOnClient(() -> {
+                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+            });
+            return null;
         });
     }
 
     private void joinParty(String role) {
         apiClient.joinParty(party.partyId, role).thenAccept(resp -> {
-            MinecraftClient.getInstance().execute(() -> {
+            runOnClient(() -> {
                 if (resp.ok) {
                     setStatus(resp.message != null ? resp.message : "Joined!", 0xFF55FF55);
                     refreshPartyState();
@@ -239,12 +278,17 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                     setStatus(resp.error != null ? resp.error : "Failed to join.", 0xFFFF5555);
                 }
             });
+        }).exceptionally(ex -> {
+            runOnClient(() -> {
+                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+            });
+            return null;
         });
     }
 
     private void changeRole(String role) {
         apiClient.joinParty(party.partyId, role).thenAccept(resp -> {
-            MinecraftClient.getInstance().execute(() -> {
+            runOnClient(() -> {
                 if (resp.ok) {
                     setStatus(resp.message != null ? resp.message : "Role changed!", 0xFF55FF55);
                     refreshPartyState();
@@ -252,17 +296,31 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                     setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
                 }
             });
+        }).exceptionally(ex -> {
+            runOnClient(() -> {
+                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+            });
+            return null;
         });
     }
 
     public void refreshPartyState() {
         apiClient.getParty(party.partyId).thenAccept(p -> {
-            MinecraftClient.getInstance().execute(() -> {
+            if (p == null) {
+                return;
+            }
+            runOnClient(() -> {
                 this.party.memberCount = p.memberCount;
                 this.party.maxSize = p.maxSize;
                 this.party.isFull = p.isFull;
-                this.party.members.clear();
-                this.party.members.putAll(p.members);
+                if (this.party.members == null) {
+                    this.party.members = new HashMap<>();
+                } else {
+                    this.party.members.clear();
+                }
+                if (p.members != null) {
+                    this.party.members.putAll(p.members);
+                }
                 this.party.region = p.region;
                 this.party.note = p.note;
                 this.party.activities = p.activities;
@@ -272,20 +330,22 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 this.clearAndInit();
             });
         }).exceptionally(ex -> {
-            MinecraftClient.getInstance().execute(() -> {
+            runOnClient(() -> {
                 parent.closeModal();
             });
             return null;
         });
     }
 
+    @Override
     public void onCloseModal() {
         AvoWebSocketManager.getInstance().unregisterListener("party_updated", partyUpdateListener);
     }
 
     private void setStatus(String msg, int color) {
         statusMessage = msg;
-        statusColor = color;
+        statusColor = (color & 0xFF000000) == 0 ? (color | 0xFF000000) : color;
+        updateWrappedStatus();
     }
 
     // ── Rendering ────────────────────────────────────────────────────────
@@ -347,7 +407,9 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int textY = membersHeaderY + 17;
         memberRows.clear();
 
-        List<Map.Entry<String, PartyData.MemberData>> sortedMembers = new ArrayList<>(party.members.entrySet());
+        List<Map.Entry<String, PartyData.MemberData>> sortedMembers = party.members != null
+                ? new ArrayList<>(party.members.entrySet())
+                : List.of();
         int listY = membersHeaderY + 14;
         int listH = sortedMembers.isEmpty() ? 16 : sortedMembers.size() * 18 - 2;
 
@@ -377,7 +439,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(styledLine), textX + 4, textY + 1, nameColor);
 
             // Kick button for leaders
-            if (isLeader && !member.name.equalsIgnoreCase(party.leaderName)) {
+            if (isLeader && member.name != null && !PlayerUtil.namesEqual(member.name, party.leaderName)) {
                 int kickX = modalX + modalW - 24;
                 boolean kickHovered = isKickButtonHovered(mouseX, mouseY, kickX, textY);
                 if (kickHovered) {
@@ -393,13 +455,17 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
         // Status message
         if (statusMessage != null) {
-            List<OrderedText> wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
-            int statusBottomY = modalY + modalH - 34;
-            int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
-            int currentY = statusStartY;
-            for (OrderedText line : wrappedStatus) {
-                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
-                currentY += 10;
+            if (wrappedStatus == null && textRenderer != null) {
+                updateWrappedStatus();
+            }
+            if (wrappedStatus != null) {
+                int statusBottomY = modalY + modalH - 34;
+                int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
+                int currentY = statusStartY;
+                for (OrderedText line : wrappedStatus) {
+                    context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+                    currentY += 10;
+                }
             }
         }
 
@@ -414,22 +480,27 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int button = click.button();
 
         // Check kick clicks for leader
-        if (isLeader && button == 0) {
+        if (isLeader && button == 0 && party.members != null) {
             for (MemberRow row : memberRows) {
                 PartyData.MemberData member = party.members.get(row.memberKey);
-                if (member == null) continue;
+                if (member == null || member.name == null) continue;
                 int kickX = modalX + modalW - 24;
-                if (!member.name.equalsIgnoreCase(party.leaderName)
+                if (!PlayerUtil.namesEqual(member.name, party.leaderName)
                         && isKickButtonHovered(mouseX, mouseY, kickX, row.y)) {
                     apiClient.kickMember(party.partyId, member.name).thenAccept(resp -> {
-                        MinecraftClient.getInstance().execute(() -> {
+                        runOnClient(() -> {
                             if (resp.ok) {
-                                setStatus("Kicked " + member.name, 0x55FF55);
+                                setStatus("Kicked " + member.name, 0xFF55FF55);
                                 refreshPartyState();
                             } else {
-                                setStatus(resp.error != null ? resp.error : "Failed.", 0xFF5555);
+                                setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
                             }
                         });
+                    }).exceptionally(ex -> {
+                        runOnClient(() -> {
+                            setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
+                        });
+                        return null;
                     });
                     return true;
                 }

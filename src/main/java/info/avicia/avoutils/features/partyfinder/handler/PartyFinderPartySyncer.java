@@ -82,11 +82,13 @@ public class PartyFinderPartySyncer {
         AvoUtilsMod.LOGGER.info("Parsed /party list: {} members", members.size());
 
         MinecraftClient mc = MinecraftClient.getInstance();
-        mc.execute(() -> {
-            if (mc.currentScreen instanceof PartyListScreen screen) {
-                screen.onPartyListUpdated();
-            }
-        });
+        if (mc != null) {
+            mc.execute(() -> {
+                if (mc.currentScreen instanceof PartyListScreen screen) {
+                    screen.onPartyListUpdated();
+                }
+            });
+        }
 
         if (trackedPartyId < 0) {
             return;
@@ -95,7 +97,7 @@ public class PartyFinderPartySyncer {
         // Auto-reserve any unknown members
         for (String name : members) {
             String lowerName = PlayerUtil.normalizeName(name);
-            if (mc.player != null && name.equalsIgnoreCase(mc.player.getName().getString())) {
+            if (PlayerUtil.isSelf(name)) {
                 continue; // skip the leader (self)
             }
 
@@ -110,6 +112,10 @@ public class PartyFinderPartySyncer {
                         knownDiscordMembers.remove(lowerName);
                         inGameSeenMembers.remove(lowerName);
                     }
+                }).exceptionally(ex -> {
+                    knownDiscordMembers.remove(lowerName);
+                    inGameSeenMembers.remove(lowerName);
+                    return null;
                 });
             } else {
                 inGameSeenMembers.add(lowerName);
@@ -119,8 +125,8 @@ public class PartyFinderPartySyncer {
         // Auto-remove members who are no longer in the in-game party
         List<String> toRemove = new ArrayList<>();
         for (String name : inGameSeenMembers) {
-            boolean stillInParty = members.stream().anyMatch(m -> m.equalsIgnoreCase(name))
-                    || (mc.player != null && name.equalsIgnoreCase(mc.player.getName().getString()));
+            boolean stillInParty = members.stream().anyMatch(m -> PlayerUtil.namesEqual(m, name))
+                    || PlayerUtil.isSelf(name);
             if (!stillInParty) {
                 toRemove.add(name);
             }
@@ -135,6 +141,9 @@ public class PartyFinderPartySyncer {
                 if (!resp.ok) {
                     knownDiscordMembers.add(lowerName);
                 }
+            }).exceptionally(ex -> {
+                knownDiscordMembers.add(lowerName);
+                return null;
             });
         }
     }

@@ -5,6 +5,7 @@ import info.avicia.avoutils.core.config.ModConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -115,6 +116,29 @@ class PartyFinderClientTest {
         }
     }
 
+    @Test
+    void listPartiesReturnsEmptyListWhenPartiesFieldMissingOrEmpty() {
+        HttpClient httpClient = mock(HttpClient.class);
+        PartyFinderClient client = new PartyFinderClient(new ModConfig(), httpClient);
+
+        try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class)) {
+            AvoAuthService authService = mock(AvoAuthService.class);
+            auth.when(AvoAuthService::getInstance).thenReturn(authService);
+            when(authService.getSessionToken()).thenReturn(CompletableFuture.completedFuture("tok"));
+
+            @SuppressWarnings("unchecked")
+            HttpResponse<String> response = (HttpResponse<String>) mock(HttpResponse.class);
+            when(response.statusCode()).thenReturn(200);
+            when(response.body()).thenReturn("{}");
+
+            doReturn(CompletableFuture.completedFuture(response))
+                    .when(httpClient).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+
+            List<PartyData> parties = client.listParties().join();
+            assertTrue(parties.isEmpty());
+        }
+    }
+
     private HttpRequest buildRequest(String path, String token, String method,
                                      HttpRequest.BodyPublisher bodyPublisher) throws Exception {
         Method methodObj = PartyFinderClient.class.getDeclaredMethod(
@@ -135,7 +159,7 @@ class PartyFinderClientTest {
         method.setAccessible(true);
         try {
             method.invoke(client, response, actionName, prefix);
-        } catch (java.lang.reflect.InvocationTargetException e) {
+        } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException runtimeException) {
                 throw runtimeException;

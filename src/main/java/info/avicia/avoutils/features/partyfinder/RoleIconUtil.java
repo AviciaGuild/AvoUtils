@@ -1,7 +1,5 @@
 package info.avicia.avoutils.features.partyfinder;
 
-import java.util.Locale;
-
 /**
  * Party-finder role icon styling.
  */
@@ -14,12 +12,15 @@ public final class RoleIconUtil {
         if (role == null) {
             return "\u00a77\uD83E\uDDE9"; // §7 + puzzle piece
         }
-        return switch (role.toLowerCase(Locale.ROOT)) {
-            case "dps" -> "\u00a7c\uD83D\uDDE1"; // §c + dagger
-            case "healer" -> "\u00a7d\u2764"; // §d + heart
-            case "tank" -> "\u00a79\uD83D\uDEE1"; // §9 + shield
-            case "other" -> "\u00a77\uD83E\uDDE9"; // §7 + puzzle piece
-            default -> "\u00a77\uD83E\uDDE9"; // §7 + puzzle piece
-        };
+        if (role.equalsIgnoreCase("dps")) {
+            return "\u00a7c\uD83D\uDDE1"; // §c + dagger
+        }
+        if (role.equalsIgnoreCase("healer")) {
+            return "\u00a7d\u2764"; // §d + heart
+        }
+        if (role.equalsIgnoreCase("tank")) {
+            return "\u00a79\uD83D\uDEE1"; // §9 + shield
+        }
+        return "\u00a77\uD83E\uDDE9"; // §7 + puzzle piece
     }
 }

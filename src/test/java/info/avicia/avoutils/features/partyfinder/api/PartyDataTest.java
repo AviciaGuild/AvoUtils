@@ -26,6 +26,16 @@ class PartyDataTest {
     }
 
     @Test
+    void displayNameHandlesNullNameGracefully() {
+        PartyData.MemberData member = new PartyData.MemberData();
+        member.name = null;
+        assertEquals("<RESERVED>", member.displayName());
+
+        member.guildTag = "TAG";
+        assertEquals("<RESERVED> §7[TAG]", member.displayName());
+    }
+
+    @Test
     void reservedMemberWithoutRoleShowsLock() {
         PartyData.MemberData member = new PartyData.MemberData();
         member.isReserved = true;
