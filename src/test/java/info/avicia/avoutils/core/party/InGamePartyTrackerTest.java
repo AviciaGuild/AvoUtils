@@ -23,6 +23,7 @@ class InGamePartyTrackerTest {
         tracker = InGamePartyTracker.getInstance();
         TestReflection.set(tracker, "inParty", false);
         TestReflection.set(tracker, "hiddenPartyListExpireTime", 0L);
+        TestReflection.set(tracker, "lastTriggerTime", 0L);
         Set<String> members = TestReflection.get(tracker, "lastPartyListMembers");
         members.clear();
     }
@@ -58,6 +59,26 @@ class InGamePartyTrackerTest {
 
             assertFalse(tracker.onChatMessage("Steve has joined your party, say hello!"));
             assertTrue(tracker.isInParty());
+        }
+    }
+
+    @Test
+    void triggerPartyListDebouncesRapidCalls() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            MinecraftClient client = mock(MinecraftClient.class);
+            mc.when(MinecraftClient::getInstance).thenReturn(client);
+            org.mockito.Mockito.doAnswer(invocation -> {
+                ((Runnable) invocation.getArgument(0)).run();
+                return null;
+            }).when(client).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
+
+            tracker.triggerPartyList();
+            long firstTrigger = TestReflection.get(tracker, "lastTriggerTime");
+            assertTrue(firstTrigger > 0);
+
+            tracker.triggerPartyList();
+            long secondTrigger = TestReflection.get(tracker, "lastTriggerTime");
+            assertEquals(firstTrigger, secondTrigger);
         }
     }
 }

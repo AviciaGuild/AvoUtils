@@ -1,6 +1,7 @@
 package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import net.minecraft.client.MinecraftClient;
 
 import java.util.ArrayDeque;
@@ -34,14 +35,16 @@ public class InviteHandler {
             if (name == null || name.isEmpty() || name.equalsIgnoreCase("<RESERVED>")) {
                 continue;
             }
-            if (selfName != null && name.equalsIgnoreCase(selfName)) {
+            if (PlayerUtil.isSelf(name) || PlayerUtil.namesEqual(name, selfName)) {
                 continue;
             }
             boolean alreadyInGame = false;
-            for (String inGameName : alreadyInGameNames) {
-                if (inGameName.equalsIgnoreCase(name)) {
-                    alreadyInGame = true;
-                    break;
+            if (alreadyInGameNames != null) {
+                for (String inGameName : alreadyInGameNames) {
+                    if (PlayerUtil.namesEqual(inGameName, name)) {
+                        alreadyInGame = true;
+                        break;
+                    }
                 }
             }
             if (!alreadyInGame) {
@@ -69,7 +72,7 @@ public class InviteHandler {
      */
     public void tick(MinecraftClient client) {
         if (inviteQueue.isEmpty()) return;
-        if (client.player == null) return;
+        if (client.player == null || client.player.networkHandler == null) return;
 
         if (cooldownTicks > 0) {
             cooldownTicks--;

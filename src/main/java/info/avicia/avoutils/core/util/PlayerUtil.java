@@ -17,7 +17,22 @@ public final class PlayerUtil {
      */
     public static String selfName() {
         MinecraftClient mc = MinecraftClient.getInstance();
-        return mc.getSession() != null ? mc.getSession().getUsername() : null;
+        return (mc != null && mc.getSession() != null) ? mc.getSession().getUsername() : null;
+    }
+
+    /**
+     * Checks whether the given player name matches the local player's identity,
+     * checking both the active player entity name and the logged-in session name.
+     */
+    public static boolean isSelf(String name) {
+        if (name == null) {
+            return false;
+        }
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc != null && mc.player != null && namesEqual(name, mc.player.getName().getString())) {
+            return true;
+        }
+        return namesEqual(name, selfName());
     }
 
     /**
@@ -32,5 +47,18 @@ public final class PlayerUtil {
      */
     public static String normalizeName(String name) {
         return name == null ? "" : name.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Checks if {@code src} contains {@code what} case-insensitively without string allocations.
+     */
+    public static boolean containsIgnoreCase(String src, String what) {
+        if (src == null || what == null) return false;
+        final int length = what.length();
+        if (length == 0) return true;
+        for (int i = src.length() - length; i >= 0; i--) {
+            if (src.regionMatches(true, i, what, 0, length)) return true;
+        }
+        return false;
     }
 }

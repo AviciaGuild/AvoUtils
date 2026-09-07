@@ -48,6 +48,16 @@ class InviteHandlerTest {
     }
 
     @Test
+    void inviteAllHandlesNullAlreadyInGameSetGracefully() {
+        List<String> queued = handler.inviteAll(
+                List.of("Other"),
+                "self",
+                null);
+
+        assertEquals(List.of("Other"), queued);
+    }
+
+    @Test
     void queueInvitesPrependsPartyCreateWhenNotInParty() {
         handler.queueInvites(List.of("Bob", "Alice"));
 

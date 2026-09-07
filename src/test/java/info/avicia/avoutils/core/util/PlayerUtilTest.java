@@ -37,6 +37,17 @@ class PlayerUtilTest {
     }
 
     @Test
+    void containsIgnoreCaseHandlesNullsAndEdgeCases() {
+        assertFalse(PlayerUtil.containsIgnoreCase(null, "test"));
+        assertFalse(PlayerUtil.containsIgnoreCase("test", null));
+        assertFalse(PlayerUtil.containsIgnoreCase(null, null));
+        assertTrue(PlayerUtil.containsIgnoreCase("hello world", ""));
+        assertTrue(PlayerUtil.containsIgnoreCase("hello world", "WORLD"));
+        assertTrue(PlayerUtil.containsIgnoreCase("Rewards are unavailable for this rank", "rewards are unavailable"));
+        assertFalse(PlayerUtil.containsIgnoreCase("hello", "world"));
+    }
+
+    @Test
     void selfNameReturnsSessionUsername() {
         try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
             MinecraftClient client = mock(MinecraftClient.class);
@@ -57,6 +68,34 @@ class PlayerUtilTest {
             when(client.getSession()).thenReturn(null);
 
             assertNull(PlayerUtil.selfName());
+        }
+    }
+
+    @Test
+    void selfNameReturnsNullWhenClientIsNull() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            mc.when(MinecraftClient::getInstance).thenReturn(null);
+            assertNull(PlayerUtil.selfName());
+        }
+    }
+
+    @Test
+    void isSelfReturnsFalseForNull() {
+        assertFalse(PlayerUtil.isSelf(null));
+    }
+
+    @Test
+    void isSelfMatchesSessionNameWhenPlayerEntityNull() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            MinecraftClient client = mock(MinecraftClient.class);
+            mc.when(MinecraftClient::getInstance).thenReturn(client);
+            Session session = mock(Session.class);
+            when(client.getSession()).thenReturn(session);
+            when(session.getUsername()).thenReturn("Steve");
+
+            assertTrue(PlayerUtil.isSelf("Steve"));
+            assertTrue(PlayerUtil.isSelf("steve"));
+            assertFalse(PlayerUtil.isSelf("Alex"));
         }
     }
 }

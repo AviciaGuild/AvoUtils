@@ -1,6 +1,7 @@
 package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
+import info.avicia.avoutils.core.util.PlayerUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +41,7 @@ public final class PartyMessageParser {
     private static final Pattern PARTY_LEAVE_PATTERN = Pattern.compile(
             "(?:\\[.+?\\] )?(.+?) has left the party!", Pattern.CASE_INSENSITIVE);
     private static final Pattern MC_USERNAME_PATTERN = Pattern.compile("^[A-Za-z0-9_]{3,16}$");
+    private static final Pattern PARTY_MEMBERS_DELIMITER_PATTERN = Pattern.compile("\\s*,\\s*(?:and\\s+)?|\\s+and\\s+");
 
     private static final String[] EVENT_KEYWORDS = {
             "party members:",
@@ -63,7 +65,7 @@ public final class PartyMessageParser {
         if (text == null) {
             return null;
         }
-        if (!text.toLowerCase(Locale.ROOT).contains("party")) {
+        if (!PlayerUtil.containsIgnoreCase(text, "party")) {
             return null;
         }
 
@@ -136,7 +138,7 @@ public final class PartyMessageParser {
             return List.of();
         }
 
-        String[] tokens = membersTail.split("\\s*,\\s*(?:and\\s+)?|\\s+and\\s+");
+        String[] tokens = PARTY_MEMBERS_DELIMITER_PATTERN.split(membersTail);
         List<String> members = new ArrayList<>();
         for (String token : tokens) {
             String name = token == null ? "" : token.trim();

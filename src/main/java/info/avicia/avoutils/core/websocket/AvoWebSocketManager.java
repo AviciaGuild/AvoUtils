@@ -15,6 +15,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -181,7 +182,7 @@ public class AvoWebSocketManager {
 
             AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connecting to: {}", wsUri);
 
-            Map<String, String> headers = new java.util.HashMap<>();
+            Map<String, String> headers = new HashMap<>();
             headers.put("Authorization", "Bearer " + token);
             headers.put(ClientVersion.MOD_VERSION_HEADER, ClientVersion.resolveInstalledVersion());
 

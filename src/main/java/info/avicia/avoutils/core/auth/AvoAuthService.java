@@ -15,6 +15,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Shared core authentication service. Coordinates Mojang join-server authentication
@@ -29,8 +31,8 @@ public class AvoAuthService {
 
     private final ModConfig config;
     private final HttpClient httpClient;
-    private final java.util.concurrent.ExecutorService authExecutor =
-            java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+    private final ExecutorService authExecutor =
+            Executors.newFixedThreadPool(2, r -> {
                 Thread t = new Thread(r, "AvoAuth-Worker");
                 t.setDaemon(true);
                 return t;
@@ -126,7 +128,11 @@ public class AvoAuthService {
     }
 
     private CompletableFuture<String> fetchSessionTokenAsync() {
-        Session session = MinecraftClient.getInstance().getSession();
+        MinecraftClient mc = MinecraftClient.getInstance();
+        Session session = mc != null ? mc.getSession() : null;
+        if (session == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Not logged into Minecraft."));
+        }
         UUID uuid = session.getUuidOrNull();
         if (uuid == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Not logged into Minecraft."));
@@ -155,7 +161,11 @@ public class AvoAuthService {
                     // Join server via Mojang SessionService
                     return CompletableFuture.runAsync(() -> {
                         try {
-                            MinecraftClient.getInstance().getApiServices().sessionService().joinServer(
+                            MinecraftClient client = MinecraftClient.getInstance();
+                            if (client == null || client.getApiServices() == null || client.getApiServices().sessionService() == null) {
+                                throw new IllegalStateException("Minecraft session service unavailable.");
+                            }
+                            client.getApiServices().sessionService().joinServer(
                                     session.getUuidOrNull(),
                                     session.getAccessToken(),
                                     challenge

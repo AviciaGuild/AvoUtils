@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 public class InGamePartyTracker {
 
     private static final long PARTY_LIST_HIDE_WINDOW_MS = 3000L;
+    private static final long MIN_TRIGGER_INTERVAL_MS = 1500L;
 
     private static final InGamePartyTracker INSTANCE = new InGamePartyTracker();
 
@@ -24,6 +25,7 @@ public class InGamePartyTracker {
     private final List<Consumer<List<String>>> partyListListeners = new CopyOnWriteArrayList<>();
 
     private volatile long hiddenPartyListExpireTime = 0;
+    private volatile long lastTriggerTime = 0;
     private volatile boolean inParty = false;
 
     private InGamePartyTracker() {
@@ -57,13 +59,17 @@ public class InGamePartyTracker {
         switch (result.event()) {
             case NOT_IN_PARTY, KICKED_FROM_PARTY, LEFT_PARTY, DISBANDED -> {
                 inParty = false;
-                lastPartyListMembers.clear();
+                synchronized (lastPartyListMembers) {
+                    lastPartyListMembers.clear();
+                }
                 return shouldHide;
             }
             case PARTY_LIST -> {
                 inParty = true;
-                lastPartyListMembers.clear();
-                lastPartyListMembers.addAll(result.partyListMembers());
+                synchronized (lastPartyListMembers) {
+                    lastPartyListMembers.clear();
+                    lastPartyListMembers.addAll(result.partyListMembers());
+                }
                 notifyPartyListListeners();
                 return shouldHide;
             }
@@ -78,9 +84,17 @@ public class InGamePartyTracker {
 
     public void triggerPartyList() {
         MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc == null) {
+            return;
+        }
         mc.execute(() -> {
+            long now = System.currentTimeMillis();
+            if (now - lastTriggerTime < MIN_TRIGGER_INTERVAL_MS) {
+                return;
+            }
+            lastTriggerTime = now;
             if (mc.player != null && mc.player.networkHandler != null) {
-                hiddenPartyListExpireTime = System.currentTimeMillis() + PARTY_LIST_HIDE_WINDOW_MS;
+                hiddenPartyListExpireTime = now + PARTY_LIST_HIDE_WINDOW_MS;
                 mc.player.networkHandler.sendChatCommand("party list");
             }
         });
@@ -98,7 +112,9 @@ public class InGamePartyTracker {
      * The members from the last parsed {@code /party list} output.
      */
     public Set<String> getLastPartyListMembers() {
-        return Set.copyOf(lastPartyListMembers);
+        synchronized (lastPartyListMembers) {
+            return Set.copyOf(lastPartyListMembers);
+        }
     }
 
     public boolean isInParty() {
@@ -106,7 +122,10 @@ public class InGamePartyTracker {
     }
 
     private void notifyPartyListListeners() {
-        List<String> snapshot = List.copyOf(lastPartyListMembers);
+        List<String> snapshot;
+        synchronized (lastPartyListMembers) {
+            snapshot = List.copyOf(lastPartyListMembers);
+        }
         for (Consumer<List<String>> listener : partyListListeners) {
             try {
                 listener.accept(snapshot);

@@ -3,6 +3,7 @@ package info.avicia.avoutils.mixin;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,7 +17,8 @@ public class ClientPlayNetworkHandlerMixin {
     @Inject(method = "onGameMessage", at = @At("HEAD"), cancellable = true)
     private void avoutils$onGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
         try {
-            if (!net.minecraft.client.MinecraftClient.getInstance().isOnThread()) {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc == null || !mc.isOnThread()) {
                 return;
             }
             if (packet.overlay()) {
