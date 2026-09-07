@@ -61,6 +61,12 @@ public class AnniPartyScreen extends ScrollableListScreen {
         super.close();
     }
 
+    @Override
+    public void removed() {
+        feature.removeRosterListener(rosterListener);
+        super.removed();
+    }
+
     private AnniRoster roster() {
         return feature.getRoster();
     }
@@ -168,7 +174,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
             if (member.inParty) {
                 continue; // already in the in-game party
             }
-            if (selfName != null && member.name.equalsIgnoreCase(selfName)) {
+            if (PlayerUtil.namesEqual(member.name, selfName)) {
                 continue; // skip the leader (self)
             }
             names.add(member.name);
@@ -251,7 +257,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
                     if (member.isLeader) {
                         line += " §b[L]";
                     }
-                    if (member.name != null && selfName != null && member.name.equalsIgnoreCase(selfName)) {
+                    if (PlayerUtil.namesEqual(member.name, selfName)) {
                         line += " §e← You";
                     }
                     CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(line), leftTextX + 8, lineY, 0xFFFFFFFF);

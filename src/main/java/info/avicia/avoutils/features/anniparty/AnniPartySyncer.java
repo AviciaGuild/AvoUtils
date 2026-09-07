@@ -25,7 +25,11 @@ public class AnniPartySyncer {
     }
 
     private void onPartyListParsed(List<String> members) {
-        AnniPartyFeature feature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        if (mod == null) {
+            return;
+        }
+        AnniPartyFeature feature = mod.getFeature(AnniPartyFeature.class);
         if (feature == null) {
             return;
         }
@@ -44,9 +48,11 @@ public class AnniPartySyncer {
 
         JsonArray inParty = new JsonArray();
         inParty.add(selfName);
-        for (String member : members) {
-            if (!member.equalsIgnoreCase(selfName)) {
-                inParty.add(member);
+        if (members != null) {
+            for (String member : members) {
+                if (member != null && !PlayerUtil.namesEqual(member, selfName)) {
+                    inParty.add(member);
+                }
             }
         }
 
