@@ -1,6 +1,7 @@
 package info.avicia.avoutils.core.command;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
 import info.avicia.avoutils.core.util.WynnPillUtil;
@@ -17,131 +18,139 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import java.util.List;
+
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
 import static com.mojang.brigadier.arguments.StringArgumentType.word;
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
 
 /**
- * Registration for all /avo subcommands.
+ * Registration for all /avo and /avoutils subcommands.
  */
 public class AvoCommands {
+    public static final List<String> COMMAND_ROOTS = List.of("avo", "avoutils");
+
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            // /avo and /avo config → opens config screen
-            Command<FabricClientCommandSource> openConfigCommand = context -> {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> register(dispatcher));
+    }
+
+    public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+        // /avo and /avo config → opens config screen
+        Command<FabricClientCommandSource> openConfigCommand = context -> {
+            MinecraftClient client = MinecraftClient.getInstance();
+            client.execute(() -> client.setScreen(new ConfigScreen()));
+            return 1;
+        };
+
+        // /avo bridge → toggle chat bridge
+        Command<FabricClientCommandSource> toggleBridgeCommand = context -> {
+            ChatBridgeFeature feature = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
+            if (feature != null) {
+                feature.toggleBridge();
+            }
+            return 1;
+        };
+
+        // /avo storage → toggle guild storage tracking
+        Command<FabricClientCommandSource> toggleStorageCommand = context -> {
+            GuildStorageNotifier feature = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
+            if (feature != null) {
+                feature.toggleStorage();
+            }
+            return 1;
+        };
+
+        // /avo emojis → toggle emoji feature
+        Command<FabricClientCommandSource> toggleEmojisCommand = context -> {
+            EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+            if (feature != null) {
+                feature.toggleEmojis();
+            }
+            return 1;
+        };
+
+        // /avo emojis reload / update → refresh and re-download emojis
+        Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
+            EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+            if (feature != null) {
                 MinecraftClient client = MinecraftClient.getInstance();
-                client.execute(() -> client.setScreen(new ConfigScreen()));
-                return 1;
-            };
-
-            // /avo bridge → toggle chat bridge
-            Command<FabricClientCommandSource> toggleBridgeCommand = context -> {
-                ChatBridgeFeature feature = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
-                if (feature != null) {
-                    feature.toggleBridge();
+                if (client.player != null) {
+                    client.player.sendMessage(
+                            WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                                    .append(Text.literal("Checking and updating emojis...").formatted(Formatting.GRAY)),
+                            false
+                    );
                 }
-                return 1;
-            };
-
-            // /avo storage → toggle guild storage tracking
-            Command<FabricClientCommandSource> toggleStorageCommand = context -> {
-                GuildStorageNotifier feature = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
-                if (feature != null) {
-                    feature.toggleStorage();
-                }
-                return 1;
-            };
-
-            // /avo emojis → toggle emoji feature
-            Command<FabricClientCommandSource> toggleEmojisCommand = context -> {
-                EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-                if (feature != null) {
-                    feature.toggleEmojis();
-                }
-                return 1;
-            };
-
-            // /avo emojis reload / update → refresh and re-download emojis
-            Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
-                EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-                if (feature != null) {
-                    MinecraftClient client = MinecraftClient.getInstance();
-                    if (client.player != null) {
-                        client.player.sendMessage(
-                                WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                                        .append(Text.literal("Checking and updating emojis...").formatted(Formatting.GRAY)),
-                                false
-                        );
+                feature.reloadEmojis().thenRun(() -> {
+                    MinecraftClient c = MinecraftClient.getInstance();
+                    if (c != null) {
+                        c.execute(() -> {
+                            if (c.player != null) {
+                                c.player.sendMessage(
+                                        WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                                                .append(Text.literal("Emojis updated successfully!").formatted(Formatting.GREEN)),
+                                        false
+                                );
+                            }
+                        });
                     }
-                    feature.reloadEmojis().thenRun(() -> {
-                        MinecraftClient c = MinecraftClient.getInstance();
-                        if (c != null) {
-                            c.execute(() -> {
-                                if (c.player != null) {
-                                    c.player.sendMessage(
-                                            WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                                                    .append(Text.literal("Emojis updated successfully!").formatted(Formatting.GREEN)),
-                                            false
-                                    );
-                                }
-                            });
-                        }
-                    }).exceptionally(ex -> {
-                        MinecraftClient c = MinecraftClient.getInstance();
-                        if (c != null) {
-                            c.execute(() -> {
-                                if (c.player != null) {
-                                    String err = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
-                                    c.player.sendMessage(
-                                            WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                                                    .append(Text.literal("Failed to update emojis: " + err).formatted(Formatting.RED)),
-                                            false
-                                    );
-                                }
-                            });
-                        }
-                        return null;
-                    });
-                }
-                return 1;
-            };
-
-            // /avo pf → open party finder screen
-            Command<FabricClientCommandSource> openPfCommand = context -> {
-                MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
-                return 1;
-            };
-
-            // /avo anni → open anni party screen
-            Command<FabricClientCommandSource> openAnniCommand = context -> {
-                MinecraftClient client = MinecraftClient.getInstance();
-                client.execute(() -> {
-                    AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
-                    PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
-                    if (anniFeature != null && pfFeature != null) {
-                        client.setScreen(new AnniPartyScreen(anniFeature, pfFeature.getInviteHandler()));
+                }).exceptionally(ex -> {
+                    MinecraftClient c = MinecraftClient.getInstance();
+                    if (c != null) {
+                        c.execute(() -> {
+                            if (c.player != null) {
+                                String err = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
+                                c.player.sendMessage(
+                                        WynnPillUtil.createPrefixedPill("AvoUtils", true)
+                                                .append(Text.literal("Failed to update emojis: " + err).formatted(Formatting.RED)),
+                                        false
+                                );
+                            }
+                        });
                     }
+                    return null;
                 });
-                return 1;
-            };
+            }
+            return 1;
+        };
 
-            // /avo pf togglenotifs
-            Command<FabricClientCommandSource> toggleNotifsCommand = PartyCommand.toggleNotifsCommand();
+        // /avo pf → open party finder screen
+        Command<FabricClientCommandSource> openPfCommand = context -> {
+            MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
+            return 1;
+        };
 
-            // /avo pf togglesounds
-            Command<FabricClientCommandSource> toggleSoundsCommand = PartyCommand.toggleSoundsCommand();
+        // /avo anni → open anni party screen
+        Command<FabricClientCommandSource> openAnniCommand = context -> {
+            MinecraftClient client = MinecraftClient.getInstance();
+            client.execute(() -> {
+                AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
+                PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
+                if (anniFeature != null && pfFeature != null) {
+                    client.setScreen(new AnniPartyScreen(anniFeature, pfFeature.getInviteHandler()));
+                }
+            });
+            return 1;
+        };
 
-            // /avo pf join <leaderName>
-            Command<FabricClientCommandSource> joinPfCommand = context -> {
-                String leaderName = getString(context, "leaderName");
-                MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(leaderName));
-                return 1;
-            };
+        // /avo pf togglenotifs
+        Command<FabricClientCommandSource> toggleNotifsCommand = PartyCommand.toggleNotifsCommand();
 
-            // Build /avo command tree
+        // /avo pf togglesounds
+        Command<FabricClientCommandSource> toggleSoundsCommand = PartyCommand.toggleSoundsCommand();
+
+        // /avo pf join <leaderName>
+        Command<FabricClientCommandSource> joinPfCommand = context -> {
+            String leaderName = getString(context, "leaderName");
+            MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(leaderName));
+            return 1;
+        };
+
+        // Build /avo and /avoutils command trees
+        for (String root : COMMAND_ROOTS) {
             dispatcher.register(
-                    literal("avo")
+                    literal(root)
                             .executes(openConfigCommand)
                             .then(literal("config")
                                     .executes(openConfigCommand))
@@ -167,6 +176,6 @@ public class AvoCommands {
                                             .then(argument("leaderName", word())
                                                     .executes(joinPfCommand))))
             );
-        });
+        }
     }
 }
