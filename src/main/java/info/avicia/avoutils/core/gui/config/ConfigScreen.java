@@ -12,6 +12,7 @@ import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
@@ -239,7 +240,7 @@ public class ConfigScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
+    public boolean keyPressed(KeyInput keyInput) {
         if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
             this.close();
             return true;

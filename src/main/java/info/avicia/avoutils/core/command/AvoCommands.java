@@ -3,6 +3,7 @@ package info.avicia.avoutils.core.command;
 import com.mojang.brigadier.Command;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
+import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
@@ -13,6 +14,8 @@ import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
@@ -27,10 +30,8 @@ public class AvoCommands {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             // /avo and /avo config → opens config screen
             Command<FabricClientCommandSource> openConfigCommand = context -> {
-                MinecraftClient.getInstance().execute(() -> {
-                    MinecraftClient client = MinecraftClient.getInstance();
-                    client.setScreen(new ConfigScreen());
-                });
+                MinecraftClient client = MinecraftClient.getInstance();
+                client.execute(() -> client.setScreen(new ConfigScreen()));
                 return 1;
             };
 
@@ -61,6 +62,51 @@ public class AvoCommands {
                 return 1;
             };
 
+            // /avo emojis reload / update → refresh and re-download emojis
+            Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
+                EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
+                if (feature != null) {
+                    MinecraftClient client = MinecraftClient.getInstance();
+                    if (client.player != null) {
+                        client.player.sendMessage(
+                                WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                                        .append(Text.literal("Checking and updating emojis...").formatted(Formatting.GRAY)),
+                                false
+                        );
+                    }
+                    feature.reloadEmojis().thenRun(() -> {
+                        MinecraftClient c = MinecraftClient.getInstance();
+                        if (c != null) {
+                            c.execute(() -> {
+                                if (c.player != null) {
+                                    c.player.sendMessage(
+                                            WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                                                    .append(Text.literal("Emojis updated successfully!").formatted(Formatting.GREEN)),
+                                            false
+                                    );
+                                }
+                            });
+                        }
+                    }).exceptionally(ex -> {
+                        MinecraftClient c = MinecraftClient.getInstance();
+                        if (c != null) {
+                            c.execute(() -> {
+                                if (c.player != null) {
+                                    String err = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
+                                    c.player.sendMessage(
+                                            WynnPillUtil.createPrefixedPill("AvoUtils", true)
+                                                    .append(Text.literal("Failed to update emojis: " + err).formatted(Formatting.RED)),
+                                            false
+                                    );
+                                }
+                            });
+                        }
+                        return null;
+                    });
+                }
+                return 1;
+            };
+
             // /avo pf → open party finder screen
             Command<FabricClientCommandSource> openPfCommand = context -> {
                 MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
@@ -69,11 +115,11 @@ public class AvoCommands {
 
             // /avo anni → open anni party screen
             Command<FabricClientCommandSource> openAnniCommand = context -> {
-                MinecraftClient.getInstance().execute(() -> {
+                MinecraftClient client = MinecraftClient.getInstance();
+                client.execute(() -> {
                     AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
                     PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
                     if (anniFeature != null && pfFeature != null) {
-                        MinecraftClient client = MinecraftClient.getInstance();
                         client.setScreen(new AnniPartyScreen(anniFeature, pfFeature.getInviteHandler()));
                     }
                 });
@@ -104,7 +150,11 @@ public class AvoCommands {
                             .then(literal("storage")
                                     .executes(toggleStorageCommand))
                             .then(literal("emojis")
-                                    .executes(toggleEmojisCommand))
+                                    .executes(toggleEmojisCommand)
+                                    .then(literal("reload")
+                                            .executes(reloadEmojisCommand))
+                                    .then(literal("update")
+                                            .executes(reloadEmojisCommand)))
                             .then(literal("anni")
                                     .executes(openAnniCommand))
                             .then(literal("pf")

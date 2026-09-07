@@ -8,6 +8,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * Mod configuration
@@ -67,6 +68,12 @@ public class ModConfig {
         if (apiBaseUrl.endsWith("/")) {
             apiBaseUrl = apiBaseUrl.substring(0, apiBaseUrl.length() - 1);
         }
+        if (guildStorageEmeraldThresholdPercent < 1 || guildStorageEmeraldThresholdPercent > 100) {
+            guildStorageEmeraldThresholdPercent = 90;
+        }
+        if (guildStorageAspectThresholdPercent < 1 || guildStorageAspectThresholdPercent > 100) {
+            guildStorageAspectThresholdPercent = 90;
+        }
     }
 
     /**
@@ -79,7 +86,9 @@ public class ModConfig {
     void save(Path configPath) {
         try {
             Files.createDirectories(configPath.getParent());
-            Files.writeString(configPath, GSON.toJson(this));
+            Path tempPath = configPath.resolveSibling(configPath.getFileName().toString() + ".tmp");
+            Files.writeString(tempPath, GSON.toJson(this));
+            Files.move(tempPath, configPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             AvoUtilsMod.LOGGER.error("Failed to save config.", e);
         }

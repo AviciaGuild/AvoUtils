@@ -7,4 +7,6 @@ import net.minecraft.client.MinecraftClient;
  */
 public interface ModalOverlay {
     void initModal(MinecraftClient client, int width, int height);
+
+    default void onCloseModal() {}
 }
