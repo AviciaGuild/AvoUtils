@@ -102,13 +102,15 @@ public class ChatBridgeFeature implements AvoFeature {
 
     /** Called when a system message is received. */
     public void onSystemChat(Text message) {
+        if (message == null) return;
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
         if (!isBridgeActive()) return;
 
         WarDetector.tick();
 
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
-        GuildStorageNotifier storage = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        GuildStorageNotifier storage = mod != null ? mod.getFeature(GuildStorageNotifier.class) : null;
 
         // ── War outcomes (system messages, not guild-colored) ──────────
         WarDetector.WarResult warResult = WarDetector.tryDetectOutcome(cleaned);
@@ -123,18 +125,18 @@ public class ChatBridgeFeature implements AvoFeature {
         RaidDetector.RaidResult raidResult = RaidDetector.tryDetect(cleaned, message);
         if (raidResult != null && !raidDeduper.isDuplicate(raidResult.formattedMessage())) {
             sendEvent(EVT_GUILD_RAID, "Raid Complete", raidResult.formattedMessage(), AVO_ICON_URL);
-        }
-        if (raidResult != null && storage != null) {
-            storage.onRaidDelta(raidResult.emeralds(), raidResult.aspects());
+            if (storage != null) {
+                storage.onRaidDelta(raidResult.emeralds(), raidResult.aspects());
+            }
         }
 
         // ── Reward grants ─────────────────────────────────────────────
         RewardDetector.RewardResult rewardResult = RewardDetector.tryDetect(cleaned, message);
-        if (rewardResult != null) {
+        if (rewardResult != null && !raidDeduper.isDuplicate(rewardResult.formattedMessage())) {
             sendEvent(EVT_GUILD_REWARD, "Guild Rewards", rewardResult.formattedMessage(), AVO_ICON_URL);
-        }
-        if (rewardResult != null && storage != null && rewardResult.tomeCount() == 0) {
-            storage.onRewardDelta(-rewardResult.emeraldAmount(), -rewardResult.aspectAmount());
+            if (storage != null && rewardResult.tomeCount() == 0) {
+                storage.onRewardDelta(-rewardResult.emeraldAmount(), -rewardResult.aspectAmount());
+            }
         }
 
         // ── Guild chat messages ───────────────────────────────────────

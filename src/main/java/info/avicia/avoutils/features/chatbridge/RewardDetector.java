@@ -69,7 +69,7 @@ final class RewardDetector {
 
     private static long parseArticleAmount(String raw) {
         if (raw == null) return 0;
-        String t = raw.trim().toLowerCase();
+        String t = raw.trim().toLowerCase(Locale.ROOT);
         if (t.equals("a") || t.equals("an")) return 1;
         return parseNumber(raw);
     }

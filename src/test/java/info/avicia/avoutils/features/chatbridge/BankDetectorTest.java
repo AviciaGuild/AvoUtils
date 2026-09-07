@@ -45,4 +45,9 @@ class BankDetectorTest {
     void returnsNullWhenUsernameCannotBeResolved() {
         assertNull(BankDetector.tryDetect("ab deposited 5 Emeralds to the Guild Bank", Text.literal("")));
     }
+
+    @Test
+    void returnsNullForNullCleaned() {
+        assertNull(BankDetector.tryDetect(null, Text.literal("")));
+    }
 }

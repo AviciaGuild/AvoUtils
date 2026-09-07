@@ -3,6 +3,7 @@ package info.avicia.avoutils.features.chatbridge;
 import info.avicia.avoutils.AvoUtilsMod;
 import net.minecraft.text.Text;
 
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,7 +22,7 @@ final class BankDetector {
     private static final String DEFAULT_ACCESS_TIER = "Unknown";
 
     static Result tryDetect(String cleaned, Text message) {
-        if (!cleaned.contains("Guild")
+        if (cleaned == null || !cleaned.contains("Guild")
                 || (!cleaned.contains("deposited") && !cleaned.contains("withdrew"))) {
             return null;
         }
@@ -37,7 +38,7 @@ final class BankDetector {
         }
 
         String displayedPlayer = matcher.group(1).trim();
-        String action = matcher.group(2).toLowerCase();
+        String action = matcher.group(2).toLowerCase(Locale.ROOT);
         String itemBlock = matcher.group(3).trim();
         if (displayedPlayer.isEmpty() || itemBlock.isEmpty()) return null;
 

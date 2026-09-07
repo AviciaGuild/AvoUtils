@@ -53,6 +53,17 @@ class RaidDetectorTest {
     }
 
     @Test
+    void returnsNullWhenNoNamesCanBeResolved() {
+        String cleaned = "ab and cd finished NOL and claimed +100000m Guild Experience";
+        assertNull(RaidDetector.tryDetect(cleaned, Text.literal("")));
+    }
+
+    @Test
+    void returnsNullForNullCleaned() {
+        assertNull(RaidDetector.tryDetect(null, Text.literal("")));
+    }
+
+    @Test
     void returnsNullWhenNamesContainColon() {
         String cleaned = "Steve: finished NOL and claimed +100000m Guild Experience";
         assertNull(RaidDetector.tryDetect(cleaned, Text.literal("")));

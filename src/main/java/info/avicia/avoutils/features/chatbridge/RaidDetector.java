@@ -32,7 +32,7 @@ final class RaidDetector {
     record RaidResult(String formattedMessage, int emeralds, int aspects) {}
 
     static RaidResult tryDetect(String cleaned, Text message) {
-        if (!isRaidCandidateText(cleaned)) return null;
+        if (cleaned == null || !isRaidCandidateText(cleaned)) return null;
         cleaned = cleaned.replace(",and ", ", and ");
 
         Matcher matcher = RAID_FINISH_PATTERN.matcher(cleaned);
@@ -60,7 +60,7 @@ final class RaidDetector {
             Matcher rewardMatcher = RAID_REWARD_PATTERN.matcher(rewardClause);
             while (rewardMatcher.find()) {
                 int amount = rewardMatcher.group(1) != null ? Integer.parseInt(rewardMatcher.group(1)) : 0;
-                if (rewardMatcher.group(2).toLowerCase().startsWith("aspect")) aspects += amount;
+                if (rewardMatcher.group(2).regionMatches(true, 0, "aspect", 0, 6)) aspects += amount;
                 else emeralds += amount;
             }
         }
@@ -105,7 +105,7 @@ final class RaidDetector {
                 resolved.add(displayedName);
             }
         }
-        return List.copyOf(new ArrayList<>(resolved));
+        return List.copyOf(resolved);
     }
 
     private static String formatPlayerList(List<String> members) {
