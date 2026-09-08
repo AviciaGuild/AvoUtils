@@ -1,6 +1,7 @@
 package info.avicia.avoutils.features.chatbridge;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.UsernameResolver;
 import net.minecraft.text.Text;
 
 import java.util.Locale;
@@ -44,7 +45,7 @@ final class BankDetector {
 
         String realUsername = UsernameResolver.resolve(message, displayedPlayer);
         if (realUsername == null) {
-            AvoUtilsMod.LOGGER.warn("[ChatBridge/Bank] Could not resolve username from '{}'", displayedPlayer);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge/Bank] Could not resolve username from '{}'", displayedPlayer);
             return null;
         }
 
@@ -54,7 +55,7 @@ final class BankDetector {
 
         String formattedMessage = "**" + DiscordMarkdown.escapeUsername(realUsername) + "** " + action + " **" + itemBlock + "**";
 
-        AvoUtilsMod.LOGGER.info("[ChatBridge/Bank] Detected: {} {} {}", realUsername, action, itemBlock);
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/Bank] Detected: {} {} {}", realUsername, action, itemBlock);
 
         return new Result(displayName, formattedMessage);
     }

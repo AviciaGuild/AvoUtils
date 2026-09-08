@@ -8,6 +8,7 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
+import info.avicia.avoutils.core.util.UsernameResolver;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
@@ -65,7 +66,7 @@ public class ChatBridgeFeature implements AvoFeature {
         this.config = config;
 
         if (!isGuildMember()) {
-            AvoUtilsMod.LOGGER.info("[ChatBridge] User is not a guild member. Chat bridge disabled.");
+            AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] User is not a guild member. Chat bridge disabled.");
         }
 
         // Register listener for Discord chat events
@@ -90,14 +91,14 @@ public class ChatBridgeFeature implements AvoFeature {
             if (json.has("guild_member")) {
                 boolean guildMember = json.get("guild_member").getAsBoolean();
                 AvoAuthService.getInstance().setCachedGuildMember(guildMember);
-                AvoUtilsMod.LOGGER.info("[ChatBridge] Guild membership updated via bridge_status: {}", guildMember);
+                AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] Guild membership updated via bridge_status: {}", guildMember);
             }
         });
 
         // Register connection demand lease (only if user has it enabled and is a guild member)
         AvoWebSocketManager.getInstance().registerConnectionDemand("chatbridge", this::isBridgeActive);
 
-        AvoUtilsMod.LOGGER.info("[ChatBridge] Initialized.");
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] Initialized.");
     }
 
     /** Called when a system message is received. */
@@ -155,7 +156,7 @@ public class ChatBridgeFeature implements AvoFeature {
 
         String realUsername = UsernameResolver.resolve(message, displayedName);
         if (realUsername == null) {
-            AvoUtilsMod.LOGGER.warn("[ChatBridge] Could not resolve username from '{}'", displayedName);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge] Could not resolve username from '{}'", displayedName);
             return;
         }
 

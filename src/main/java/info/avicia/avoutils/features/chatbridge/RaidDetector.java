@@ -1,6 +1,7 @@
 package info.avicia.avoutils.features.chatbridge;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.UsernameResolver;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -43,13 +44,13 @@ final class RaidDetector {
 
         List<String> displayedNames = parseDisplayedNames(namesPart);
         if (displayedNames.size() > 4) {
-            AvoUtilsMod.LOGGER.warn("[ChatBridge/Raid] Too many displayed names, dropping: {}", namesPart);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge/Raid] Too many displayed names, dropping: {}", namesPart);
             return null;
         }
 
         List<String> partyMembers = resolvePartyMembers(displayedNames, message);
         if (partyMembers.isEmpty()) {
-            AvoUtilsMod.LOGGER.warn("[ChatBridge/Raid] No valid usernames found");
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge/Raid] No valid usernames found");
             return null;
         }
 
@@ -78,7 +79,7 @@ final class RaidDetector {
         if (sr > 0) parts.add("+" + sr + " SR");
         if (!parts.isEmpty()) sb.append(" — ").append(String.join(", ", parts));
 
-        AvoUtilsMod.LOGGER.info("[ChatBridge/Raid] Detected: raid='{}'", raidName);
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/Raid] Detected: raid='{}'", raidName);
         return new RaidResult(sb.toString(), emeralds, aspects);
     }
 

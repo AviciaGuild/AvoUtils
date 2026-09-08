@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.chatbridge;
 
+import info.avicia.avoutils.core.util.UsernameResolver;
 import net.minecraft.text.Text;
 import java.util.Locale;
 import java.util.regex.Matcher;

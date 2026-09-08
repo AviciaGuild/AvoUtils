@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.util;
 
 import info.avicia.avoutils.testutil.TextFixtures;
 import net.minecraft.text.Text;
@@ -40,5 +40,11 @@ class UsernameResolverTest {
     @Test
     void resolveReturnsNullForInvalidNameWithoutHover() {
         assertNull(UsernameResolver.resolve(Text.literal("ab"), "ab"));
+    }
+
+    @Test
+    void resolveExtractsRealNameFromClassNickname() {
+        Text message = TextFixtures.hoverText("avo ignis war dps", "'s real name is CupBoi");
+        assertEquals("CupBoi", UsernameResolver.resolve(message, "avo ignis war dps"));
     }
 }

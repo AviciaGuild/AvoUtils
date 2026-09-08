@@ -17,6 +17,12 @@ public final class PlayerUtil {
      */
     public static String selfName() {
         MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc != null && mc.player != null && mc.player.getName() != null) {
+            String name = mc.player.getName().getString();
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+        }
         return (mc != null && mc.getSession() != null) ? mc.getSession().getUsername() : null;
     }
 
