@@ -10,6 +10,8 @@ public final class PacketTextNormalizer {
     private static final Pattern LEGACY_FORMATTING_PATTERN = Pattern.compile("(?i)§[0-9A-FK-ORX]");
     private static final Pattern SECTION_ANY_PATTERN = Pattern.compile("§.");
     private static final Pattern AMPERSAND_FORMATTING_PATTERN = Pattern.compile("(?i)&[0-9A-FK-OR]");
+    private static final Pattern AMPERSAND_HEX_COLOR_PATTERN = Pattern.compile("(?i)&#[0-9a-f]{6,8}");
+    private static final Pattern AMPERSAND_TAG_PATTERN = Pattern.compile("&[<\\[{][^>\\]}]+[>\\]}]");
     private static final Pattern AMPERSAND_FONT_TAG_PATTERN = Pattern.compile("&\\{[^}]+\\}");
     private static final Pattern SPACE_BEFORE_PUNCTUATION_PATTERN = Pattern.compile("\\s+([,.;!?])");
     private static final Pattern SPACE_AFTER_OPENING_DELIMITER_PATTERN = Pattern.compile("([\\[(])\\s+");
@@ -27,6 +29,8 @@ public final class PacketTextNormalizer {
         }
 
         String strippedFormatting = LEGACY_FORMATTING_PATTERN.matcher(rawText).replaceAll(" ").replace('§', ' ');
+        strippedFormatting = AMPERSAND_HEX_COLOR_PATTERN.matcher(strippedFormatting).replaceAll(" ");
+        strippedFormatting = AMPERSAND_TAG_PATTERN.matcher(strippedFormatting).replaceAll(" ");
         strippedFormatting = AMPERSAND_FONT_TAG_PATTERN.matcher(strippedFormatting).replaceAll(" ");
         strippedFormatting = AMPERSAND_FORMATTING_PATTERN.matcher(strippedFormatting).replaceAll(" ");
         StringBuilder normalized = new StringBuilder(strippedFormatting.length());

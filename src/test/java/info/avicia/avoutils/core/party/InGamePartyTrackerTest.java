@@ -1,7 +1,9 @@
 package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.testutil.TestReflection;
+import info.avicia.avoutils.testutil.TextFixtures;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -59,6 +61,35 @@ class InGamePartyTrackerTest {
 
             assertFalse(tracker.onChatMessage("Steve has joined your party, say hello!"));
             assertTrue(tracker.isInParty());
+            assertTrue(tracker.getLastPartyListMembers().contains("Steve"));
+        }
+    }
+
+    @Test
+    void kickRemovesMemberImmediately() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            MinecraftClient client = mock(MinecraftClient.class);
+            mc.when(MinecraftClient::getInstance).thenReturn(client);
+
+            tracker.onChatMessage("Party members: CupBoi, and LargeMug");
+            assertEquals(Set.of("CupBoi", "LargeMug"), tracker.getLastPartyListMembers());
+
+            tracker.onChatMessage("LargeMug has been kicked from the party!");
+            assertEquals(Set.of("CupBoi"), tracker.getLastPartyListMembers());
+        }
+    }
+
+    @Test
+    void leaveRemovesMemberImmediately() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            MinecraftClient client = mock(MinecraftClient.class);
+            mc.when(MinecraftClient::getInstance).thenReturn(client);
+
+            tracker.onChatMessage("Party members: CupBoi, and LargeMug");
+            assertEquals(Set.of("CupBoi", "LargeMug"), tracker.getLastPartyListMembers());
+
+            tracker.onChatMessage("LargeMug has left the party!");
+            assertEquals(Set.of("CupBoi"), tracker.getLastPartyListMembers());
         }
     }
 
@@ -79,6 +110,39 @@ class InGamePartyTrackerTest {
             tracker.triggerPartyList();
             long secondTrigger = TestReflection.get(tracker, "lastTriggerTime");
             assertEquals(firstTrigger, secondTrigger);
+        }
+    }
+
+    @Test
+    void kickWithClassNicknameAndHoverRemovesRealMember() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            MinecraftClient client = mock(MinecraftClient.class);
+            mc.when(MinecraftClient::getInstance).thenReturn(client);
+
+            tracker.onChatMessage("Party members: CupBoi, and LargeMug");
+            assertEquals(Set.of("CupBoi", "LargeMug"), tracker.getLastPartyListMembers());
+
+            Text message = TextFixtures.hoverText(
+                    "avo ignis war dps has been kicked from the party!",
+                    "'s real name is CupBoi");
+            tracker.onChatMessage(message);
+            assertEquals(Set.of("LargeMug"), tracker.getLastPartyListMembers());
+        }
+    }
+
+    @Test
+    void kickWithClassNicknameTriggersSyncEvenWithoutHover() {
+        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
+            MinecraftClient client = mock(MinecraftClient.class);
+            mc.when(MinecraftClient::getInstance).thenReturn(client);
+            org.mockito.Mockito.doAnswer(invocation -> {
+                ((Runnable) invocation.getArgument(0)).run();
+                return null;
+            }).when(client).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
+
+            tracker.onChatMessage("avo ignis war dps has been kicked from the party!");
+            long triggerTime = TestReflection.get(tracker, "lastTriggerTime");
+            assertTrue(triggerTime > 0);
         }
     }
 }

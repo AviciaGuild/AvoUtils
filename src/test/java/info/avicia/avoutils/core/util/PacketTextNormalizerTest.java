@@ -56,6 +56,13 @@ class PacketTextNormalizerTest {
     }
 
     @Test
+    void normalizeForParsingStripsHexAndCustomBracketTags() {
+        assertEquals("avo ignis war dps has been kicked from the party!",
+                PacketTextNormalizer.normalizeForParsing("&e&{fr:cp}&{fr:d} &o&<1>avo ignis war dps&r&e has been kicked from the party!"));
+        assertEquals("Hello", PacketTextNormalizer.normalizeForParsing("&#ffbb33ff&[1]&<1>Hello"));
+    }
+
+    @Test
     void stripColorCodesHandlesNullAndSectionSigns() {
         assertEquals("", PacketTextNormalizer.stripColorCodes(null));
         assertEquals("Hello", PacketTextNormalizer.stripColorCodes("§aHello"));

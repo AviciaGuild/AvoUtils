@@ -1,7 +1,9 @@
 package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.PlayerUtil;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,12 +38,31 @@ public class InGamePartyTracker {
     }
 
     /**
-     * Process a chat message.
+     * Process a chat message from a Text component.
+     *
+     * @return true if the message should be hidden from the chat.
+     */
+    public boolean onChatMessage(Text message) {
+        if (message == null) return false;
+        return onChatMessage(message.getString(), message);
+    }
+
+    /**
+     * Process a chat message from raw text string.
      *
      * @return true if the message should be hidden from the chat.
      */
     public boolean onChatMessage(String text) {
-        PartyMessageParser.Result result = PartyMessageParser.parse(text);
+        return onChatMessage(text, null);
+    }
+
+    /**
+     * Process a chat message with raw text and optional Text component for hover resolution.
+     *
+     * @return true if the message should be hidden from the chat.
+     */
+    public boolean onChatMessage(String text, Text message) {
+        PartyMessageParser.Result result = PartyMessageParser.parse(text, message);
         if (result == null) {
             return false;
         }
@@ -62,6 +83,7 @@ public class InGamePartyTracker {
                 synchronized (lastPartyListMembers) {
                     lastPartyListMembers.clear();
                 }
+                notifyPartyListListeners();
                 return shouldHide;
             }
             case PARTY_LIST -> {
@@ -73,8 +95,27 @@ public class InGamePartyTracker {
                 notifyPartyListListeners();
                 return shouldHide;
             }
-            case JOIN, KICK, LEAVE -> {
+            case KICK, LEAVE -> {
                 inParty = true;
+                if (result.player() != null) {
+                    AvoUtilsMod.LOGGER.info("[AvoUtils] Member removed ({}): {}", result.event(), result.player());
+                    synchronized (lastPartyListMembers) {
+                        lastPartyListMembers.removeIf(m -> PlayerUtil.namesEqual(m, result.player()));
+                    }
+                    notifyPartyListListeners();
+                }
+                triggerPartyList();
+                return shouldHide;
+            }
+            case JOIN -> {
+                inParty = true;
+                if (result.player() != null) {
+                    AvoUtilsMod.LOGGER.info("[AvoUtils] Member joined: {}", result.player());
+                    synchronized (lastPartyListMembers) {
+                        lastPartyListMembers.add(result.player());
+                    }
+                    notifyPartyListListeners();
+                }
                 triggerPartyList();
                 return shouldHide;
             }
@@ -94,6 +135,7 @@ public class InGamePartyTracker {
             }
             lastTriggerTime = now;
             if (mc.player != null && mc.player.networkHandler != null) {
+                AvoUtilsMod.LOGGER.info("[AvoUtils] Triggering /party list sync");
                 hiddenPartyListExpireTime = now + PARTY_LIST_HIDE_WINDOW_MS;
                 mc.player.networkHandler.sendChatCommand("party list");
             }
@@ -130,7 +172,7 @@ public class InGamePartyTracker {
             try {
                 listener.accept(snapshot);
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.error("[InGamePartyTracker] Error in party-list listener", e);
+                AvoUtilsMod.LOGGER.error("[AvoUtils] Error in party-list listener", e);
             }
         }
     }

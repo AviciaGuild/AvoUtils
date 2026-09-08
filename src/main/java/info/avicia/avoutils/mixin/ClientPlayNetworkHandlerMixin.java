@@ -25,11 +25,8 @@ public class ClientPlayNetworkHandlerMixin {
                 return;
             }
             if (packet.content() != null && AvoUtilsMod.getInstance() != null) {
-                String text = packet.content().getString();
-                if (text != null) {
-                    if (InGamePartyTracker.getInstance().onChatMessage(text)) {
-                        ci.cancel();
-                    }
+                if (InGamePartyTracker.getInstance().onChatMessage(packet.content())) {
+                    ci.cancel();
                 }
                 ChatBridgeFeature cb = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
                 if (cb != null) {
@@ -37,7 +34,7 @@ public class ClientPlayNetworkHandlerMixin {
                 }
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Error handling game message in mixin", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Error handling game message in mixin", e);
         }
     }
 }
