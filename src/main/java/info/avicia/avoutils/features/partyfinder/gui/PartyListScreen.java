@@ -146,7 +146,7 @@ public class PartyListScreen extends ScrollableListScreen {
                 boolean isLeadingAny = false;
                 PartyData ownedParty = null;
                 for (PartyData p : result) {
-                    if (PlayerUtil.namesEqual(p.leaderName, selfName)) {
+                    if (PlayerUtil.isSelf(p.leaderName)) {
                         partySyncer.setTrackedPartyId(p.partyId);
                         if (p.members != null) {
                             List<String> memberNames = p.members.values().stream()
@@ -189,7 +189,7 @@ public class PartyListScreen extends ScrollableListScreen {
             });
         }).exceptionally(ex -> {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-            AvoUtilsMod.LOGGER.warn("Failed to fetch parties: {}", cause.getMessage());
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [PartyFinder] Failed to fetch parties: {}", cause.getMessage());
             runOnClient(() -> {
                 errorMessage = cause.getMessage() != null ? cause.getMessage() : "Failed to load parties.";
                 loading = false;
@@ -206,9 +206,8 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     private PartyData getOwnedParty() {
-        String selfName = PlayerUtil.selfName();
         for (PartyData p : parties) {
-            if (PlayerUtil.namesEqual(p.leaderName, selfName)) {
+            if (PlayerUtil.isSelf(p.leaderName)) {
                 return p;
             }
         }

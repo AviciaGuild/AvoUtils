@@ -4,10 +4,12 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import info.avicia.avoutils.features.partyfinder.gui.PartyDetailModal;
 import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
 import net.minecraft.client.MinecraftClient;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,18 +81,19 @@ public class PartyFinderPartySyncer {
     }
 
     private void onPartyListParsed(List<String> members) {
-        AvoUtilsMod.LOGGER.info("Parsed /party list: {} members", members.size());
-
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc != null) {
             mc.execute(() -> {
                 if (mc.currentScreen instanceof PartyListScreen screen) {
                     screen.onPartyListUpdated();
+                } else if (mc.currentScreen instanceof PartyDetailModal modal) {
+                    modal.refreshPartyState();
                 }
             });
         }
 
         if (trackedPartyId < 0) {
+            AvoUtilsMod.LOGGER.debug("[AvoUtils] [PartyFinder] Skipping sync: trackedPartyId={}", trackedPartyId);
             return;
         }
 
@@ -104,7 +107,7 @@ public class PartyFinderPartySyncer {
             boolean isKnownDiscord = knownDiscordMembers.contains(lowerName);
 
             if (!isKnownDiscord) {
-                AvoUtilsMod.LOGGER.info("Auto-reserving from /party list: {}", name);
+                AvoUtilsMod.LOGGER.info("[AvoUtils] [PartyFinder] Auto-reserving from /party list: {}", name);
                 knownDiscordMembers.add(lowerName);
                 inGameSeenMembers.add(lowerName);
                 apiClient.reserveIngame(trackedPartyId, name).thenAccept(resp -> {
@@ -123,8 +126,11 @@ public class PartyFinderPartySyncer {
         }
 
         // Auto-remove members who are no longer in the in-game party
+        Set<String> trackedMembers = new LinkedHashSet<>(knownDiscordMembers);
+        trackedMembers.addAll(inGameSeenMembers);
+
         List<String> toRemove = new ArrayList<>();
-        for (String name : inGameSeenMembers) {
+        for (String name : trackedMembers) {
             boolean stillInParty = members.stream().anyMatch(m -> PlayerUtil.namesEqual(m, name))
                     || PlayerUtil.isSelf(name);
             if (!stillInParty) {
@@ -134,7 +140,7 @@ public class PartyFinderPartySyncer {
 
         for (String name : toRemove) {
             String lowerName = PlayerUtil.normalizeName(name);
-            AvoUtilsMod.LOGGER.info("Auto-kicking member no longer in party: {}", name);
+            AvoUtilsMod.LOGGER.info("[AvoUtils] [PartyFinder] Auto-kicking member no longer in party: {}", name);
             inGameSeenMembers.remove(lowerName);
             knownDiscordMembers.remove(lowerName);
             apiClient.kickMember(trackedPartyId, name).thenAccept(resp -> {
