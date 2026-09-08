@@ -61,7 +61,7 @@ final class WarDetector {
                 activeInfo = info;
                 activeWarrers = collectNearbyPlayers();
                 submissionSent = false;
-                AvoUtilsMod.LOGGER.info("[ChatBridge/War] Tracking war: territory='{}' warrers={}",
+                AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/War] Tracking war: territory='{}' warrers={}",
                         info.getTerritory(), activeWarrers);
             } else {
                 activeInfo = info;
@@ -72,7 +72,7 @@ final class WarDetector {
                 warDisappearedAt = System.currentTimeMillis();
             }
             if (System.currentTimeMillis() - warDisappearedAt > GRACE_PERIOD_MS) {
-                AvoUtilsMod.LOGGER.warn("[ChatBridge/War] War disappeared without outcome chat — resetting");
+                AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge/War] War disappeared without outcome chat — resetting");
                 reset();
             }
         }
@@ -122,7 +122,7 @@ final class WarDetector {
         }
 
         AvoUtilsMod.LOGGER.info(
-                "[ChatBridge/War] {}: territory='{}' hp={} def={}% dmg={}-{} atk={}x duration={}s dps={} warrers={}",
+                "[AvoUtils] [ChatBridge/War] {}: territory='{}' hp={} def={}% dmg={}-{} atk={}x duration={}s dps={} warrers={}",
                 outcome, territory, hp, def, dmgLow, dmgHigh, atk, durationSeconds, dps, warrers);
 
         StringBuilder stats = new StringBuilder();

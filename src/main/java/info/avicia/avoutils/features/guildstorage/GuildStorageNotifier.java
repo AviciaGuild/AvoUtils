@@ -89,13 +89,13 @@ public class GuildStorageNotifier implements AvoFeature {
                         json.get("aspect_current").getAsLong(),
                         json.get("aspect_max").getAsLong());
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.warn("[GuildStorageNotifier] Malformed remote snapshot", e);
+                AvoUtilsMod.LOGGER.warn("[AvoUtils] [GuildStorage] Malformed remote snapshot", e);
             }
         });
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> reset());
 
-        AvoUtilsMod.LOGGER.info("[GuildStorageNotifier] Initialized. Emerald threshold: {}%, Aspect threshold: {}%",
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [GuildStorage] Initialized. Emerald threshold: {}%, Aspect threshold: {}%",
                 config.guildStorageEmeraldThresholdPercent, config.guildStorageAspectThresholdPercent);
     }
 
@@ -162,7 +162,7 @@ public class GuildStorageNotifier implements AvoFeature {
         if (ageMs >= 0 && ageMs <= LOCAL_AUTHORITY_WINDOW_MS) return;
 
         applyAbsoluteState(emCur, emMax, asCur, asMax);
-        AvoUtilsMod.LOGGER.debug("[GuildStorageNotifier] Applied remote snapshot emerald={}/{} aspect={}/{}",
+        AvoUtilsMod.LOGGER.debug("[AvoUtils] [GuildStorage] Applied remote snapshot emerald={}/{} aspect={}/{}",
                 emCur, emMax, asCur, asMax);
     }
 

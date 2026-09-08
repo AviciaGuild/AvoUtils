@@ -289,7 +289,7 @@ public class EmojiFeature implements AvoFeature {
         try {
             createResourcePackStructure();
         } catch (IOException e) {
-            AvoUtilsMod.LOGGER.error("Failed to create emoji resource pack folders", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to create emoji resource pack folders", e);
         }
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
@@ -375,7 +375,7 @@ public class EmojiFeature implements AvoFeature {
 
         boolean changed = false;
         try {
-            AvoUtilsMod.LOGGER.info("Starting loading and caching emojis...");
+            AvoUtilsMod.LOGGER.info("[AvoUtils] Starting loading and caching emojis...");
             loadAnimationCache();
 
             Map<String, String> allEmojis = new HashMap<>();
@@ -399,10 +399,10 @@ public class EmojiFeature implements AvoFeature {
                         }
                     }
                 } else {
-                    AvoUtilsMod.LOGGER.error("custom_emojis.json not found in mod resources!");
+                    AvoUtilsMod.LOGGER.error("[AvoUtils] custom_emojis.json not found in mod resources!");
                 }
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.error("Failed to load custom emojis from resources", e);
+                AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to load custom emojis from resources", e);
             }
 
             if (!allEmojis.isEmpty()) {
@@ -525,7 +525,7 @@ public class EmojiFeature implements AvoFeature {
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             } catch (Exception e) {
-                                AvoUtilsMod.LOGGER.error("Failed to process emoji image for {} from {}",
+                                AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to process emoji image for {} from {}",
                                         emojiName, imageUrl, e);
                             }
                         }, downloadExecutor));
@@ -574,7 +574,7 @@ public class EmojiFeature implements AvoFeature {
                     animatedEmojis.putAll(newAnimatedEmojis);
                     animatedEmojis.keySet().removeIf(k -> !newAnimatedEmojis.containsKey(k));
                 }
-                AvoUtilsMod.LOGGER.info("Successfully loaded {} custom emojis ({} animated).",
+                AvoUtilsMod.LOGGER.info("[AvoUtils] Successfully loaded {} custom emojis ({} animated).",
                         downloadedEmojis.size(), animatedEmojis.size());
             }
 
@@ -583,7 +583,7 @@ public class EmojiFeature implements AvoFeature {
             return changed || fontChanged;
 
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Error occurred while loading emojis", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Error occurred while loading emojis", e);
             return false;
         } finally {
             loadingEmojis.set(false);
@@ -744,7 +744,7 @@ public class EmojiFeature implements AvoFeature {
                 animationCache.putAll(map);
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to load animation cache from {}", animationCachePath, e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to load animation cache from {}", animationCachePath, e);
         }
     }
 
@@ -756,7 +756,7 @@ public class EmojiFeature implements AvoFeature {
             Files.writeString(temp, json, StandardCharsets.UTF_8);
             Files.move(temp, animationCachePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to save animation cache to {}", animationCachePath, e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to save animation cache to {}", animationCachePath, e);
         } finally {
             try {
                 Files.deleteIfExists(temp);
@@ -773,7 +773,7 @@ public class EmojiFeature implements AvoFeature {
             String json = Files.readString(manifestPath, StandardCharsets.UTF_8);
             return GSON.fromJson(json, EmojiManifest.class);
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to load emoji manifest from {}", manifestPath, e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to load emoji manifest from {}", manifestPath, e);
             return null;
         }
     }
@@ -786,7 +786,7 @@ public class EmojiFeature implements AvoFeature {
             Files.writeString(temp, json, StandardCharsets.UTF_8);
             Files.move(temp, manifestPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to save emoji manifest to {}", manifestPath, e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to save emoji manifest to {}", manifestPath, e);
         } finally {
             try {
                 Files.deleteIfExists(temp);

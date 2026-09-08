@@ -93,7 +93,7 @@ public class AnniPartyFeature implements AvoFeature {
             try {
                 listener.accept(updatedRoster);
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.error("[AnniParty] Roster listener error", e);
+                AvoUtilsMod.LOGGER.error("[AvoUtils] [AnniParty] Roster listener error", e);
             }
         }
     }

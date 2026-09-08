@@ -65,7 +65,7 @@ public class EmojiResourcePackProvider implements ResourcePackProvider {
                     factory, ResourceType.CLIENT_RESOURCES, position);
             profileAdder.accept(profile);
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to create resource pack '{}'", name, e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to create resource pack '{}'", name, e);
         }
     }
 }

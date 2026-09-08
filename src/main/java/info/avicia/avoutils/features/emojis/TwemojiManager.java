@@ -74,7 +74,7 @@ class TwemojiManager {
 
         Path tempPath = twemojiPath.resolveSibling("avoutils-twemoji.tmp");
         Path sanitizedTemp = twemojiPath.resolveSibling("avoutils-twemoji-sanitized.tmp");
-        AvoUtilsMod.LOGGER.info("Downloading Twemoji resource pack for high-quality color emojis...");
+        AvoUtilsMod.LOGGER.info("[AvoUtils] Downloading Twemoji resource pack for high-quality color emojis...");
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(TWEMOJI_ZIP_URL))
@@ -90,13 +90,13 @@ class TwemojiManager {
                 }
                 sanitize(tempPath, sanitizedTemp);
                 Files.move(sanitizedTemp, twemojiPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-                AvoUtilsMod.LOGGER.info("Twemoji resource pack downloaded and sanitized successfully.");
+                AvoUtilsMod.LOGGER.info("[AvoUtils] Twemoji resource pack downloaded and sanitized successfully.");
             } else {
-                AvoUtilsMod.LOGGER.error("Failed to download Twemoji pack. HTTP code: {}",
+                AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to download Twemoji pack. HTTP code: {}",
                         response.statusCode());
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Error downloading Twemoji resource pack", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Error downloading Twemoji resource pack", e);
         } finally {
             try {
                 Files.deleteIfExists(tempPath);
@@ -114,7 +114,7 @@ class TwemojiManager {
 
     void loadResources() {
         if (!Files.exists(twemojiPath)) {
-            AvoUtilsMod.LOGGER.error("Twemoji resource pack not found, standard emojis mapping skipped!");
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Twemoji resource pack not found, standard emojis mapping skipped!");
             return;
         }
 
@@ -122,7 +122,7 @@ class TwemojiManager {
             loadPuaMappings(zip);
             loadStandardEmojis(zip);
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to load standard emoji resources from ZIP", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to load standard emoji resources from ZIP", e);
         }
     }
 
@@ -144,14 +144,14 @@ class TwemojiManager {
                 }
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to load Twemoji PUA mappings", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to load Twemoji PUA mappings", e);
         }
     }
 
     private void loadStandardEmojis(ZipFile zip) {
         ZipEntry entry = zip.getEntry(SHORTCODES_JSON_PATH);
         if (entry == null) {
-            AvoUtilsMod.LOGGER.error("en_us.json not found in Twemoji pack!");
+            AvoUtilsMod.LOGGER.error("[AvoUtils] en_us.json not found in Twemoji pack!");
             return;
         }
         try (InputStream is = zip.getInputStream(entry);
@@ -176,10 +176,10 @@ class TwemojiManager {
             }
             standardEmojis.clear();
             standardEmojis.putAll(newStandardEmojis);
-            AvoUtilsMod.LOGGER.info("Successfully loaded {} standard Twemoji shortcodes from ZIP.",
+            AvoUtilsMod.LOGGER.info("[AvoUtils] Successfully loaded {} standard Twemoji shortcodes from ZIP.",
                     standardEmojis.size());
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("Failed to parse Twemoji shortcodes from ZIP", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to parse Twemoji shortcodes from ZIP", e);
         }
     }
 

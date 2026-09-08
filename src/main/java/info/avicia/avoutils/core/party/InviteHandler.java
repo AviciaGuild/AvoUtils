@@ -63,7 +63,7 @@ public class InviteHandler {
             inviteQueue.add("__CREATE__");
         }
         inviteQueue.addAll(playerNames);
-        AvoUtilsMod.LOGGER.info("Queued {} party invites. Need party creation: {}",
+        AvoUtilsMod.LOGGER.info("[AvoUtils] Queued {} party invites. Need party creation: {}",
                 playerNames.size(), !InGamePartyTracker.getInstance().isInParty());
     }
 
@@ -82,7 +82,7 @@ public class InviteHandler {
         String action = inviteQueue.poll();
         if (action != null) {
             String command = commandFor(action);
-            AvoUtilsMod.LOGGER.info("Sending: /{}", command);
+            AvoUtilsMod.LOGGER.info("[AvoUtils] Sending: /{}", command);
             client.player.networkHandler.sendChatCommand(command);
             cooldownTicks = TICKS_BETWEEN_INVITES;
         }

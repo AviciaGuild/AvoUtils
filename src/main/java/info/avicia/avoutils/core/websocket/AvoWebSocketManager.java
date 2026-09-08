@@ -108,7 +108,7 @@ public class AvoWebSocketManager {
         if (activeClient != null && activeClient.isOpen()) {
             activeClient.sendEvent(eventType, payload);
         } else {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Cannot send event. Socket not open: {}", eventType);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [WebSocket] Cannot send event. Socket not open: {}", eventType);
         }
     }
 
@@ -152,11 +152,11 @@ public class AvoWebSocketManager {
         }
         lastConnectAttempt = System.currentTimeMillis();
 
-        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Requesting authentication token...");
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Requesting authentication token...");
         AvoAuthService.getInstance().getSessionToken().whenComplete((token, throwable) -> {
             if (throwable != null) {
                 String msg = throwable.getCause() != null ? throwable.getCause().getMessage() : throwable.getMessage();
-                AvoUtilsMod.LOGGER.error("[AvoWebSocket] Failed to retrieve session token: {}", msg);
+                AvoUtilsMod.LOGGER.error("[AvoUtils] [WebSocket] Failed to retrieve session token: {}", msg);
                 isConnecting.set(false);
                 consecutiveFailures++;
                 return;
@@ -174,13 +174,13 @@ public class AvoWebSocketManager {
                 try {
                     client.close();
                 } catch (Exception e) {
-                    AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Error closing previous client", e);
+                    AvoUtilsMod.LOGGER.warn("[AvoUtils] [WebSocket] Error closing previous client", e);
                 }
             }
 
             URI wsUri = wsUriFor(config.apiBaseUrl);
 
-            AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connecting to: {}", wsUri);
+            AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Connecting to: {}", wsUri);
 
             Map<String, String> headers = new HashMap<>();
             headers.put("Authorization", "Bearer " + token);
@@ -191,7 +191,7 @@ public class AvoWebSocketManager {
                     () -> {
                         isConnecting.set(false);
                         consecutiveFailures = 0;
-                        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connected successfully.");
+                        AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Connected successfully.");
                     },
                     code -> {
                         isConnecting.set(false);
@@ -201,12 +201,12 @@ public class AvoWebSocketManager {
                             versionUnsupported = true;
                             notifyVersionUnsupported();
                         }
-                        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Disconnected (code={}).", code);
+                        AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Disconnected (code={}).", code);
                     }
             );
             client.connect();
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error connecting", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] [WebSocket] Error connecting", e);
             isConnecting.set(false);
             consecutiveFailures++;
         }
@@ -220,7 +220,7 @@ public class AvoWebSocketManager {
                     try {
                         listener.accept(json);
                     } catch (Exception e) {
-                        AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error invoking listener for event: {}", type, e);
+                        AvoUtilsMod.LOGGER.error("[AvoUtils] [WebSocket] Error invoking listener for event: {}", type, e);
                     }
                 }
             }
@@ -261,7 +261,7 @@ public class AvoWebSocketManager {
             try {
                 client.close();
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error during disconnect", e);
+                AvoUtilsMod.LOGGER.error("[AvoUtils] [WebSocket] Error during disconnect", e);
             }
             client = null;
         }

@@ -107,6 +107,6 @@ public class PartyFinderNotificationHandler {
             }
         });
 
-        AvoUtilsMod.LOGGER.info("[PartyFinder] Notification handler registered.");
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [PartyFinder] Notification handler registered.");
     }
 }

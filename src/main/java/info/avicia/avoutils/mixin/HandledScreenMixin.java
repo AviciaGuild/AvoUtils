@@ -32,7 +32,7 @@ public abstract class HandledScreenMixin {
                 }
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("[GuildStorageNotifier] Error in render hook", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] [GuildStorage] Error in render hook", e);
         }
     }
 }

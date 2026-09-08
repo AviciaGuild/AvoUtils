@@ -46,7 +46,7 @@ public class ModConfig {
                     return config;
                 }
             } catch (Exception e) {
-                AvoUtilsMod.LOGGER.error("Failed to load config, using defaults.", e);
+                AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to load config, using defaults.", e);
             }
         }
         // Create default config
@@ -61,7 +61,7 @@ public class ModConfig {
     private void validate() {
         if (apiBaseUrl == null || (!apiBaseUrl.startsWith("https://") && !apiBaseUrl.startsWith("http://localhost") && !apiBaseUrl.startsWith("http://127.0.0.1"))) {
             AvoUtilsMod.LOGGER.warn(
-                "Config 'apiBaseUrl' is missing or does not use HTTPS (got '{}')."
+                "[AvoUtils] Config 'apiBaseUrl' is missing or does not use HTTPS (got '{}')."
                     + " Resetting to default: {}", apiBaseUrl, DEFAULT_API_BASE_URL);
             apiBaseUrl = DEFAULT_API_BASE_URL;
         }
@@ -90,7 +90,7 @@ public class ModConfig {
             Files.writeString(tempPath, GSON.toJson(this));
             Files.move(tempPath, configPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            AvoUtilsMod.LOGGER.error("Failed to save config.", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] Failed to save config.", e);
         }
     }
 }

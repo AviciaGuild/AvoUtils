@@ -52,7 +52,7 @@ public class AvoUtilsMod implements ClientModInitializer {
         // Register commands
         AvoCommands.register();
 
-        LOGGER.info("AvoUtils mod initialized.");
+        LOGGER.info("[AvoUtils] Mod initialized.");
     }
 
     private void registerFeature(AvoFeature feature) {

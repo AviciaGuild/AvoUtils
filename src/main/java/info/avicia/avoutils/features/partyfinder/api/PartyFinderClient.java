@@ -102,7 +102,7 @@ public class PartyFinderClient {
 
     private void throwOnError(HttpResponse<String> response, String actionName, String defaultMessagePrefix) {
         if (response.statusCode() != 200) {
-            AvoUtilsMod.LOGGER.warn("{} failed: HTTP {}", actionName, response.statusCode());
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [PartyFinder] {} failed: HTTP {}", actionName, response.statusCode());
             String errorMessage = defaultMessagePrefix + " (HTTP " + response.statusCode() + ").";
             try {
                 ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);

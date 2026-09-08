@@ -38,7 +38,7 @@ public class AvoWebSocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection opened. Status: {}", handshakedata.getHttpStatus());
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Connection opened. Status: {}", handshakedata.getHttpStatus());
         if (onOpenCallback != null) {
             onOpenCallback.run();
         }
@@ -47,7 +47,7 @@ public class AvoWebSocketClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         if (message.length() > MAX_MESSAGE_SIZE) {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Dropping oversized message: {} bytes", message.length());
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [WebSocket] Dropping oversized message: {} bytes", message.length());
             return;
         }
         try {
@@ -57,15 +57,15 @@ public class AvoWebSocketClient extends WebSocketClient {
                 eventHandler.accept(type, json);
             }
         } catch (Exception e) {
-            AvoUtilsMod.LOGGER.error("[AvoWebSocket] Error processing incoming message", e);
+            AvoUtilsMod.LOGGER.error("[AvoUtils] [WebSocket] Error processing incoming message", e);
         }
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        AvoUtilsMod.LOGGER.info("[AvoWebSocket] Connection closed. Code: {}, Reason: {}, Remote: {}", code, reason, remote);
+        AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Connection closed. Code: {}, Reason: {}, Remote: {}", code, reason, remote);
         if (code == AUTH_FAILURE_CLOSE_CODE || code == PROTOCOL_ERROR_CLOSE_CODE) {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Auth failure or protocol error (code={}). Invalidating session token.", code);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [WebSocket] Auth failure or protocol error (code={}). Invalidating session token.", code);
             AvoAuthService.getInstance().invalidateToken();
         }
         if (onCloseCallback != null) {
@@ -75,7 +75,7 @@ public class AvoWebSocketClient extends WebSocketClient {
 
     @Override
     public void onError(Exception ex) {
-        AvoUtilsMod.LOGGER.error("[AvoWebSocket] Socket error occurred", ex);
+        AvoUtilsMod.LOGGER.error("[AvoUtils] [WebSocket] Socket error occurred", ex);
     }
 
     public void sendEvent(String type, JsonObject payload) {
@@ -84,7 +84,7 @@ public class AvoWebSocketClient extends WebSocketClient {
             envelope.addProperty("type", type);
             send(GSON.toJson(envelope));
         } else {
-            AvoUtilsMod.LOGGER.warn("[AvoWebSocket] Cannot send event. Connection not open: {}", type);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [WebSocket] Cannot send event. Connection not open: {}", type);
         }
     }
 }
