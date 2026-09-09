@@ -133,7 +133,7 @@ public class ChatBridgeFeature implements AvoFeature {
 
         // ── Reward grants ─────────────────────────────────────────────
         RewardDetector.RewardResult rewardResult = RewardDetector.tryDetect(cleaned, message);
-        if (rewardResult != null && !raidDeduper.isDuplicate(rewardResult.formattedMessage())) {
+        if (rewardResult != null) {
             sendEvent(EVT_GUILD_REWARD, "Guild Rewards", rewardResult.formattedMessage(), AVO_ICON_URL);
             if (storage != null && rewardResult.tomeCount() == 0) {
                 storage.onRewardDelta(-rewardResult.emeraldAmount(), -rewardResult.aspectAmount());

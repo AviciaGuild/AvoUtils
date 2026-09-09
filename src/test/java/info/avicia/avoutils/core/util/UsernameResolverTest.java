@@ -47,4 +47,19 @@ class UsernameResolverTest {
         Text message = TextFixtures.hoverText("avo ignis war dps", "'s real name is CupBoi");
         assertEquals("CupBoi", UsernameResolver.resolve(message, "avo ignis war dps"));
     }
+
+    @Test
+    void resolveDoesNotBleedHoverTextToOtherNames() {
+        // Simulates a Wynncraft message where the sender has hover text but the recipient does not.
+        net.minecraft.text.MutableText message = net.minecraft.text.Text.empty()
+                .append(info.avicia.avoutils.testutil.TextFixtures.hoverText("CupBoi", "'s real name is RealCupBoi"))
+                .append(" rewarded 1,000 Emeralds to ")
+                .append("Krokofant");
+                
+        // Sender has hover text, should resolve to RealCupBoi
+        org.junit.jupiter.api.Assertions.assertEquals("RealCupBoi", UsernameResolver.resolve(message, "CupBoi"));
+        
+        // Recipient does NOT have hover text, should fall back to just Krokofant without bleeding
+        org.junit.jupiter.api.Assertions.assertEquals("Krokofant", UsernameResolver.resolve(message, "Krokofant"));
+    }
 }

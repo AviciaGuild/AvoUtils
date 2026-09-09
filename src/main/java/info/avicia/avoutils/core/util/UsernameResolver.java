@@ -60,14 +60,10 @@ public final class UsernameResolver {
         String targetName = name != null ? name.trim().toLowerCase(Locale.ROOT) : "";
 
         AtomicReference<String> matchedHover = new AtomicReference<>(null);
-        AtomicReference<String> fallbackHover = new AtomicReference<>(null);
 
         message.visit((style, spanText) -> {
             String hoverName = extractHoverRealName(style);
             if (hoverName != null) {
-                if (fallbackHover.get() == null) {
-                    fallbackHover.set(hoverName);
-                }
                 if (!targetName.isEmpty()) {
                     String spanTrimmed = spanText.trim().toLowerCase(Locale.ROOT);
                     if (!spanTrimmed.isEmpty() && (targetName.contains(spanTrimmed) || spanTrimmed.contains(targetName))) {
@@ -81,10 +77,6 @@ public final class UsernameResolver {
 
         if (matchedHover.get() != null) {
             return matchedHover.get();
-        }
-
-        if (!targetName.isEmpty() && fallbackHover.get() != null) {
-            return fallbackHover.get();
         }
 
         return null;
