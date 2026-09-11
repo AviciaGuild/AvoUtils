@@ -8,6 +8,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -39,7 +40,7 @@ final class WarDetector {
 
     private static String activeBattleId;
     private static WarBattleInfo activeInfo;
-    private static List<String> activeWarrers;
+    private static Set<String> activeWarrers;
     private static boolean submissionSent;
     private static long warDisappearedAt;
 
@@ -59,12 +60,13 @@ final class WarDetector {
             if (!battleId.equals(activeBattleId)) {
                 activeBattleId = battleId;
                 activeInfo = info;
-                activeWarrers = collectNearbyPlayers();
+                activeWarrers = new LinkedHashSet<>(collectNearbyPlayers());
                 submissionSent = false;
                 AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/War] Tracking war: territory='{}' warrers={}",
                         info.getTerritory(), activeWarrers);
             } else {
                 activeInfo = info;
+                activeWarrers.addAll(collectNearbyPlayers());
             }
         } else if (activeBattleId != null && !submissionSent) {
             // War disappeared from API; allow grace period for chat message
@@ -192,7 +194,7 @@ final class WarDetector {
         return !trimmed.isEmpty() && VALID_USERNAME.matcher(trimmed).matches();
     }
 
-    private static List<String> sanitizeWarrers(List<String> warrers) {
+    private static List<String> sanitizeWarrers(Collection<String> warrers) {
         if (warrers == null || warrers.isEmpty()) return List.of();
         Set<String> unique = new LinkedHashSet<>();
         for (String warrer : warrers) {
