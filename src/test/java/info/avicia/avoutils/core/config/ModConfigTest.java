@@ -75,6 +75,7 @@ class ModConfigTest {
         assertTrue(config.guildStorageNotifsEnabled);
         assertEquals(90, config.guildStorageEmeraldThresholdPercent);
         assertEquals(90, config.guildStorageAspectThresholdPercent);
+        assertTrue(config.updateRemindersEnabled);
     }
 
     @Test

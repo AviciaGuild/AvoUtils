@@ -10,6 +10,9 @@ import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
+import info.avicia.avoutils.features.updater.UpdateCheckResult;
+import info.avicia.avoutils.features.updater.UpdateFeature;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.KeyInput;
@@ -174,6 +177,57 @@ public class ConfigScreen extends Screen {
 
         y += CARD_QUAD_H + CARD_GAP;
 
+        // ── Updates ─────────────────────────────────────────────────────
+        addDrawableChild(new FlatToggleWidget(
+                cardRight - 40, y + 28, 30, 16,
+                config.updateRemindersEnabled,
+                checked -> { config.updateRemindersEnabled = checked; config.save(); }
+        ));
+
+        // Check for updates if unchecked or checking so update button appears once check completes
+        UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+        boolean hasUpdateAction = false;
+        if (updateFeature != null) {
+            UpdateFeature.UpdateState updateState = updateFeature.getState();
+            if (updateState == UpdateFeature.UpdateState.UNCHECKED || updateState == UpdateFeature.UpdateState.CHECKING) {
+                updateFeature.checkForUpdate().thenAccept(res -> {
+                    MinecraftClient mc = MinecraftClient.getInstance();
+                    mc.execute(() -> {
+                        if (mc.currentScreen == this) {
+                            this.clearAndInit();
+                        }
+                    });
+                });
+            }
+
+            hasUpdateAction = hasUpdateAction(updateState);
+
+            // Show update button when update is available, or restart button when ready
+            if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
+                UpdateCheckResult result = updateFeature.getLastCheckResult();
+                String label = result != null ? "Update to v" + result.latestVersion() : "Update";
+                addDrawableChild(new FlatButtonWidget(
+                        cardRight - 110, y + 44, 100, 18,
+                        Text.literal(label),
+                        () -> {
+                            this.close();
+                            updateFeature.downloadAndApplyUpdate();
+                        }
+                ));
+            } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
+                addDrawableChild(new FlatButtonWidget(
+                        cardRight - 110, y + 44, 100, 18,
+                        Text.literal("Restart Now"),
+                        () -> {
+                            this.close();
+                            updateFeature.requestRestart();
+                        }
+                ));
+            }
+        }
+
+        y += (hasUpdateAction ? CARD_DOUBLE_H : CARD_SINGLE_H) + CARD_GAP;
+
         // ── Bottom buttons ──────────────────────────────────────────────
         int btnY = y + 16;
         addDrawableChild(new FlatButtonWidget(
@@ -236,6 +290,41 @@ public class ConfigScreen extends Screen {
         drawRightText(context, config.guildStorageAspectThresholdPercent + "%",
                 cardRight - 13, y + 86, UiStyle.ACCENT_BLUE);
 
+        y += CARD_QUAD_H + CARD_GAP;
+
+        // ── Updates ─────────────────────────────────────────────────────
+        UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+        UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
+        boolean hasUpdateAction = updateFeature != null && hasUpdateAction(updateState);
+
+        drawSectionCard(context, y, hasUpdateAction ? CARD_DOUBLE_H : CARD_SINGLE_H, "Updates");
+        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
+                Text.literal("\u00a77Update Reminders"), cardLeft + 16, y + 32, 0xFFFFFFFF);
+
+        // Show update status text only when an action or status is present
+        if (hasUpdateAction) {
+            if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
+                UpdateCheckResult result = updateFeature.getLastCheckResult();
+                if (result != null) {
+                    CompatibilityHelper.drawTextWithShadow(context, textRenderer,
+                            Text.literal("\u00a7aUpdate available: v" + result.latestVersion()),
+                            cardLeft + 16, y + 50, 0xFFFFFFFF);
+                }
+            } else if (updateState == UpdateFeature.UpdateState.DOWNLOADING) {
+                CompatibilityHelper.drawTextWithShadow(context, textRenderer,
+                        Text.literal("\u00a77Downloading update..."),
+                        cardLeft + 16, y + 50, 0xFFFFFFFF);
+            } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
+                CompatibilityHelper.drawTextWithShadow(context, textRenderer,
+                        Text.literal("\u00a7aUpdate ready — restart to apply"),
+                        cardLeft + 16, y + 50, 0xFFFFFFFF);
+            } else if (updateState == UpdateFeature.UpdateState.ERROR) {
+                CompatibilityHelper.drawTextWithShadow(context, textRenderer,
+                        Text.literal("\u00a7cUpdate check failed"),
+                        cardLeft + 16, y + 50, 0xFFFFFFFF);
+            }
+        }
+
         super.render(context, mouseX, mouseY, delta);
     }
 
@@ -268,5 +357,12 @@ public class ConfigScreen extends Screen {
 
         CompatibilityHelper.drawTextWithShadow(context, textRenderer,
                 Text.literal("\u00a7b\u00a7l" + label), cardLeft + 16, cardY + 11, 0xFFFFFFFF);
+    }
+
+    private static boolean hasUpdateAction(UpdateFeature.UpdateState state) {
+        return state == UpdateFeature.UpdateState.UPDATE_AVAILABLE
+                || state == UpdateFeature.UpdateState.READY_TO_RESTART
+                || state == UpdateFeature.UpdateState.DOWNLOADING
+                || state == UpdateFeature.UpdateState.ERROR;
     }
 }

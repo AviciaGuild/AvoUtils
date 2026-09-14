@@ -69,7 +69,7 @@ public class FlatButtonWidget extends ClickableWidget {
         int h = getHeight();
         
         // Determine hover state
-        boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+        boolean hovered = active && mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
 
         if (borderless) {
             // Draw a background highlight on hover

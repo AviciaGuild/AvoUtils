@@ -1,5 +1,7 @@
 package info.avicia.avoutils.core.util;
 
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -42,6 +44,19 @@ public final class WynnPillUtil {
     public static MutableText createPrefixedPill(String label, boolean isError) {
         Formatting bg = isError ? Formatting.RED : Formatting.AQUA;
         return create(label, bg, PILL_FG).append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
+    }
+
+    public static MutableText createClickable(String label, Formatting backgroundColor, Formatting foregroundColor, String command, String hoverText) {
+        MutableText pill = create(label, backgroundColor, foregroundColor);
+        ClickEvent clickEvent = new ClickEvent.RunCommand(command);
+        HoverEvent hoverEvent = hoverText != null ? new HoverEvent.ShowText(Text.literal(hoverText)) : null;
+        pill.styled(style -> style.withClickEvent(clickEvent).withHoverEvent(hoverEvent));
+        for (Text sibling : pill.getSiblings()) {
+            if (sibling instanceof MutableText mutableSibling) {
+                mutableSibling.styled(style -> style.withClickEvent(clickEvent).withHoverEvent(hoverEvent));
+            }
+        }
+        return pill;
     }
 
     private static String toWynncraftGlyph(char rawChar) {

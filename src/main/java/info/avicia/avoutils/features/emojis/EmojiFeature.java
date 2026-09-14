@@ -321,6 +321,46 @@ public class EmojiFeature implements AvoFeature {
         });
     }
 
+    public void handleReloadCommand() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null && client.player != null) {
+            client.player.sendMessage(
+                    WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                            .append(Text.literal("Checking and updating emojis...").formatted(Formatting.GRAY)),
+                    false
+            );
+        }
+        reloadEmojis().thenRun(() -> {
+            MinecraftClient c = MinecraftClient.getInstance();
+            if (c != null) {
+                c.execute(() -> {
+                    if (c.player != null) {
+                        c.player.sendMessage(
+                                WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                                        .append(Text.literal("Emojis updated successfully!").formatted(Formatting.GREEN)),
+                                false
+                        );
+                    }
+                });
+            }
+        }).exceptionally(ex -> {
+            MinecraftClient c = MinecraftClient.getInstance();
+            if (c != null) {
+                c.execute(() -> {
+                    if (c.player != null) {
+                        String err = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
+                        c.player.sendMessage(
+                                WynnPillUtil.createPrefixedPill("AvoUtils", true)
+                                        .append(Text.literal("Failed to update emojis: " + err).formatted(Formatting.RED)),
+                                false
+                        );
+                    }
+                });
+            }
+            return null;
+        });
+    }
+
     public void toggleEmojis() {
         config.emojiEnabled = !config.emojiEnabled;
         config.save();

@@ -7,7 +7,6 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.ClickEvent;
 import net.minecraft.text.Text;
 import net.minecraft.text.MutableText;
 import net.minecraft.util.Formatting;
@@ -97,8 +96,8 @@ public class PartyFinderNotificationHandler {
                     .append(Text.literal(activityStr).formatted(Formatting.WHITE))
                     .append(Text.literal(" party! ").formatted(Formatting.GRAY));
 
-            MutableText joinPill = WynnPillUtil.create("JOIN", Formatting.GREEN, Formatting.BLACK)
-                    .styled(style -> style.withClickEvent(new ClickEvent.RunCommand("/apf join " + leaderName)));
+            MutableText joinPill = WynnPillUtil.createClickable("JOIN", Formatting.GREEN, Formatting.BLACK,
+                    "/apf join " + leaderName, "Click to join party");
             formatted.append(joinPill);
 
             mc.player.sendMessage(formatted, false);

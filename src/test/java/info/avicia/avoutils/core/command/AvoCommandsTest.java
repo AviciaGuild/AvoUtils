@@ -55,7 +55,7 @@ class AvoCommandsTest {
                 .map(CommandNode::getName)
                 .collect(Collectors.toSet());
 
-        Set<String> expectedSubcommands = Set.of("config", "bridge", "storage", "emojis", "anni", "pf");
+        Set<String> expectedSubcommands = Set.of("config", "bridge", "storage", "emojis", "anni", "pf", "update");
         assertEquals(expectedSubcommands, avoChildren);
         assertEquals(expectedSubcommands, avoutilsChildren);
         assertEquals(avoChildren, avoutilsChildren);
@@ -79,6 +79,16 @@ class AvoCommandsTest {
                 .collect(Collectors.toSet());
         assertEquals(Set.of("togglenotifs", "togglesounds", "join"), avoPfChildren);
         assertEquals(Set.of("togglenotifs", "togglesounds", "join"), avoutilsPfChildren);
+
+        // Check update children
+        Set<String> avoUpdateChildren = avoNode.getChild("update").getChildren().stream()
+                .map(CommandNode::getName)
+                .collect(Collectors.toSet());
+        Set<String> avoutilsUpdateChildren = avoutilsNode.getChild("update").getChildren().stream()
+                .map(CommandNode::getName)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of("check", "download", "restart"), avoUpdateChildren);
+        assertEquals(Set.of("check", "download", "restart"), avoutilsUpdateChildren);
     }
 
     @Test
@@ -95,7 +105,11 @@ class AvoCommandsTest {
                 "avoutils pf",
                 "avoutils pf togglenotifs",
                 "avoutils pf togglesounds",
-                "avoutils pf join PlayerName"
+                "avoutils pf join PlayerName",
+                "avoutils update",
+                "avoutils update check",
+                "avoutils update download",
+                "avoutils update restart"
         };
 
         for (String cmd : commandLines) {

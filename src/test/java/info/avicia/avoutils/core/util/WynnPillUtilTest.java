@@ -48,4 +48,15 @@ class WynnPillUtilTest {
         String text = WynnPillUtil.createPrefixedPill("X", true).getString();
         assertTrue(text.endsWith(" \u203A\u203A "));
     }
+
+    @Test
+    void createClickableAttachesClickAndHoverEvents() {
+        var pill = WynnPillUtil.createClickable("UPDATE", Formatting.GREEN, Formatting.BLACK,
+                "/avo update download", "Click to update");
+
+        assertNotNull(pill.getStyle().getClickEvent());
+        assertNotNull(pill.getStyle().getHoverEvent());
+        assertTrue(pill.getString().startsWith("\uE010\u2064"));
+        assertTrue(pill.getString().endsWith("\uE011\u2064"));
+    }
 }

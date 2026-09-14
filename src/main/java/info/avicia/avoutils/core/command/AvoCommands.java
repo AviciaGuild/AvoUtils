@@ -4,19 +4,17 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
-import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
+import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
-import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
-import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
+import info.avicia.avoutils.features.updater.UpdateFeature;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
 import java.util.List;
 
@@ -74,43 +72,7 @@ public class AvoCommands {
         Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
             EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
             if (feature != null) {
-                MinecraftClient client = MinecraftClient.getInstance();
-                if (client.player != null) {
-                    client.player.sendMessage(
-                            WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                                    .append(Text.literal("Checking and updating emojis...").formatted(Formatting.GRAY)),
-                            false
-                    );
-                }
-                feature.reloadEmojis().thenRun(() -> {
-                    MinecraftClient c = MinecraftClient.getInstance();
-                    if (c != null) {
-                        c.execute(() -> {
-                            if (c.player != null) {
-                                c.player.sendMessage(
-                                        WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                                                .append(Text.literal("Emojis updated successfully!").formatted(Formatting.GREEN)),
-                                        false
-                                );
-                            }
-                        });
-                    }
-                }).exceptionally(ex -> {
-                    MinecraftClient c = MinecraftClient.getInstance();
-                    if (c != null) {
-                        c.execute(() -> {
-                            if (c.player != null) {
-                                String err = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
-                                c.player.sendMessage(
-                                        WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                                                .append(Text.literal("Failed to update emojis: " + err).formatted(Formatting.RED)),
-                                        false
-                                );
-                            }
-                        });
-                    }
-                    return null;
-                });
+                feature.handleReloadCommand();
             }
             return 1;
         };
@@ -147,6 +109,42 @@ public class AvoCommands {
             return 1;
         };
 
+        // /avo update → check for update and show status
+        Command<FabricClientCommandSource> updateCommand = context -> {
+            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+            if (feature != null) {
+                feature.handleCheckCommand(false);
+            }
+            return 1;
+        };
+
+        // /avo update check → force re-check
+        Command<FabricClientCommandSource> updateCheckCommand = context -> {
+            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+            if (feature != null) {
+                feature.handleCheckCommand(true);
+            }
+            return 1;
+        };
+
+        // /avo update download → download and stage update
+        Command<FabricClientCommandSource> updateDownloadCommand = context -> {
+            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+            if (feature != null) {
+                feature.handleDownloadCommand();
+            }
+            return 1;
+        };
+
+        // /avo update restart → restart Minecraft to apply staged update
+        Command<FabricClientCommandSource> updateRestartCommand = context -> {
+            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+            if (feature != null) {
+                feature.handleRestartCommand();
+            }
+            return 1;
+        };
+
         // Build /avo and /avoutils command trees
         for (String root : COMMAND_ROOTS) {
             dispatcher.register(
@@ -175,6 +173,14 @@ public class AvoCommands {
                                     .then(literal("join")
                                             .then(argument("leaderName", word())
                                                     .executes(joinPfCommand))))
+                            .then(literal("update")
+                                    .executes(updateCommand)
+                                    .then(literal("check")
+                                            .executes(updateCheckCommand))
+                                    .then(literal("download")
+                                            .executes(updateDownloadCommand))
+                                    .then(literal("restart")
+                                            .executes(updateRestartCommand)))
             );
         }
     }

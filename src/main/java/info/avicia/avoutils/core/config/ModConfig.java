@@ -28,6 +28,7 @@ public class ModConfig {
     public boolean guildStorageNotifSoundsEnabled = true;
     public int guildStorageEmeraldThresholdPercent = 90;
     public int guildStorageAspectThresholdPercent = 90;
+    public boolean updateRemindersEnabled = true;
 
     /**
      * Load config from disk, or create a default one if it doesn't exist
