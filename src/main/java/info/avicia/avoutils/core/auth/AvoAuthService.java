@@ -45,6 +45,7 @@ public class AvoAuthService {
     private volatile long sessionTokenExpiry = 0;
     private volatile long invalidatedGeneration = 0;
     private volatile Boolean cachedGuildMember = null;
+    private volatile Boolean pendingGuildMember = null;
     private CompletableFuture<String> activeAuthFuture = null;
 
     private AvoAuthService(ModConfig config) {
@@ -92,6 +93,55 @@ public class AvoAuthService {
         return cachedGuildMember != null && cachedGuildMember;
     }
 
+    /**
+     * Resolves guild membership status, returning immediately if cached,
+     * or fetching a session token asynchronously to check membership.
+     */
+    public CompletableFuture<Boolean> resolveGuildMembership() {
+        synchronized (authLock) {
+            if (cachedGuildMember != null) {
+                return CompletableFuture.completedFuture(cachedGuildMember);
+            }
+        }
+        return getSessionToken()
+                .thenApply(token -> isGuildMember())
+                .exceptionally(ex -> false);
+    }
+
+    /**
+     * Executes the appropriate callback based on guild membership.
+     * If cached, runs immediately on the calling thread.
+     * If not cached, asynchronously resolves membership and dispatches the callback
+     * on the Minecraft client thread (if available) or the async completion thread.
+     */
+    public void runIfGuildMember(Runnable onAuthorized, Runnable onDenied) {
+        if (isGuildMember()) {
+            if (onAuthorized != null) {
+                onAuthorized.run();
+            }
+            return;
+        }
+        if (getCachedGuildMember() != null) {
+            if (onDenied != null) {
+                onDenied.run();
+            }
+            return;
+        }
+        CompletableFuture<Boolean> future = resolveGuildMembership();
+        future.thenAccept(isMember -> {
+            Runnable action = Boolean.TRUE.equals(isMember) ? onAuthorized : onDenied;
+            if (action == null) {
+                return;
+            }
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client != null) {
+                client.execute(action);
+            } else {
+                action.run();
+            }
+        });
+    }
+
     public CompletableFuture<String> getSessionToken() {
         synchronized (authLock) {
             if (sessionToken != null && System.currentTimeMillis() < sessionTokenExpiry) {
@@ -111,7 +161,9 @@ public class AvoAuthService {
                     if (genAtStart == invalidatedGeneration) {
                         sessionToken = token;
                         sessionTokenExpiry = System.currentTimeMillis() + TOKEN_TTL_MS;
+                        cachedGuildMember = pendingGuildMember;
                     }
+                    pendingGuildMember = null;
                     activeAuthFuture = null;
                 }
                 return token;
@@ -200,7 +252,7 @@ public class AvoAuthService {
                     if (apiResp == null || apiResp.token == null) {
                         throw new RuntimeException("Invalid login response: missing token");
                     }
-                    cachedGuildMember = apiResp.guild_member;
+                    pendingGuildMember = apiResp.guildMember;
                     return apiResp.token;
                 });
     }
@@ -219,6 +271,6 @@ public class AvoAuthService {
     private static class AuthApiResponse {
         public String challenge;
         public String token;
-        public Boolean guild_member;
+        public Boolean guildMember;
     }
 }
