@@ -11,6 +11,9 @@ import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.features.updater.UpdateFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.core.party.InGamePartyTracker;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import net.fabricmc.api.ClientModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,10 +54,26 @@ public class AvoUtilsMod implements ClientModInitializer {
             feature.initialize(config);
         }
 
+        // Initialize server policy tracking
+        WynncraftServerPolicy.initialize();
+        WynncraftServerPolicy.addScopeChangeListener(this::onServerScopeChanged);
+
         // Register commands
         AvoCommands.register();
 
         LOGGER.info("[AvoUtils] Mod initialized.");
+    }
+
+    private void onServerScopeChanged(Scope newScope) {
+        if (newScope != Scope.MAIN) {
+            AvoWebSocketManager.getInstance().disconnect();
+        }
+        if (newScope == Scope.BLOCKED) {
+            InGamePartyTracker.getInstance().reset();
+        }
+        for (AvoFeature feature : features) {
+            feature.onServerScopeChanged(newScope);
+        }
     }
 
     private void registerFeature(AvoFeature feature) {

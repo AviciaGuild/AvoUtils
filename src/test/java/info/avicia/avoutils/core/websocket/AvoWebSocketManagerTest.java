@@ -2,12 +2,14 @@ package info.avicia.avoutils.core.websocket;
 
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.testutil.TestReflection;
 import net.minecraft.client.MinecraftClient;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -20,6 +22,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AvoWebSocketManagerTest {
@@ -43,8 +46,14 @@ class AvoWebSocketManagerTest {
         manager.unregisterConnectionDemand("feature");
     }
 
+    @AfterEach
+    void tearDown() {
+        WynncraftServerPolicy.setScopeOverride(null);
+    }
+
     @Test
-    void sendEventForwardsToOpenClient() {
+    void sendEventForwardsToOpenClientWhenAllowed() {
+        WynncraftServerPolicy.setScopeOverride(() -> Scope.MAIN);
         AvoWebSocketManager.initialize(new ModConfig());
         AvoWebSocketManager manager = AvoWebSocketManager.getInstance();
 
@@ -56,6 +65,22 @@ class AvoWebSocketManagerTest {
         manager.sendEvent("guild_chat", payload);
 
         verify(client).sendEvent("guild_chat", payload);
+    }
+
+    @Test
+    void sendEventBlockedWhenNetworkingNotAllowed() {
+        WynncraftServerPolicy.setScopeOverride(() -> Scope.BLOCKED);
+        AvoWebSocketManager.initialize(new ModConfig());
+        AvoWebSocketManager manager = AvoWebSocketManager.getInstance();
+
+        AvoWebSocketClient client = mock(AvoWebSocketClient.class);
+        when(client.isOpen()).thenReturn(true);
+        TestReflection.set(manager, "client", client);
+
+        JsonObject payload = new JsonObject();
+        manager.sendEvent("guild_chat", payload);
+
+        verifyNoInteractions(client);
     }
 
     @Test
@@ -112,26 +137,13 @@ class AvoWebSocketManagerTest {
         manager.setVersionUnsupported(true);
         assertTrue(manager.isVersionUnsupported());
 
-        try {
-            Method method = AvoWebSocketManager.class.getDeclaredMethod("tickConnection");
-            method.setAccessible(true);
-            method.invoke(manager);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        TestReflection.invoke(manager, "tickConnection", new Class[]{});
 
         assertFalse(manager.isConnected());
         manager.setVersionUnsupported(false);
     }
 
     private static void invokeHandleIncomingEvent(AvoWebSocketManager manager, String type, JsonObject json) {
-        try {
-            Method method = AvoWebSocketManager.class
-                    .getDeclaredMethod("handleIncomingEvent", String.class, JsonObject.class);
-            method.setAccessible(true);
-            method.invoke(manager, type, json);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to invoke handleIncomingEvent", e);
-        }
+        TestReflection.invoke(manager, "handleIncomingEvent", new Class[]{String.class, JsonObject.class}, type, json);
     }
 }

@@ -3,6 +3,7 @@ package info.avicia.avoutils.mixin;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import net.minecraft.client.gui.screen.ChatInputSuggestor;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -37,6 +38,10 @@ public abstract class ChatInputSuggestorMixin {
     @Inject(method = "refresh", at = @At("TAIL"))
     private void avoutils$onRefresh(CallbackInfo ci) {
         if (this.completingSuggestions) {
+            return;
+        }
+
+        if (!WynncraftServerPolicy.isOnWynncraft()) {
             return;
         }
 

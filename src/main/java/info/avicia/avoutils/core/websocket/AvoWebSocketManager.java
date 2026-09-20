@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import info.avicia.avoutils.core.util.ClientVersion;
 import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
@@ -104,6 +105,9 @@ public class AvoWebSocketManager {
     }
 
     public void sendEvent(String eventType, JsonObject payload) {
+        if (!WynncraftServerPolicy.isNetworkingAllowed()) {
+            return;
+        }
         AvoWebSocketClient activeClient = client;
         if (activeClient != null && activeClient.isOpen()) {
             activeClient.sendEvent(eventType, payload);
@@ -119,6 +123,13 @@ public class AvoWebSocketManager {
 
     private void tickConnection() {
         if (versionUnsupported) {
+            return;
+        }
+
+        if (!WynncraftServerPolicy.isNetworkingAllowed()) {
+            if (client != null) {
+                disconnect();
+            }
             return;
         }
 

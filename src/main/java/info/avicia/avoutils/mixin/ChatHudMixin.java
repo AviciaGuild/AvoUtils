@@ -1,6 +1,7 @@
 package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.emojis.EmojiReplacer;
 import net.minecraft.client.gui.hud.ChatHud;
@@ -23,6 +24,9 @@ public class ChatHudMixin {
     private Text avoutils$replaceEmojis(Text message) {
         if (message == null) {
             return null;
+        }
+        if (!WynncraftServerPolicy.isOnWynncraft()) {
+            return message;
         }
         AvoUtilsMod mod = AvoUtilsMod.getInstance();
         if (mod == null) {

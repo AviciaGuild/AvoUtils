@@ -2,6 +2,7 @@ package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.party.InGamePartyTracker;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
@@ -22,6 +23,9 @@ public class ClientPlayNetworkHandlerMixin {
                 return;
             }
             if (packet.overlay()) {
+                return;
+            }
+            if (!WynncraftServerPolicy.isOnWynncraft()) {
                 return;
             }
             if (packet.content() != null && AvoUtilsMod.getInstance() != null) {

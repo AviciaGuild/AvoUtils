@@ -1,5 +1,6 @@
 package info.avicia.avoutils.mixin;
 
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiTooltipComponent;
 import info.avicia.avoutils.features.emojis.EmojiTooltipHelper;
 import net.minecraft.client.font.TextRenderer;
@@ -43,6 +44,10 @@ public abstract class DrawContextMixin {
             CallbackInfo ci
     ) {
         if (style == null || style.getHoverEvent() == null) {
+            return;
+        }
+
+        if (!WynncraftServerPolicy.isOnWynncraft()) {
             return;
         }
 

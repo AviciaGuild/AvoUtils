@@ -7,6 +7,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.PlayerUtil;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.List;
@@ -36,6 +37,18 @@ public class AnniPartyFeature implements AvoFeature {
 
         // Register a connection demand so that the backend will send us the roster when we connect
         AvoWebSocketManager.getInstance().registerConnectionDemand("anniparty", this::isGuildMember);
+    }
+
+    @Override
+    public void onServerScopeChanged(Scope newScope) {
+        if (newScope != Scope.MAIN) {
+            reset();
+        }
+    }
+
+    public void reset() {
+        this.active = false;
+        this.roster = new AnniRoster();
     }
 
     private void onRosterEvent(JsonObject json) {

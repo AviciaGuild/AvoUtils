@@ -1,6 +1,7 @@
 package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
@@ -24,6 +25,9 @@ public abstract class HandledScreenMixin {
     @Inject(method = "render", at = @At("TAIL"))
     private void avoutils$onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         try {
+            if (!WynncraftServerPolicy.isOnWynncraft()) {
+                return;
+            }
             AvoUtilsMod mod = AvoUtilsMod.getInstance();
             if (mod != null) {
                 GuildStorageNotifier notifier = mod.getFeature(GuildStorageNotifier.class);

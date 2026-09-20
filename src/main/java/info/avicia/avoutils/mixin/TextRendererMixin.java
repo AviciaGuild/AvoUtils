@@ -1,6 +1,7 @@
 package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.emojis.animation.AnimatedBakedGlyph;
 import net.minecraft.client.font.BakedGlyph;
@@ -30,6 +31,7 @@ public abstract class TextRendererMixin {
         // Animated emojis are allocated strictly in Plane 15 (>= 0xF0000).
         // Bypasses all overhead for all standard text, numbers, symbols, and UI fonts.
         if (codePoint < 0xF0000) return;
+        if (!WynncraftServerPolicy.isOnWynncraft()) return;
 
         AvoUtilsMod mod = AvoUtilsMod.getInstance();
         if (mod == null) return;
