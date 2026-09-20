@@ -5,6 +5,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.ClientVersion;
 import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
@@ -63,8 +64,9 @@ public class UpdateFeature implements AvoFeature {
         // Recover unapplied pending update from a previous session (e.g. abrupt exit)
         recoverPendingUpdateIfExists();
 
-        // Auto-check on world join (once per session)
+        // Auto-check on world join (once per session on Wynncraft)
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            if (!WynncraftServerPolicy.isNetworkingAllowed()) return;
             if (!sessionChecked.compareAndSet(false, true)) return;
 
             if (state.get() == UpdateState.READY_TO_RESTART) {

@@ -3,6 +3,7 @@ package info.avicia.avoutils.core.command;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
 import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
 import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
@@ -12,11 +13,16 @@ import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
 import info.avicia.avoutils.features.updater.UpdateFeature;
+import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
@@ -42,49 +48,33 @@ public class AvoCommands {
         };
 
         // /avo bridge → toggle chat bridge
-        Command<FabricClientCommandSource> toggleBridgeCommand = context -> {
-            ChatBridgeFeature feature = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
-            if (feature != null) {
-                feature.toggleBridge();
-            }
-            return 1;
-        };
+        Command<FabricClientCommandSource> toggleBridgeCommand = context ->
+                withFeature(ChatBridgeFeature.class, ChatBridgeFeature::toggleBridge);
 
         // /avo storage → toggle guild storage tracking
-        Command<FabricClientCommandSource> toggleStorageCommand = context -> {
-            GuildStorageNotifier feature = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
-            if (feature != null) {
-                feature.toggleStorage();
-            }
-            return 1;
-        };
+        Command<FabricClientCommandSource> toggleStorageCommand = context ->
+                withFeature(GuildStorageNotifier.class, GuildStorageNotifier::toggleStorage);
 
         // /avo emojis → toggle emoji feature
-        Command<FabricClientCommandSource> toggleEmojisCommand = context -> {
-            EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-            if (feature != null) {
-                feature.toggleEmojis();
-            }
-            return 1;
-        };
+        Command<FabricClientCommandSource> toggleEmojisCommand = context ->
+                withFeature(EmojiFeature.class, EmojiFeature::toggleEmojis);
 
         // /avo emojis reload / update → refresh and re-download emojis
         Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
-            EmojiFeature feature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-            if (feature != null) {
-                feature.handleReloadCommand();
-            }
-            return 1;
+            if (!ensureOnWynncraft(context.getSource())) return 1;
+            return withFeature(EmojiFeature.class, EmojiFeature::handleReloadCommand);
         };
 
         // /avo pf → open party finder screen
         Command<FabricClientCommandSource> openPfCommand = context -> {
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
             MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
             return 1;
         };
 
         // /avo anni → open anni party screen
         Command<FabricClientCommandSource> openAnniCommand = context -> {
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
             MinecraftClient client = MinecraftClient.getInstance();
             client.execute(() -> {
                 AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
@@ -104,6 +94,7 @@ public class AvoCommands {
 
         // /avo pf join <leaderName>
         Command<FabricClientCommandSource> joinPfCommand = context -> {
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
             String leaderName = getString(context, "leaderName");
             MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(leaderName));
             return 1;
@@ -111,38 +102,26 @@ public class AvoCommands {
 
         // /avo update → check for update and show status
         Command<FabricClientCommandSource> updateCommand = context -> {
-            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
-            if (feature != null) {
-                feature.handleCheckCommand(false);
-            }
-            return 1;
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
+            return withFeature(UpdateFeature.class, f -> f.handleCheckCommand(false));
         };
 
         // /avo update check → force re-check
         Command<FabricClientCommandSource> updateCheckCommand = context -> {
-            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
-            if (feature != null) {
-                feature.handleCheckCommand(true);
-            }
-            return 1;
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
+            return withFeature(UpdateFeature.class, f -> f.handleCheckCommand(true));
         };
 
         // /avo update download → download and stage update
         Command<FabricClientCommandSource> updateDownloadCommand = context -> {
-            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
-            if (feature != null) {
-                feature.handleDownloadCommand();
-            }
-            return 1;
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
+            return withFeature(UpdateFeature.class, UpdateFeature::handleDownloadCommand);
         };
 
         // /avo update restart → restart Minecraft to apply staged update
         Command<FabricClientCommandSource> updateRestartCommand = context -> {
-            UpdateFeature feature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
-            if (feature != null) {
-                feature.handleRestartCommand();
-            }
-            return 1;
+            if (!ensureNetworkingAllowed(context.getSource())) return 1;
+            return withFeature(UpdateFeature.class, UpdateFeature::handleRestartCommand);
         };
 
         // Build /avo and /avoutils command trees
@@ -183,5 +162,40 @@ public class AvoCommands {
                                             .executes(updateRestartCommand)))
             );
         }
+    }
+
+    public static boolean ensureNetworkingAllowed(FabricClientCommandSource source) {
+        if (!WynncraftServerPolicy.isOnWynncraft()) {
+            sendDisabledFeedback(source, WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE);
+            return false;
+        }
+        if (!WynncraftServerPolicy.isNetworkingAllowed()) {
+            sendDisabledFeedback(source, WynncraftServerPolicy.BETA_NETWORKING_BLOCKED_MESSAGE);
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean ensureOnWynncraft(FabricClientCommandSource source) {
+        if (!WynncraftServerPolicy.isOnWynncraft()) {
+            sendDisabledFeedback(source, WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE);
+            return false;
+        }
+        return true;
+    }
+
+    public static void sendDisabledFeedback(FabricClientCommandSource source, String message) {
+        source.sendFeedback(WynnPillUtil.createPrefixedPill("AvoUtils", true)
+                .append(Text.literal(message).formatted(Formatting.RED)));
+    }
+
+    private static <T extends AvoFeature> int withFeature(Class<T> cls, Consumer<T> action) {
+        AvoUtilsMod mod = AvoUtilsMod.getInstance();
+        if (mod == null) return 1;
+        T feature = mod.getFeature(cls);
+        if (feature != null) {
+            action.accept(feature);
+        }
+        return 1;
     }
 }

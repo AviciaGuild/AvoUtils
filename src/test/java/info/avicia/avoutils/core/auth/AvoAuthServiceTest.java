@@ -2,9 +2,9 @@ package info.avicia.avoutils.core.auth;
 
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.testutil.TestReflection;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,11 +15,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvoAuthServiceTest {
 
+    private AvoAuthService service;
+
+    @BeforeEach
+    void setUp() {
+        AvoAuthService.initialize(new ModConfig());
+        this.service = AvoAuthService.getInstance();
+    }
+
     @Test
     void cachedGuildMemberTracksMembership() {
-        AvoAuthService.initialize(new ModConfig());
-        AvoAuthService service = AvoAuthService.getInstance();
-
         assertFalse(service.isGuildMember());
         service.setCachedGuildMember(true);
 
@@ -29,9 +34,6 @@ class AvoAuthServiceTest {
 
     @Test
     void invalidateTokenClearsCachedMembership() {
-        AvoAuthService.initialize(new ModConfig());
-        AvoAuthService service = AvoAuthService.getInstance();
-
         service.setCachedGuildMember(true);
         service.invalidateToken();
 
@@ -41,15 +43,67 @@ class AvoAuthServiceTest {
 
     @Test
     void getSessionTokenReturnsCachedTokenWithoutNetwork() {
-        AvoAuthService.initialize(new ModConfig());
-        AvoAuthService service = AvoAuthService.getInstance();
-
         TestReflection.set(service, "sessionToken", "test-token");
         TestReflection.set(service, "sessionTokenExpiry", System.currentTimeMillis() + 60_000L);
 
         CompletableFuture<String> future = service.getSessionToken();
 
         assertEquals("test-token", future.join());
+    }
+
+    @Test
+    void resolveGuildMembershipReturnsCachedValueImmediately() {
+        service.setCachedGuildMember(true);
+        assertTrue(service.resolveGuildMembership().join());
+
+        service.setCachedGuildMember(false);
+        assertFalse(service.resolveGuildMembership().join());
+    }
+
+    @Test
+    void resolveGuildMembershipHandlesFailureGracefully() {
+        service.invalidateToken();
+        // mc session is null in tests, so fetchSessionTokenAsync fails; resolveGuildMembership catches and returns false
+        assertFalse(service.resolveGuildMembership().join());
+    }
+
+    @Test
+    void runIfGuildMemberRunsAuthorizedImmediatelyWhenCachedTrue() {
+        service.setCachedGuildMember(true);
+
+        boolean[] flags = new boolean[2];
+        service.runIfGuildMember(() -> flags[0] = true, () -> flags[1] = true);
+
+        assertTrue(flags[0]);
+        assertFalse(flags[1]);
+    }
+
+    @Test
+    void runIfGuildMemberRunsDeniedImmediatelyWhenCachedFalse() {
+        service.setCachedGuildMember(false);
+
+        boolean[] flags = new boolean[2];
+        service.runIfGuildMember(() -> flags[0] = true, () -> flags[1] = true);
+
+        assertFalse(flags[0]);
+        assertTrue(flags[1]);
+    }
+
+    @Test
+    void runIfGuildMemberResolvesAsyncWhenUncached() {
+        service.invalidateToken();
+
+        boolean[] flags = new boolean[2];
+        // In unit test without MC session, resolveGuildMembership fails and returns false -> runs onDenied
+        service.runIfGuildMember(() -> flags[0] = true, () -> flags[1] = true);
+
+        // Allow async completion
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException ignored) {}
+
+        assertFalse(flags[0]);
+        assertTrue(flags[1]);
     }
 
     @Test
@@ -71,13 +125,8 @@ class AvoAuthServiceTest {
         assertNull(invokeExtractErrorMessage("not json"));
     }
 
-    private static String invokeExtractErrorMessage(String body) {
-        try {
-            Method method = AvoAuthService.class.getDeclaredMethod("extractErrorMessage", String.class);
-            method.setAccessible(true);
-            return (String) method.invoke(null, body);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to invoke extractErrorMessage", e);
-        }
+    private String invokeExtractErrorMessage(String body) {
+        return TestReflection.invokeStatic(AvoAuthService.class, "extractErrorMessage",
+                new Class[]{String.class}, body);
     }
 }

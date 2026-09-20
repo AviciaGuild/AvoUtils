@@ -1,5 +1,6 @@
 package info.avicia.avoutils.core.util;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
@@ -44,6 +45,41 @@ public final class WynnPillUtil {
     public static MutableText createPrefixedPill(String label, boolean isError) {
         Formatting bg = isError ? Formatting.RED : Formatting.AQUA;
         return create(label, bg, PILL_FG).append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
+    }
+
+    /**
+     * Sends a toggle feedback message: "[pill] messagePrefix enabled/disabled."
+     *
+     * @param messagePrefix e.g. "Chat bridge is now " or "Storage threshold notifications are now "
+     */
+    public static void sendToggleFeedback(String pillLabel, String messagePrefix, boolean enabled) {
+        Formatting statusColor = enabled ? Formatting.GREEN : Formatting.RED;
+        String statusWord = enabled ? "enabled" : "disabled";
+        MutableText msg = createPrefixedPill(pillLabel, false)
+                .append(Text.literal(messagePrefix).formatted(Formatting.GRAY))
+                .append(Text.literal(statusWord).formatted(statusColor))
+                .append(Text.literal(".").formatted(Formatting.GRAY));
+        sendToPlayer(msg);
+    }
+
+    /**
+     * Sends a not-a-member feedback message with the given error text.
+     */
+    public static void sendNotMemberFeedback(String pillLabel, String message) {
+        MutableText msg = createPrefixedPill(pillLabel, true)
+                .append(Text.literal(message).formatted(Formatting.RED));
+        sendToPlayer(msg);
+    }
+
+    private static void sendToPlayer(Text message) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc != null) {
+            mc.execute(() -> {
+                if (mc.player != null) {
+                    mc.player.sendMessage(message, false);
+                }
+            });
+        }
     }
 
     public static MutableText createClickable(String label, Formatting backgroundColor, Formatting foregroundColor, String command, String hoverText) {

@@ -4,15 +4,19 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.tree.CommandNode;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
+import net.minecraft.text.Text;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 
 class AvoCommandsTest {
 
@@ -24,6 +28,11 @@ class AvoCommandsTest {
         dispatcher = new CommandDispatcher<>();
         source = mock(FabricClientCommandSource.class);
         AvoCommands.register(dispatcher);
+    }
+
+    @AfterEach
+    void tearDown() {
+        WynncraftServerPolicy.setScopeOverride(null);
     }
 
     @Test
@@ -119,6 +128,77 @@ class AvoCommandsTest {
             assertNotNull(parse.getContext().getCommand(),
                     "Expected executable command for '" + cmd + "'");
         }
+    }
+
+    @Test
+    void testActionCommandsBlockedWhenNotOnWynncraft() throws Exception {
+        WynncraftServerPolicy.setScopeOverride(() -> WynncraftServerPolicy.Scope.BLOCKED);
+
+        dispatcher.execute("avo pf", source);
+        ArgumentCaptor<Text> captor = ArgumentCaptor.forClass(Text.class);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE));
+
+        reset(source);
+        dispatcher.execute("avo anni", source);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE));
+
+        reset(source);
+        dispatcher.execute("avo update", source);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE));
+
+        reset(source);
+        dispatcher.execute("avo emojis reload", source);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE));
+    }
+
+    @Test
+    void testNetworkingCommandsBlockedOnBeta() throws Exception {
+        WynncraftServerPolicy.setScopeOverride(() -> WynncraftServerPolicy.Scope.BETA);
+
+        dispatcher.execute("avo pf", source);
+        ArgumentCaptor<Text> captor = ArgumentCaptor.forClass(Text.class);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.BETA_NETWORKING_BLOCKED_MESSAGE));
+
+        reset(source);
+        dispatcher.execute("avo anni", source);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.BETA_NETWORKING_BLOCKED_MESSAGE));
+
+        reset(source);
+        dispatcher.execute("avo update", source);
+        verify(source).sendFeedback(captor.capture());
+        assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.BETA_NETWORKING_BLOCKED_MESSAGE));
+    }
+
+    @Test
+    void testSettingCommandsAllowedWhenOutsideWynncraftOrBeta() throws Exception {
+        WynncraftServerPolicy.setScopeOverride(() -> WynncraftServerPolicy.Scope.BLOCKED);
+
+        // Setting toggle commands should not receive server policy blocked message
+        dispatcher.execute("avo bridge", source);
+        verify(source, never()).sendFeedback(any());
+
+        dispatcher.execute("avo storage", source);
+        verify(source, never()).sendFeedback(any());
+
+        dispatcher.execute("avo emojis", source);
+        verify(source, never()).sendFeedback(any());
+
+        WynncraftServerPolicy.setScopeOverride(() -> WynncraftServerPolicy.Scope.BETA);
+
+        dispatcher.execute("avo bridge", source);
+        verify(source, never()).sendFeedback(any());
+
+        dispatcher.execute("avo storage", source);
+        verify(source, never()).sendFeedback(any());
+
+        dispatcher.execute("avo emojis", source);
+        verify(source, never()).sendFeedback(any());
     }
 }
 

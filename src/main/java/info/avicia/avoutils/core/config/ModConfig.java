@@ -81,7 +81,13 @@ public class ModConfig {
      * Save config to disk
      */
     public void save() {
-        save(FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE));
+        try {
+            if (FabricLoader.getInstance() != null && FabricLoader.getInstance().getConfigDir() != null) {
+                save(FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE));
+            }
+        } catch (Throwable e) {
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] Could not save config to Fabric config directory: {}", e.getMessage());
+        }
     }
 
     void save(Path configPath) {

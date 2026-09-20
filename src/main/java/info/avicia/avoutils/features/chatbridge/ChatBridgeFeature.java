@@ -203,26 +203,25 @@ public class ChatBridgeFeature implements AvoFeature {
     }
 
     public void toggleBridge() {
-        if (!config.chatBridgeEnabled && !isGuildMember()) {
-            MutableText blocked = WynnPillUtil.createPrefixedPill("AvoBridge", true)
-                    .append(Text.literal("Chat bridge is unavailable: you are not in Avicia.")
-                            .formatted(Formatting.RED));
-            if (MinecraftClient.getInstance().player != null) {
-                MinecraftClient.getInstance().player.sendMessage(blocked, false);
-            }
+        if (!config.chatBridgeEnabled) {
+            AvoAuthService.getInstance().runIfGuildMember(() -> {
+                config.chatBridgeEnabled = true;
+                config.save();
+                sendBridgeFeedback(true);
+            }, this::sendBridgeNotMemberFeedback);
             return;
         }
 
-        config.chatBridgeEnabled = !config.chatBridgeEnabled;
+        config.chatBridgeEnabled = false;
         config.save();
-        Formatting statusColor = config.chatBridgeEnabled ? Formatting.GREEN : Formatting.RED;
-        String statusWord = config.chatBridgeEnabled ? "enabled" : "disabled";
-        MutableText formatted = WynnPillUtil.createPrefixedPill("AvoBridge", false)
-                .append(Text.literal("Chat bridge is now ").formatted(Formatting.GRAY))
-                .append(Text.literal(statusWord).formatted(statusColor))
-                .append(Text.literal(".").formatted(Formatting.GRAY));
-        if (MinecraftClient.getInstance().player != null) {
-            MinecraftClient.getInstance().player.sendMessage(formatted, false);
-        }
+        sendBridgeFeedback(false);
+    }
+
+    private void sendBridgeFeedback(boolean enabled) {
+        WynnPillUtil.sendToggleFeedback("AvoBridge", "Chat bridge is now ", enabled);
+    }
+
+    private void sendBridgeNotMemberFeedback() {
+        WynnPillUtil.sendNotMemberFeedback("AvoBridge", "Chat bridge is unavailable: you are not in Avicia.");
     }
 }

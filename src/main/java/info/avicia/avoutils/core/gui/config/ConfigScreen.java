@@ -1,15 +1,15 @@
 package info.avicia.avoutils.core.gui.config;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.UiStyle;
-import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
-import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.features.updater.UpdateCheckResult;
 import info.avicia.avoutils.features.updater.UpdateFeature;
 import net.minecraft.client.MinecraftClient;
@@ -41,21 +41,42 @@ public class ConfigScreen extends Screen {
         int cardRight = width - SIDE_PADDING;
         int y = 38;
 
+        AvoAuthService authService = AvoAuthService.getInstance();
+        if (authService.getCachedGuildMember() == null) {
+            authService.resolveGuildMembership().thenAccept(ignored -> {
+                MinecraftClient mc = MinecraftClient.getInstance();
+                if (mc != null) {
+                    mc.execute(() -> {
+                        if (mc.currentScreen == this) {
+                            this.clearAndInit();
+                        }
+                    });
+                }
+            });
+        }
+
         // ── Chat Bridge ──────────────────────────────────────────────────
-        ChatBridgeFeature bridgeFeature = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
-        boolean canEnableBridge = bridgeFeature != null && bridgeFeature.isGuildMember();
+        boolean guildAuthPending = authService.getCachedGuildMember() == null;
+        boolean canEnableBridge = authService.isGuildMember() || guildAuthPending;
 
         FlatToggleWidget[] bridgeToggle = new FlatToggleWidget[1];
         bridgeToggle[0] = new FlatToggleWidget(
                 cardRight - 40, y + 28, 30, 16,
                 config.chatBridgeEnabled,
                 checked -> {
-                    if (checked && !canEnableBridge) {
-                        bridgeToggle[0].setChecked(false);
-                        return;
+                    if (checked) {
+                        authService.runIfGuildMember(() -> {
+                            config.chatBridgeEnabled = true;
+                            config.save();
+                            bridgeToggle[0].setChecked(true);
+                        }, () -> {
+                            bridgeToggle[0].setChecked(false);
+                            bridgeToggle[0].active = false;
+                        });
+                    } else {
+                        config.chatBridgeEnabled = false;
+                        config.save();
                     }
-                    config.chatBridgeEnabled = checked;
-                    config.save();
                 }
         );
         if (!config.chatBridgeEnabled && !canEnableBridge) {
@@ -116,8 +137,7 @@ public class ConfigScreen extends Screen {
         y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Guild Storage ───────────────────────────────────────────────
-        GuildStorageNotifier storageFeature = AvoUtilsMod.getInstance().getFeature(GuildStorageNotifier.class);
-        boolean canEnableStorage = storageFeature != null && storageFeature.isGuildMember();
+        boolean canEnableStorage = authService.isGuildMember() || guildAuthPending;
 
         FlatToggleWidget[] storageSoundsToggle = new FlatToggleWidget[1];
         FlatSliderWidget[] emeraldSlider = new FlatSliderWidget[1];
@@ -128,16 +148,22 @@ public class ConfigScreen extends Screen {
                 cardRight - 40, y + 28, 30, 16,
                 config.guildStorageNotifsEnabled,
                 checked -> {
-                    if (checked && !canEnableStorage) {
-                        storageToggle[0].setChecked(false);
-                        return;
+                    if (checked) {
+                        authService.runIfGuildMember(() -> {
+                            config.guildStorageNotifsEnabled = true;
+                            config.save();
+                            storageToggle[0].setChecked(true);
+                            setStorageControlsActive(true, storageSoundsToggle[0], emeraldSlider[0], aspectSlider[0]);
+                        }, () -> {
+                            storageToggle[0].setChecked(false);
+                            storageToggle[0].active = false;
+                            setStorageControlsActive(false, storageSoundsToggle[0], emeraldSlider[0], aspectSlider[0]);
+                        });
+                    } else {
+                        config.guildStorageNotifsEnabled = false;
+                        config.save();
+                        setStorageControlsActive(false, storageSoundsToggle[0], emeraldSlider[0], aspectSlider[0]);
                     }
-                    config.guildStorageNotifsEnabled = checked;
-                    config.save();
-                    boolean active = checked && canEnableStorage;
-                    if (storageSoundsToggle[0] != null) storageSoundsToggle[0].active = active;
-                    if (emeraldSlider[0] != null) emeraldSlider[0].active = active;
-                    if (aspectSlider[0] != null) aspectSlider[0].active = active;
                 }
         );
         if (!config.guildStorageNotifsEnabled && !canEnableStorage) {
@@ -189,7 +215,7 @@ public class ConfigScreen extends Screen {
         boolean hasUpdateAction = false;
         if (updateFeature != null) {
             UpdateFeature.UpdateState updateState = updateFeature.getState();
-            if (updateState == UpdateFeature.UpdateState.UNCHECKED || updateState == UpdateFeature.UpdateState.CHECKING) {
+            if (WynncraftServerPolicy.isNetworkingAllowed() && (updateState == UpdateFeature.UpdateState.UNCHECKED || updateState == UpdateFeature.UpdateState.CHECKING)) {
                 updateFeature.checkForUpdate().thenAccept(res -> {
                     MinecraftClient mc = MinecraftClient.getInstance();
                     mc.execute(() -> {
@@ -364,5 +390,11 @@ public class ConfigScreen extends Screen {
                 || state == UpdateFeature.UpdateState.READY_TO_RESTART
                 || state == UpdateFeature.UpdateState.DOWNLOADING
                 || state == UpdateFeature.UpdateState.ERROR;
+    }
+
+    private static void setStorageControlsActive(boolean active, FlatToggleWidget sounds, FlatSliderWidget emerald, FlatSliderWidget aspect) {
+        if (sounds != null) sounds.active = active;
+        if (emerald != null) emerald.active = active;
+        if (aspect != null) aspect.active = active;
     }
 }

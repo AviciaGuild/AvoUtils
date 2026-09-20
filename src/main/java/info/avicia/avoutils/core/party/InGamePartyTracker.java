@@ -163,6 +163,18 @@ public class InGamePartyTracker {
         return inParty;
     }
 
+    /**
+     * Resets party tracker state on server disconnect or when leaving Wynncraft.
+     */
+    public void reset() {
+        synchronized (lastPartyListMembers) {
+            lastPartyListMembers.clear();
+        }
+        inParty = false;
+        hiddenPartyListExpireTime = 0;
+        lastTriggerTime = 0;
+    }
+
     private void notifyPartyListListeners() {
         List<String> snapshot;
         synchronized (lastPartyListMembers) {

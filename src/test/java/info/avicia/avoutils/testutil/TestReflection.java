@@ -1,6 +1,7 @@
 package info.avicia.avoutils.testutil;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 /**
  * Minimal reflection helpers for reading and writing private fields in tests.
@@ -28,6 +29,28 @@ public final class TestReflection {
             return (T) field.get(target);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to get field " + fieldName, e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T invoke(Object target, String methodName, Class<?>[] paramTypes, Object... args) {
+        try {
+            Method method = target.getClass().getDeclaredMethod(methodName, paramTypes);
+            method.setAccessible(true);
+            return (T) method.invoke(target, args);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to invoke " + methodName, e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T invokeStatic(Class<?> clazz, String methodName, Class<?>[] paramTypes, Object... args) {
+        try {
+            Method method = clazz.getDeclaredMethod(methodName, paramTypes);
+            method.setAccessible(true);
+            return (T) method.invoke(null, args);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to invoke static " + methodName, e);
         }
     }
 

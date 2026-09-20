@@ -8,6 +8,7 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.MinecraftClient;
@@ -72,6 +73,13 @@ public class GuildStorageNotifier implements AvoFeature {
 
     private boolean areNotifsEnabled() {
         return config != null && config.guildStorageNotifsEnabled;
+    }
+
+    @Override
+    public void onServerScopeChanged(Scope newScope) {
+        if (newScope != Scope.MAIN) {
+            reset();
+        }
     }
 
     @Override
@@ -245,31 +253,26 @@ public class GuildStorageNotifier implements AvoFeature {
     }
 
     public void toggleStorage() {
-        if (!isGuildMember()) {
-            MinecraftClient.getInstance().execute(() -> {
-                if (MinecraftClient.getInstance().player != null) {
-                    var msg = WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                            .append(Text.literal("Storage notifications are unavailable: you are not in Avicia.")
-                                    .formatted(Formatting.RED));
-                    MinecraftClient.getInstance().player.sendMessage(msg, false);
-                }
-            });
+        if (!config.guildStorageNotifsEnabled) {
+            AvoAuthService.getInstance().runIfGuildMember(() -> {
+                config.guildStorageNotifsEnabled = true;
+                config.save();
+                sendStorageFeedback(true);
+            }, this::sendStorageNotMemberFeedback);
             return;
         }
 
-        config.guildStorageNotifsEnabled = !config.guildStorageNotifsEnabled;
+        config.guildStorageNotifsEnabled = false;
         config.save();
-        Formatting statusColor = config.guildStorageNotifsEnabled ? Formatting.GREEN : Formatting.RED;
-        String statusWord = config.guildStorageNotifsEnabled ? "enabled" : "disabled";
-        MinecraftClient.getInstance().execute(() -> {
-            if (MinecraftClient.getInstance().player != null) {
-                var msg = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                        .append(Text.literal("Storage threshold notifications are now ").formatted(Formatting.GRAY))
-                        .append(Text.literal(statusWord).formatted(statusColor))
-                        .append(Text.literal(".").formatted(Formatting.GRAY));
-                MinecraftClient.getInstance().player.sendMessage(msg, false);
-            }
-        });
+        sendStorageFeedback(false);
+    }
+
+    private void sendStorageFeedback(boolean enabled) {
+        WynnPillUtil.sendToggleFeedback("AvoUtils", "Storage threshold notifications are now ", enabled);
+    }
+
+    private void sendStorageNotMemberFeedback() {
+        WynnPillUtil.sendNotMemberFeedback("AvoUtils", "Storage notifications are unavailable: you are not in Avicia.");
     }
 
     public void reset() {
