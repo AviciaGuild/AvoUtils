@@ -16,6 +16,9 @@
   "entrypoints": {
     "client": [
       "info.avicia.avoutils.AvoUtilsMod"
+    ],
+    "modmenu": [
+      "info.avicia.avoutils.core.config.ModMenuIntegration"
     ]
   },
   "mixins": [

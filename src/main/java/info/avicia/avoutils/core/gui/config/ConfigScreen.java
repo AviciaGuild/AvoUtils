@@ -25,6 +25,7 @@ import org.lwjgl.glfw.GLFW;
 public class ConfigScreen extends Screen {
 
     private final ModConfig config;
+    private final Screen parent;
     private static final int SIDE_PADDING = 20;
     private static final int CARD_SINGLE_H = 48;
     private static final int CARD_DOUBLE_H = 66;
@@ -32,8 +33,20 @@ public class ConfigScreen extends Screen {
     private static final int CARD_GAP = 8;
 
     public ConfigScreen() {
+        this(null);
+    }
+
+    public ConfigScreen(Screen parent) {
         super(Text.literal("AvoUtils Configs"));
         this.config = AvoUtilsMod.getInstance().getConfig();
+        this.parent = parent;
+    }
+
+    @Override
+    public void close() {
+        if (this.client != null) {
+            this.client.setScreen(this.parent);
+        }
     }
 
     @Override
