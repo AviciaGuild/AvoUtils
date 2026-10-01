@@ -21,10 +21,26 @@ public final class WynnPillUtil {
     private static final Formatting PILL_FG = Formatting.BLACK;
     private static final Formatting ARROW_COLOR = Formatting.GRAY;
 
+    private static volatile Boolean usePillOverride = null;
+
     private WynnPillUtil() {
     }
 
+    public static boolean canUsePill() {
+        if (usePillOverride != null) {
+            return usePillOverride;
+        }
+        return WynncraftServerPolicy.isOnWynncraft();
+    }
+
+    public static void setUsePillOverride(Boolean override) {
+        usePillOverride = override;
+    }
+
     public static MutableText create(String label, Formatting backgroundColor, Formatting foregroundColor) {
+        if (!canUsePill()) {
+            return createFallback(label, backgroundColor, foregroundColor);
+        }
         MutableText pill = Text.empty();
         pill.append(Text.literal(PILL_CORNER_LEFT)
                 .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
@@ -40,6 +56,10 @@ public final class WynnPillUtil {
         pill.append(Text.literal(PILL_CORNER_RIGHT)
                 .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
         return pill;
+    }
+
+    public static MutableText createFallback(String label, Formatting backgroundColor, Formatting foregroundColor) {
+        return Text.empty().append(Text.literal("[" + label + "]").formatted(backgroundColor, Formatting.BOLD));
     }
 
     public static MutableText createPrefixedPill(String label, boolean isError) {
