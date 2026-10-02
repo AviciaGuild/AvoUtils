@@ -46,7 +46,6 @@ public class ChatBridgeFeature implements AvoFeature {
     private static final String EVT_GUILD_BANK = "guild_bank_event";
     private static final String EVT_GUILD_RAID = "guild_raid_completion";
     private static final String EVT_GUILD_REWARD = "guild_reward";
-    private static final String EVT_GUILD_WAR = "guild_war_result";
     private static final String EVT_BRIDGE_STATUS = "bridge_status";
 
     public boolean isGuildMember() {
@@ -107,18 +106,9 @@ public class ChatBridgeFeature implements AvoFeature {
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
         if (!isBridgeActive()) return;
 
-        WarDetector.tick();
-
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
         AvoUtilsMod mod = AvoUtilsMod.getInstance();
         GuildStorageNotifier storage = mod != null ? mod.getFeature(GuildStorageNotifier.class) : null;
-
-        // ── War outcomes (system messages, not guild-colored) ──────────
-        WarDetector.WarResult warResult = WarDetector.tryDetectOutcome(cleaned);
-        if (warResult != null) {
-            sendWarEvent(warResult);
-            return;
-        }
 
         if (!hasLeadingGuildChatColor(message)) return;
 
@@ -186,20 +176,6 @@ public class ChatBridgeFeature implements AvoFeature {
         payload.addProperty("message", message);
         payload.addProperty("avatar_url", avatarUrl);
         AvoWebSocketManager.getInstance().sendEvent(eventType, payload);
-    }
-
-    private void sendWarEvent(WarDetector.WarResult warResult) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("username", "War Result");
-        payload.addProperty("message", warResult.formattedMessage());
-        payload.addProperty("avatar_url", AVO_ICON_URL);
-        payload.addProperty("territory", warResult.territory());
-        payload.addProperty("outcome", warResult.outcome());
-        payload.addProperty("stats", warResult.stats());
-        payload.addProperty("warrers", warResult.warrers());
-        payload.addProperty("duration_seconds", warResult.durationSeconds());
-        payload.addProperty("dps", warResult.dps());
-        AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_WAR, payload);
     }
 
     public void toggleBridge() {

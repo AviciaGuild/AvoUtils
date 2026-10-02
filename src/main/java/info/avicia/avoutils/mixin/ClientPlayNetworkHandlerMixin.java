@@ -4,6 +4,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import info.avicia.avoutils.features.wardetector.WarDetectorFeature;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
@@ -35,6 +36,10 @@ public class ClientPlayNetworkHandlerMixin {
                 ChatBridgeFeature cb = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
                 if (cb != null) {
                     cb.onSystemChat(packet.content());
+                }
+                WarDetectorFeature war = AvoUtilsMod.getInstance().getFeature(WarDetectorFeature.class);
+                if (war != null) {
+                    war.onSystemChat(packet.content());
                 }
             }
         } catch (Exception e) {

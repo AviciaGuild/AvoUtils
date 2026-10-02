@@ -3,11 +3,11 @@ package info.avicia.avoutils.features.chatbridge;
 /**
  * Escapes Discord markdown.
  */
-final class DiscordMarkdown {
+public final class DiscordMarkdown {
     private DiscordMarkdown() {
     }
 
-    static String escapeUsername(String text) {
+    public static String escapeUsername(String text) {
         if (text == null) {
             return "";
         }

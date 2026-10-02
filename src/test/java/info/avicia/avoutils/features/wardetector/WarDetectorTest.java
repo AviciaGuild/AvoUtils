@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.features.wardetector;
 
 import org.junit.jupiter.api.Test;
 
