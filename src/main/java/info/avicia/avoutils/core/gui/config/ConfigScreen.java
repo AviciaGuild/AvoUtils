@@ -44,6 +44,8 @@ public class ConfigScreen extends Screen {
     private FlatButtonWidget doneButton;
     // Updates card height chosen in init(), so render() draws the layout the widgets were placed for
     private boolean updateCardHasAction;
+    // Sliders change the config on every step; it's written to disk once on release or close
+    private boolean unsavedSliderChanges;
 
     public ConfigScreen() {
         this(null);
@@ -211,7 +213,7 @@ public class ConfigScreen extends Screen {
         emeraldSlider[0] = new FlatSliderWidget(
                 cardRight - 170, y + 67, 120, 10,
                 0, 100, config.guildStorageEmeraldThresholdPercent,
-                value -> { config.guildStorageEmeraldThresholdPercent = value; config.save(); }
+                value -> { config.guildStorageEmeraldThresholdPercent = value; unsavedSliderChanges = true; }
         );
         if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
             emeraldSlider[0].active = false;
@@ -221,7 +223,7 @@ public class ConfigScreen extends Screen {
         aspectSlider[0] = new FlatSliderWidget(
                 cardRight - 170, y + 85, 120, 10,
                 0, 100, config.guildStorageAspectThresholdPercent,
-                value -> { config.guildStorageAspectThresholdPercent = value; config.save(); }
+                value -> { config.guildStorageAspectThresholdPercent = value; unsavedSliderChanges = true; }
         );
         if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
             aspectSlider[0].active = false;
@@ -415,6 +417,26 @@ public class ConfigScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         return viewport.scroll(verticalAmount) || super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        boolean handled = super.mouseReleased(click);
+        saveSliderChanges();
+        return handled;
+    }
+
+    @Override
+    public void removed() {
+        saveSliderChanges();
+        super.removed();
+    }
+
+    private void saveSliderChanges() {
+        if (unsavedSliderChanges) {
+            unsavedSliderChanges = false;
+            config.save();
+        }
     }
 
     @Override
