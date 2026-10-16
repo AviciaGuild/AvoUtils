@@ -3,6 +3,7 @@
 build/
 out/
 bin/
+local.properties
 
 # IDE
 .idea/

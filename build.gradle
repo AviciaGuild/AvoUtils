@@ -5,7 +5,13 @@ plugins {
     id 'jacoco'
 }
 
-version = project.mod_version
+def localProperties = new Properties()
+def localPropertiesFile = file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+version = localProperties.getProperty('mod_version', project.mod_version)
 group = project.maven_group
 
 base {
@@ -27,7 +33,7 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     modCompileOnly "maven.modrinth:wynntils:v4.1.10-fabric"
-    modCompileOnly "maven.modrinth:modmenu:17.0.1-beta.1"
+    modCompileOnly "maven.modrinth:modmenu:17.0.1"
     implementation "org.java-websocket:Java-WebSocket:1.6.0"
     include "org.java-websocket:Java-WebSocket:1.6.0"
 
