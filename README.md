@@ -31,7 +31,7 @@ A Minecraft Fabric client mod providing various helper utilities for Avicia guil
 | Dependency | Version |
 |---|---|
 | Minecraft | `1.21.11` |
-| Fabric Loader | `>=0.16.14` |
+| Fabric Loader | `>=0.17.3` |
 | Fabric API | `>=0.141.4` |
 | Java | `>=21` |
 | Wynntils  (optional) | `>=4.1.10` |
