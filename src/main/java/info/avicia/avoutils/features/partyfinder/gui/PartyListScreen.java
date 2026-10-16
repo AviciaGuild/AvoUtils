@@ -294,7 +294,8 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     private void renderPartyList(DrawContext context, int mouseX, int mouseY) {
-        int listBottom = height - 10;
+        int listBottom = getListBottom();
+        enableListScissor(context, LIST_TOP);
 
         for (int i = 0; i < parties.size(); i++) {
             int y = LIST_TOP + (i * ROW_HEIGHT) - scrollOffset;
@@ -352,6 +353,8 @@ public class PartyListScreen extends ScrollableListScreen {
             int regionWidth = textRenderer.getWidth(regionLabel);
             CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(regionLabel), badgeRight - regionWidth, y + 21, 0xFFFFFFFF);
         }
+
+        context.disableScissor();
     }
 
     // ── Input handling ───────────────────────────────────────────────────
@@ -389,6 +392,24 @@ public class PartyListScreen extends ScrollableListScreen {
         }
         applyScroll(parties.size() * ROW_HEIGHT, LIST_TOP, verticalAmount);
         return true;
+    }
+
+    // Modal widgets aren't children of this screen, so drags and releases must be forwarded too, or
+    // the modal's slider never sees them
+    @Override
+    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+        if (activeModal != null) {
+            return activeModal.mouseDragged(click, deltaX, deltaY);
+        }
+        return super.mouseDragged(click, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        if (activeModal != null) {
+            return activeModal.mouseReleased(click);
+        }
+        return super.mouseReleased(click);
     }
 
     @Override
@@ -437,7 +458,8 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     private boolean isRowHovered(double mouseX, double mouseY, int rowY) {
-        return mouseX >= SIDE_PADDING && mouseX <= width - SIDE_PADDING
+        return isInListViewport(mouseY, LIST_TOP)
+                && mouseX >= SIDE_PADDING && mouseX <= width - SIDE_PADDING
                 && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT - 4;
     }
 }

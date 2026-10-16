@@ -9,10 +9,12 @@ import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
+import info.avicia.avoutils.core.gui.ScrollViewport;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.Click;
+import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
@@ -44,6 +46,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
     // Modal dimensions
     private int modalX, modalY, modalW, modalH;
+
+    // Scrolling body
+    private final ScrollViewport bodyViewport = new ScrollViewport();
+    private int bodyContentBottom; // unscrolled Y of the last card's bottom edge
+    private FlatButtonWidget closeButton;
+    private FlatButtonWidget saveButton;
 
     // Form state
     private final Set<String> selectedActivities = new HashSet<>();
@@ -116,11 +124,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         modalH = Math.min(partyToEdit != null ? 296 : 334, height - 40);
         modalX = (width - modalW) / 2;
         modalY = (height - modalH) / 2;
+        bodyViewport.clearTracked();
 
-        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Text.literal("✕"), () -> parent.closeModal());
-        closeBtn.setDanger(true);
-        closeBtn.setBorderless(true);
-        addDrawableChild(closeBtn);
+        closeButton = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Text.literal("✕"), () -> parent.closeModal());
+        closeButton.setDanger(true);
+        closeButton.setBorderless(true);
+        addDrawableChild(closeButton);
 
         int y = modalY + 38;
 
@@ -130,7 +139,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         for (String activity : ACTIVITIES) {
             FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 42, 18, Text.literal(activity), () -> toggleActivity(activity));
             activityButtons.add(btn);
-            addDrawableChild(btn);
+            addBody(btn);
             btnX += 47;
         }
         y += 38;
@@ -149,7 +158,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                 case "other" -> btn.setSelectedColors(0xFF888888, 0x25888888, 0xFF888888);
             }
             roleButtons.add(btn);
-            addDrawableChild(btn);
+            addBody(btn);
             btnX += 60;
         }
         y += 38;
@@ -161,7 +170,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             final String r = reg;
             FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 50, 18, Text.literal(reg), () -> toggleRegion(r));
             regionButtons.add(btn);
-            addDrawableChild(btn);
+            addBody(btn);
             btnX += 55;
         }
         y += 38;
@@ -178,7 +187,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         if (wasFocused) {
             setFocused(noteField);
         }
-        addDrawableChild(noteField);
+        addBody(noteField);
         y += 50;
 
         // Reserved slots
@@ -191,7 +200,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             reservedSlider = new FlatSliderWidget(modalX + 120, y + 8, modalW - 155, 18, minReserved, 3, reservedSlots, val -> {
                 reservedSlots = val;
             });
-            addDrawableChild(reservedSlider);
+            addBody(reservedSlider);
             y += 38;
         }
 
@@ -199,12 +208,44 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         pingToggle = new FlatToggleWidget(modalX + modalW - 50, y + 8, 30, 16, ping, val -> {
             ping = val;
         });
-        addDrawableChild(pingToggle);
+        addBody(pingToggle);
+        bodyContentBottom = y + 32; // bottom edge of the Ping card
 
         // Submit
-        FlatButtonWidget saveBtn = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
-        addDrawableChild(saveBtn);
+        saveButton = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
+        addDrawableChild(saveButton);
         updateWrappedStatus();
+        updateBodyViewport();
+    }
+
+    /**
+     * Adds a form widget that scrolls with the body. These aren't drawable children because
+     * {@link #render} draws them clipped to the body.
+     */
+    private <T extends ClickableWidget> T addBody(T widget) {
+        return addSelectableChild(bodyViewport.track(widget));
+    }
+
+    /**
+     * Fits the scrolling body between the header and the status text (or the Save button when
+     * there's no status), so every card stays reachable when the modal is clamped.
+     */
+    private void updateBodyViewport() {
+        int top = modalY + 25;
+        int bottom = hasWrappedStatus() ? statusTopY() - 2 : modalY + modalH - 32;
+        bodyViewport.update(top, bottom, bodyContentBottom - top);
+    }
+
+    private boolean hasWrappedStatus() {
+        return statusMessage != null && wrappedStatus != null && !wrappedStatus.isEmpty();
+    }
+
+    /**
+     * Top of the wrapped status text, which sits just above the Save button.
+     */
+    private int statusTopY() {
+        int statusBottomY = modalY + modalH - 32;
+        return statusBottomY - (wrappedStatus.size() * 10 - 2);
     }
 
     // ── Form actions ─────────────────────────────────────────────────────
@@ -342,6 +383,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         statusMessage = msg;
         statusColor = (color & 0xFF000000) == 0 ? (color | 0xFF000000) : color;
         updateWrappedStatus();
+        updateBodyViewport();
     }
 
     private void updateWrappedStatus() {
@@ -370,7 +412,14 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         // Title
         context.drawCenteredTextWithShadow(textRenderer, Text.literal(partyToEdit != null ? "§b§lEdit Party" : "§b§lCreate Party"), width / 2, modalY + 8, 0xFFFFFFFF);
 
-        int y = modalY + 38;
+        // The status height decides where the body ends, so wrap it before laying out the body
+        if (statusMessage != null && wrappedStatus == null && textRenderer != null) {
+            updateWrappedStatus();
+        }
+        updateBodyViewport();
+
+        int y = modalY + 38 - bodyViewport.getOffset();
+        bodyViewport.enableScissor(context, modalX + 1, modalX + modalW - 1);
 
         // Selection cards
         drawSectionCard(context, "Activity", y, 30, false);
@@ -408,22 +457,20 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             roleButtons.get(i).setSelected(ROLE_VALUES[i].equals(selectedRole));
         }
 
+        bodyViewport.renderTracked(context, mouseX, mouseY, delta);
+        context.disableScissor();
+        bodyViewport.drawScrollbar(context, modalX + modalW - 6);
+
         // Status message
-        if (statusMessage != null) {
-            if (wrappedStatus == null && textRenderer != null) {
-                updateWrappedStatus();
-            }
-            if (wrappedStatus != null) {
-                int statusBottomY = modalY + modalH - 32;
-                int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
-                int currentY = statusStartY;
-                for (OrderedText line : wrappedStatus) {
-                    context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
-                    currentY += 10;
-                }
+        if (hasWrappedStatus()) {
+            int currentY = statusTopY();
+            for (OrderedText line : wrappedStatus) {
+                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+                currentY += 10;
             }
         }
 
+        // Fixed widgets (close, Save)
         super.render(context, mouseX, mouseY, delta);
     }
 
@@ -436,7 +483,23 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             parent.closeModal();
             return true;
         }
+        // Form widgets scrolled under the header or footer are clipped there, so outside the body
+        // only the fixed buttons may take the click
+        if (!bodyViewport.contains(mouseY)) {
+            for (FlatButtonWidget fixed : new FlatButtonWidget[]{closeButton, saveButton}) {
+                if (fixed != null && fixed.mouseClicked(click, doubleClick)) {
+                    setFocused(fixed);
+                    return true;
+                }
+            }
+            return false;
+        }
         return super.mouseClicked(click, doubleClick);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return bodyViewport.scroll(verticalAmount) || super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override

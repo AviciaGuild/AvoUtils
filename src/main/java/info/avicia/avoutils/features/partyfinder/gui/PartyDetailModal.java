@@ -8,6 +8,7 @@ import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
+import info.avicia.avoutils.core.gui.ScrollViewport;
 import info.avicia.avoutils.core.gui.UiStyle;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -40,6 +41,9 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     // Modal dimensions
     private int modalX, modalY, modalW, modalH;
+
+    // Scrolling body
+    private final ScrollViewport bodyViewport = new ScrollViewport();
 
     // Current player info
     private String playerName;
@@ -147,7 +151,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Reserve"), () -> reserveSlot()));
             btnX += 65;
 
-            FlatButtonWidget disbandBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Disband"), () -> confirmDisband());
+            FlatButtonWidget disbandBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Disband"), () -> disbandParty());
             disbandBtn.setDanger(true);
             addDrawableChild(disbandBtn);
         } else if (isInParty) {
@@ -234,7 +238,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         });
     }
 
-    private void confirmDisband() {
+    private void disbandParty() {
         apiClient.disbandParty(party.partyId).thenAccept(resp -> {
             runOnClient(() -> {
                 if (resp.ok) {
@@ -358,9 +362,6 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         String title = String.join(" / ", party.activities);
         context.drawCenteredTextWithShadow(textRenderer, Text.literal("§b§l" + title), width / 2, modalY + 8, 0xFFFFFFFF);
 
-        int textX = modalX + 12;
-        int metaY = modalY + 30;
-
         // Metadata panel card (leader, region, note)
         int topPadding = 8;
         int bottomPadding = 8;
@@ -370,6 +371,25 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         if (noteLinesCount > 0) {
             cardH += noteGap + (noteLinesCount * 12);
         }
+
+        List<Map.Entry<String, PartyData.MemberData>> sortedMembers = party.members != null
+                ? new ArrayList<>(party.members.entrySet())
+                : List.of();
+        int listH = sortedMembers.isEmpty() ? 16 : sortedMembers.size() * 18 - 2;
+
+        // Fit the body between the header and the status text / action buttons; it scrolls when a
+        // long note and a full party don't fit in a clamped modal
+        if (statusMessage != null && wrappedStatus == null && textRenderer != null) {
+            updateWrappedStatus();
+        }
+        int bodyTop = modalY + 25;
+        int bodyBottom = hasWrappedStatus() ? statusTopY() - 2 : modalY + modalH - 34;
+        int bodyContentBottom = modalY + 30 + cardH + 15 + 14 + listH;
+        bodyViewport.update(bodyTop, bodyBottom, bodyContentBottom - bodyTop);
+
+        int textX = modalX + 12;
+        int metaY = modalY + 30 - bodyViewport.getOffset();
+        bodyViewport.enableScissor(context, modalX + 1, modalX + modalW - 1);
 
         // Panel background
         context.fill(modalX + 8, metaY, modalX + modalW - 8, metaY + cardH, UiStyle.CARD_BACKGROUND);
@@ -407,11 +427,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int textY = membersHeaderY + 17;
         memberRows.clear();
 
-        List<Map.Entry<String, PartyData.MemberData>> sortedMembers = party.members != null
-                ? new ArrayList<>(party.members.entrySet())
-                : List.of();
         int listY = membersHeaderY + 14;
-        int listH = sortedMembers.isEmpty() ? 16 : sortedMembers.size() * 18 - 2;
 
         // Members list background
         context.fill(modalX + 8, listY, modalX + modalW - 8, listY + listH, UiStyle.CARD_BACKGROUND);
@@ -441,7 +457,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             // Kick button for leaders
             if (isLeader && member.name != null && !PlayerUtil.namesEqual(member.name, party.leaderName)) {
                 int kickX = modalX + modalW - 24;
-                boolean kickHovered = isKickButtonHovered(mouseX, mouseY, kickX, textY);
+                boolean kickHovered = bodyViewport.contains(mouseY) && isKickButtonHovered(mouseX, mouseY, kickX, textY);
                 if (kickHovered) {
                     context.fill(kickX - 4, textY - 2, kickX + 10, textY + 12, 0x40FF4D4D);
                 }
@@ -453,24 +469,37 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             textY += 18;
         }
 
+        context.disableScissor();
+        bodyViewport.drawScrollbar(context, modalX + modalW - 6);
+
         // Status message
-        if (statusMessage != null) {
-            if (wrappedStatus == null && textRenderer != null) {
-                updateWrappedStatus();
-            }
-            if (wrappedStatus != null) {
-                int statusBottomY = modalY + modalH - 34;
-                int statusStartY = statusBottomY - (wrappedStatus.size() * 10 - 2);
-                int currentY = statusStartY;
-                for (OrderedText line : wrappedStatus) {
-                    context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
-                    currentY += 10;
-                }
+        if (hasWrappedStatus()) {
+            int currentY = statusTopY();
+            for (OrderedText line : wrappedStatus) {
+                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+                currentY += 10;
             }
         }
 
         // Render buttons
         super.render(context, mouseX, mouseY, delta);
+    }
+
+    private boolean hasWrappedStatus() {
+        return statusMessage != null && wrappedStatus != null && !wrappedStatus.isEmpty();
+    }
+
+    /**
+     * Top of the wrapped status text, which sits just above the action buttons.
+     */
+    private int statusTopY() {
+        int statusBottomY = modalY + modalH - 34;
+        return statusBottomY - (wrappedStatus.size() * 10 - 2);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return bodyViewport.scroll(verticalAmount) || super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
@@ -479,8 +508,8 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         double mouseY = click.y();
         int button = click.button();
 
-        // Check kick clicks for leader
-        if (isLeader && button == 0 && party.members != null) {
+        // Check kick clicks for leader (rows scrolled out of the body are clipped and can't be kicked)
+        if (isLeader && button == 0 && party.members != null && bodyViewport.contains(mouseY)) {
             for (MemberRow row : memberRows) {
                 PartyData.MemberData member = party.members.get(row.memberKey);
                 if (member == null || member.name == null) continue;

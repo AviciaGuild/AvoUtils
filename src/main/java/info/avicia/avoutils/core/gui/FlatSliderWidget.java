@@ -95,16 +95,6 @@ public class FlatSliderWidget extends ClickableWidget {
 
         boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
 
-        if (this.dragging && !dimmed) {
-            long windowHandle = MinecraftClient.getInstance().getWindow().getHandle();
-            boolean isPressed = GLFW.glfwGetMouseButton(windowHandle, 0) == GLFW.GLFW_PRESS;
-            if (isPressed) {
-                updateValueFromMouse(mouseX);
-            } else {
-                this.dragging = false;
-            }
-        }
-
         // Track background
         int trackBg = dimmed ? 0xFF0E0E18 : 0xFF14141E;
         context.fill(x, y + h / 2 - 2, x + w, y + h / 2 + 2, trackBg);

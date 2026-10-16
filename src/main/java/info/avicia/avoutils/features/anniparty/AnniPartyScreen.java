@@ -145,7 +145,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
         }
         expandedPartyIds.retainAll(validIds);
 
-        int listBottom = height - 10;
+        int listBottom = getListBottom();
         for (int i = 0; i < parties.size(); i++) {
             AnniPartyData party = parties.get(i);
             int top = partyTop(i) - scrollOffset;
@@ -202,7 +202,8 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
         String selfName = PlayerUtil.selfName();
         AnniPartyData myParty = roster.findPartyContaining(selfName);
-        int listBottom = height - 10;
+        int listBottom = getListBottom();
+        enableListScissor(context, LIST_TOP);
 
         for (int i = 0; i < parties.size(); i++) {
             AnniPartyData party = parties.get(i);
@@ -265,6 +266,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
             }
         }
 
+        context.disableScissor();
         super.render(context, mouseX, mouseY, delta);
     }
 
@@ -279,7 +281,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
     @Override
     public boolean mouseClicked(Click click, boolean doubleClick) {
-        if (click.button() == 0) {
+        if (click.button() == 0 && isInListViewport(click.y(), LIST_TOP)) {
             for (HeaderHitbox hitbox : headerHitboxes) {
                 if (hitbox.contains(click.x(), click.y())) {
                     if (expandedPartyIds.contains(hitbox.partyId)) {

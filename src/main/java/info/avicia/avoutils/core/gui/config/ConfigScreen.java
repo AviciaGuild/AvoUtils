@@ -7,14 +7,17 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
+import info.avicia.avoutils.core.gui.ScrollViewport;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.updater.UpdateCheckResult;
 import info.avicia.avoutils.features.updater.UpdateFeature;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
@@ -31,6 +34,16 @@ public class ConfigScreen extends Screen {
     private static final int CARD_DOUBLE_H = 66;
     private static final int CARD_QUAD_H = 102;
     private static final int CARD_GAP = 8;
+    // Unscrolled Y of the first card; cards scroll under the title above VIEWPORT_TOP
+    private static final int CONTENT_TOP = 38;
+    private static final int VIEWPORT_TOP = 30;
+    private static final int DONE_BUTTON_H = 20;
+    private static final int DONE_BOTTOM_MARGIN = 8;
+
+    private final ScrollViewport viewport = new ScrollViewport();
+    private FlatButtonWidget doneButton;
+    // Updates card height chosen in init(), so render() draws the layout the widgets were placed for
+    private boolean updateCardHasAction;
 
     public ConfigScreen() {
         this(null);
@@ -51,8 +64,9 @@ public class ConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        viewport.clearTracked();
         int cardRight = width - SIDE_PADDING;
-        int y = 38;
+        int y = CONTENT_TOP;
 
         AvoAuthService authService = AvoAuthService.getInstance();
         if (authService.getCachedGuildMember() == null) {
@@ -95,7 +109,7 @@ public class ConfigScreen extends Screen {
         if (!config.chatBridgeEnabled && !canEnableBridge) {
             bridgeToggle[0].active = false;
         }
-        addDrawableChild(bridgeToggle[0]);
+        addScrolling(bridgeToggle[0]);
         y += CARD_SINGLE_H + CARD_GAP;
 
         // ── Emojis ──────────────────────────────────────────────────────
@@ -109,7 +123,7 @@ public class ConfigScreen extends Screen {
                     config.save();
                 }
         );
-        addDrawableChild(new FlatToggleWidget(
+        addScrolling(new FlatToggleWidget(
                 cardRight - 40, y + 28, 30, 16,
                 config.emojiEnabled,
                 checked -> {
@@ -124,7 +138,7 @@ public class ConfigScreen extends Screen {
         if (!config.emojiEnabled) {
             emojiAutocompleteToggle[0].active = false;
         }
-        addDrawableChild(emojiAutocompleteToggle[0]);
+        addScrolling(emojiAutocompleteToggle[0]);
         y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Party Finder ────────────────────────────────────────────────
@@ -134,7 +148,7 @@ public class ConfigScreen extends Screen {
                 config.notificationSoundsEnabled,
                 checked -> { config.notificationSoundsEnabled = checked; config.save(); }
         );
-        addDrawableChild(new FlatToggleWidget(
+        addScrolling(new FlatToggleWidget(
                 cardRight - 40, y + 28, 30, 16,
                 config.newPartyNotifsEnabled,
                 checked -> {
@@ -146,7 +160,7 @@ public class ConfigScreen extends Screen {
         if (!config.newPartyNotifsEnabled) {
             pfSoundsToggle[0].active = false;
         }
-        addDrawableChild(pfSoundsToggle[0]);
+        addScrolling(pfSoundsToggle[0]);
         y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Guild Storage ───────────────────────────────────────────────
@@ -182,7 +196,7 @@ public class ConfigScreen extends Screen {
         if (!config.guildStorageNotifsEnabled && !canEnableStorage) {
             storageToggle[0].active = false;
         }
-        addDrawableChild(storageToggle[0]);
+        addScrolling(storageToggle[0]);
 
         storageSoundsToggle[0] = new FlatToggleWidget(
                 cardRight - 40, y + 46, 30, 16,
@@ -192,7 +206,7 @@ public class ConfigScreen extends Screen {
         if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
             storageSoundsToggle[0].active = false;
         }
-        addDrawableChild(storageSoundsToggle[0]);
+        addScrolling(storageSoundsToggle[0]);
 
         emeraldSlider[0] = new FlatSliderWidget(
                 cardRight - 170, y + 67, 120, 10,
@@ -202,7 +216,7 @@ public class ConfigScreen extends Screen {
         if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
             emeraldSlider[0].active = false;
         }
-        addDrawableChild(emeraldSlider[0]);
+        addScrolling(emeraldSlider[0]);
 
         aspectSlider[0] = new FlatSliderWidget(
                 cardRight - 170, y + 85, 120, 10,
@@ -212,12 +226,12 @@ public class ConfigScreen extends Screen {
         if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
             aspectSlider[0].active = false;
         }
-        addDrawableChild(aspectSlider[0]);
+        addScrolling(aspectSlider[0]);
 
         y += CARD_QUAD_H + CARD_GAP;
 
         // ── Updates ─────────────────────────────────────────────────────
-        addDrawableChild(new FlatToggleWidget(
+        addScrolling(new FlatToggleWidget(
                 cardRight - 40, y + 28, 30, 16,
                 config.updateRemindersEnabled,
                 checked -> { config.updateRemindersEnabled = checked; config.save(); }
@@ -245,7 +259,7 @@ public class ConfigScreen extends Screen {
             if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
                 UpdateCheckResult result = updateFeature.getLastCheckResult();
                 String label = result != null ? "Update to v" + result.latestVersion() : "Update";
-                addDrawableChild(new FlatButtonWidget(
+                addScrolling(new FlatButtonWidget(
                         cardRight - 110, y + 44, 100, 18,
                         Text.literal(label),
                         () -> {
@@ -254,7 +268,7 @@ public class ConfigScreen extends Screen {
                         }
                 ));
             } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
-                addDrawableChild(new FlatButtonWidget(
+                addScrolling(new FlatButtonWidget(
                         cardRight - 110, y + 44, 100, 18,
                         Text.literal("Restart Now"),
                         () -> {
@@ -266,14 +280,25 @@ public class ConfigScreen extends Screen {
         }
 
         y += (hasUpdateAction ? CARD_DOUBLE_H : CARD_SINGLE_H) + CARD_GAP;
+        updateCardHasAction = hasUpdateAction;
 
         // ── Bottom buttons ──────────────────────────────────────────────
-        int btnY = y + 16;
-        addDrawableChild(new FlatButtonWidget(
-                width / 2 - 50, btnY, 100, 20,
+        int btnY = Math.min(y + 16, height - DONE_BUTTON_H - DONE_BOTTOM_MARGIN);
+        doneButton = addDrawableChild(new FlatButtonWidget(
+                width / 2 - 50, btnY, 100, DONE_BUTTON_H,
                 Text.literal("Done"),
                 this::close
         ));
+
+        viewport.update(VIEWPORT_TOP, btnY - CARD_GAP, y - VIEWPORT_TOP);
+    }
+
+    /**
+     * Adds a card control that scrolls with the viewport. These aren't drawable children because
+     * {@link #render} draws them clipped to the viewport.
+     */
+    private <T extends ClickableWidget> T addScrolling(T widget) {
+        return addSelectableChild(viewport.track(widget));
     }
 
     @Override
@@ -284,7 +309,9 @@ public class ConfigScreen extends Screen {
 
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
-        int y = 38;
+        int y = CONTENT_TOP - viewport.getOffset();
+
+        viewport.enableScissor(context, 0, width);
 
         // ── Chat Bridge ──────────────────────────────────────────────────
         drawSectionCard(context, y, CARD_SINGLE_H, "Chat Bridge");
@@ -334,14 +361,13 @@ public class ConfigScreen extends Screen {
         // ── Updates ─────────────────────────────────────────────────────
         UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
         UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
-        boolean hasUpdateAction = updateFeature != null && hasUpdateAction(updateState);
 
-        drawSectionCard(context, y, hasUpdateAction ? CARD_DOUBLE_H : CARD_SINGLE_H, "Updates");
+        drawSectionCard(context, y, updateCardHasAction ? CARD_DOUBLE_H : CARD_SINGLE_H, "Updates");
         CompatibilityHelper.drawTextWithShadow(context, textRenderer,
                 Text.literal("\u00a77Update Reminders"), cardLeft + 16, y + 32, 0xFFFFFFFF);
 
         // Show update status text only when an action or status is present
-        if (hasUpdateAction) {
+        if (updateCardHasAction && updateFeature != null) {
             if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
                 UpdateCheckResult result = updateFeature.getLastCheckResult();
                 if (result != null) {
@@ -364,7 +390,31 @@ public class ConfigScreen extends Screen {
             }
         }
 
+        viewport.renderTracked(context, mouseX, mouseY, delta);
+        context.disableScissor();
+        viewport.drawScrollbar(context, cardRight + 6);
+
+        // Fixed widgets (Done)
         super.render(context, mouseX, mouseY, delta);
+    }
+
+    @Override
+    public boolean mouseClicked(Click click, boolean doubleClick) {
+        // Controls scrolled under the title or Done button are clipped there, so they must not take
+        // the click; outside the viewport only Done is interactive
+        if (!viewport.contains(click.y())) {
+            if (doneButton != null && doneButton.mouseClicked(click, doubleClick)) {
+                setFocused(doneButton);
+                return true;
+            }
+            return false;
+        }
+        return super.mouseClicked(click, doubleClick);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return viewport.scroll(verticalAmount) || super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
