@@ -16,7 +16,9 @@ import info.avicia.avoutils.features.emojis.models.FontConfig;
 import info.avicia.avoutils.features.emojis.models.FontProvider;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.resource.ResourceType;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -262,15 +264,14 @@ public class EmojiFeature implements AvoFeature {
     }
 
     public String getEmojiReplacement(String shortcode) {
-        if (shortcode == null) return null;
+        if (shortcode == null)
+            return null;
         String custom = customEmojis.get(shortcode);
-        if (custom != null) {
+        if (custom != null)
             return custom;
-        }
         String twemoji = twemojiManager.standardEmojis.get(shortcode);
-        if (twemoji != null) {
+        if (twemoji != null)
             return twemoji;
-        }
         if (!shortcode.startsWith(":") || !shortcode.endsWith(":")) {
             String wrapped = ":" + shortcode + ":";
             custom = customEmojis.get(wrapped);
@@ -381,9 +382,11 @@ public class EmojiFeature implements AvoFeature {
     }
 
     public static void reloadResourcesWithPacks(MinecraftClient client) {
-        if (client == null) return;
+        if (client == null)
+            return;
         client.execute(() -> {
-            if (client.getResourcePackManager() == null) return;
+            if (client.getResourcePackManager() == null)
+                return;
             client.getResourcePackManager().scanPacks();
             List<String> enabled = new ArrayList<>(client.getResourcePackManager().getEnabledIds());
             if (client.getResourcePackManager().hasProfile("avoutils/twemoji") && !enabled.contains("avoutils/twemoji")) {
@@ -767,7 +770,9 @@ public class EmojiFeature implements AvoFeature {
 
     // ── Image download ───────────────────────────────────────────────────
 
-    // Sanitizes an emoji name for use as a resource-pack file name
+    /*
+     * Sanitizes an emoji name for use as a resource-pack file name
+     */
     static String safeNameFor(String name) {
         return SAFE_NAME_PATTERN.matcher(name).replaceAll("_").toLowerCase(Locale.ROOT);
     }
@@ -883,17 +888,18 @@ public class EmojiFeature implements AvoFeature {
 
     private static int resolvePackFormat() {
         try {
-            Object gameVersion = Class.forName("net.minecraft.SharedConstants")
-                    .getMethod("getGameVersion")
-                    .invoke(null);
-            Class<?> resourceTypeClass = Class.forName("net.minecraft.resource.ResourceType");
-            Object clientResources = resourceTypeClass.getField("CLIENT_RESOURCES").get(null);
-            return (int) gameVersion.getClass()
-                    .getMethod("getResourceVersion", resourceTypeClass)
-                    .invoke(gameVersion, clientResources);
-        } catch (Throwable t) {
+            return currentPackFormat();
+        } catch (IllegalStateException e) {
+            // The game version isn't set yet; 75 is 1.21.11's resource pack format
             return 75;
         }
+    }
+
+    /**
+     * The running game's resource pack format.
+     */
+    static int currentPackFormat() {
+        return SharedConstants.getGameVersion().packVersion(ResourceType.CLIENT_RESOURCES).major();
     }
 
     // ── pack.mcmeta structures ───────────────────────────────────────────

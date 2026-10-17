@@ -1,14 +1,19 @@
 package info.avicia.avoutils.features.emojis;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.features.emojis.animation.AnimationMeta;
 import info.avicia.avoutils.features.emojis.models.FontConfig;
 import info.avicia.avoutils.features.emojis.models.FontProvider;
+import net.minecraft.SharedConstants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +41,20 @@ class EmojiFeatureTest {
     @Test
     void safeNameForKeepsAllowedCharacters() {
         assertEquals("a.b-c_d", EmojiFeature.safeNameFor("a.b-c_d"));
+    }
+
+    @Test
+    void currentPackFormatMatchesTheGamesVersionFile() throws IOException {
+        // What the client does at startup; reads version.json from the Minecraft jar
+        SharedConstants.createGameVersion();
+
+        try (InputStream in = SharedConstants.class.getResourceAsStream("/version.json")) {
+            assertNotNull(in);
+            JsonObject version = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            int expected = version.getAsJsonObject("pack_version").get("resource_major").getAsInt();
+            assertEquals(expected, EmojiFeature.currentPackFormat());
+        }
     }
 
     @Test
