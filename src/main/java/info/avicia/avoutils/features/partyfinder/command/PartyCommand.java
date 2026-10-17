@@ -9,7 +9,7 @@ import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
@@ -24,14 +24,14 @@ public class PartyCommand {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             Command<FabricClientCommandSource> openScreenCommand = context -> {
                 if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
-                MinecraftClient.getInstance().execute(() -> openPartyFinderScreen(null));
+                Minecraft.getInstance().execute(() -> openPartyFinderScreen(null));
                 return 1;
             };
 
             Command<FabricClientCommandSource> joinPartyCommand = context -> {
                 if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
                 String leaderName = getString(context, "leaderName");
-                MinecraftClient.getInstance().execute(() -> openPartyFinderScreen(leaderName));
+                Minecraft.getInstance().execute(() -> openPartyFinderScreen(leaderName));
                 return 1;
             };
 
@@ -56,7 +56,7 @@ public class PartyCommand {
         if (pfFeature == null) {
             return;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
             client.setScreen(new PartyListScreen(
                     pfFeature.getApiClient(),

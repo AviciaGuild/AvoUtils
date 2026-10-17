@@ -11,7 +11,7 @@ import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 /**
  * Feature that detects guild war outcomes and participants, relaying results to the Avicia gateway.
@@ -47,7 +47,7 @@ public class WarDetectorFeature implements AvoFeature {
     /**
      * Called when a system chat packet is received.
      */
-    public void onSystemChat(Text message) {
+    public void onSystemChat(Component message) {
         if (message == null || !isGuildMember()) return;
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
 

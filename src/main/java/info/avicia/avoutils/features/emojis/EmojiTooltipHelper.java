@@ -1,7 +1,7 @@
 package info.avicia.avoutils.features.emojis;
 
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 
 /**
  * Encodes and decodes emoji hover metadata for tooltips.
@@ -17,7 +17,7 @@ public final class EmojiTooltipHelper {
     }
 
     public static HoverEvent createEmojiHover(String replacement, String emojiName) {
-        return new HoverEvent.ShowText(Text.literal(EMOJI_HOVER_PREFIX + replacement + ":" + emojiName));
+        return new HoverEvent.ShowText(Component.literal(EMOJI_HOVER_PREFIX + replacement + ":" + emojiName));
     }
 
     public static EmojiHoverData parseEmojiHover(HoverEvent hoverEvent) {

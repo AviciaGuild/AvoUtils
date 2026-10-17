@@ -5,9 +5,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.core.config.ModConfig;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.session.Session;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,6 +14,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.User;
 
 /**
  * Shared core authentication service. Coordinates Mojang join-server authentication
@@ -133,7 +132,7 @@ public class AvoAuthService {
             if (action == null) {
                 return;
             }
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client != null) {
                 client.execute(action);
             } else {
@@ -180,12 +179,12 @@ public class AvoAuthService {
     }
 
     private CompletableFuture<String> fetchSessionTokenAsync() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        Session session = mc != null ? mc.getSession() : null;
+        Minecraft mc = Minecraft.getInstance();
+        User session = mc != null ? mc.getUser() : null;
         if (session == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Not logged into Minecraft."));
         }
-        UUID uuid = session.getUuidOrNull();
+        UUID uuid = session.getProfileId();
         if (uuid == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Not logged into Minecraft."));
         }
@@ -213,12 +212,12 @@ public class AvoAuthService {
                     // Join server via Mojang SessionService
                     return CompletableFuture.runAsync(() -> {
                         try {
-                            MinecraftClient client = MinecraftClient.getInstance();
-                            if (client == null || client.getApiServices() == null || client.getApiServices().sessionService() == null) {
+                            Minecraft client = Minecraft.getInstance();
+                            if (client == null || client.services() == null || client.services().sessionService() == null) {
                                 throw new IllegalStateException("Minecraft session service unavailable.");
                             }
-                            client.getApiServices().sessionService().joinServer(
-                                    session.getUuidOrNull(),
+                            client.services().sessionService().joinServer(
+                                    session.getProfileId(),
                                     session.getAccessToken(),
                                     challenge
                             );
@@ -231,7 +230,7 @@ public class AvoAuthService {
                     // Post to login
                     JsonObject body = new JsonObject();
                     body.addProperty("uuid", uuidStr);
-                    body.addProperty("username", session.getUsername());
+                    body.addProperty("username", session.getName());
                     body.addProperty("challenge", challenge);
 
                     HttpRequest loginReq = HttpRequest.newBuilder()

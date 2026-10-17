@@ -17,10 +17,9 @@ import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -42,7 +41,7 @@ public class AvoCommands {
     public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
         // /avo and /avo config → opens config screen
         Command<FabricClientCommandSource> openConfigCommand = context -> {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             client.execute(() -> client.setScreen(new ConfigScreen()));
             return 1;
         };
@@ -68,14 +67,14 @@ public class AvoCommands {
         // /avo pf → open party finder screen
         Command<FabricClientCommandSource> openPfCommand = context -> {
             if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
+            Minecraft.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
             return 1;
         };
 
         // /avo anni → open anni party screen
         Command<FabricClientCommandSource> openAnniCommand = context -> {
             if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             client.execute(() -> {
                 AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
                 PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
@@ -96,7 +95,7 @@ public class AvoCommands {
         Command<FabricClientCommandSource> joinPfCommand = context -> {
             if (!ensureNetworkingAllowed(context.getSource())) return 1;
             String leaderName = getString(context, "leaderName");
-            MinecraftClient.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(leaderName));
+            Minecraft.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(leaderName));
             return 1;
         };
 
@@ -186,7 +185,7 @@ public class AvoCommands {
 
     public static void sendDisabledFeedback(FabricClientCommandSource source, String message) {
         source.sendFeedback(WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                .append(Text.literal(message).formatted(Formatting.RED)));
+                .append(Component.literal(message).withStyle(ChatFormatting.RED)));
     }
 
     private static <T extends AvoFeature> int withFeature(Class<T> cls, Consumer<T> action) {

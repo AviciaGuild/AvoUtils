@@ -4,8 +4,8 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.emojis.EmojiReplacer;
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -13,15 +13,15 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 /**
  * Intercepts chat messages to replace :shortcode: patterns with PUA emoji characters.
  */
-@Mixin(ChatHud.class)
+@Mixin(ChatComponent.class)
 public class ChatHudMixin {
 
     @ModifyVariable(
-            method = "addMessage(Lnet/minecraft/text/Text;Lnet/minecraft/network/message/MessageSignatureData;Lnet/minecraft/client/gui/hud/MessageIndicator;)V",
+            method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V",
             at = @At("HEAD"),
             argsOnly = true
     )
-    private Text avoutils$replaceEmojis(Text message) {
+    private Component avoutils$replaceEmojis(Component message) {
         if (message == null) {
             return null;
         }

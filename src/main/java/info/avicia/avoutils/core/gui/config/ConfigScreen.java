@@ -13,13 +13,13 @@ import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.updater.UpdateCheckResult;
 import info.avicia.avoutils.features.updater.UpdateFeature;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -52,15 +52,15 @@ public class ConfigScreen extends Screen {
     }
 
     public ConfigScreen(Screen parent) {
-        super(Text.literal("AvoUtils Configs"));
+        super(Component.literal("AvoUtils Configs"));
         this.config = AvoUtilsMod.getInstance().getConfig();
         this.parent = parent;
     }
 
     @Override
-    public void close() {
-        if (this.client != null) {
-            this.client.setScreen(this.parent);
+    public void onClose() {
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(this.parent);
         }
     }
 
@@ -73,11 +73,11 @@ public class ConfigScreen extends Screen {
         AvoAuthService authService = AvoAuthService.getInstance();
         if (authService.getCachedGuildMember() == null) {
             authService.resolveGuildMembership().thenAccept(ignored -> {
-                MinecraftClient mc = MinecraftClient.getInstance();
+                Minecraft mc = Minecraft.getInstance();
                 if (mc != null) {
                     mc.execute(() -> {
-                        if (mc.currentScreen == this) {
-                            this.clearAndInit();
+                        if (mc.screen == this) {
+                            this.rebuildWidgets();
                         }
                     });
                 }
@@ -246,10 +246,10 @@ public class ConfigScreen extends Screen {
             UpdateFeature.UpdateState updateState = updateFeature.getState();
             if (WynncraftServerPolicy.isNetworkingAllowed() && (updateState == UpdateFeature.UpdateState.UNCHECKED || updateState == UpdateFeature.UpdateState.CHECKING)) {
                 updateFeature.checkForUpdate().thenAccept(res -> {
-                    MinecraftClient mc = MinecraftClient.getInstance();
+                    Minecraft mc = Minecraft.getInstance();
                     mc.execute(() -> {
-                        if (mc.currentScreen == this) {
-                            this.clearAndInit();
+                        if (mc.screen == this) {
+                            this.rebuildWidgets();
                         }
                     });
                 });
@@ -263,18 +263,18 @@ public class ConfigScreen extends Screen {
                 String label = result != null ? "Update to v" + result.latestVersion() : "Update";
                 addScrolling(new FlatButtonWidget(
                         cardRight - 110, y + 44, 100, 18,
-                        Text.literal(label),
+                        Component.literal(label),
                         () -> {
-                            this.close();
+                            this.onClose();
                             updateFeature.downloadAndApplyUpdate();
                         }
                 ));
             } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
                 addScrolling(new FlatButtonWidget(
                         cardRight - 110, y + 44, 100, 18,
-                        Text.literal("Restart Now"),
+                        Component.literal("Restart Now"),
                         () -> {
-                            this.close();
+                            this.onClose();
                             updateFeature.requestRestart();
                         }
                 ));
@@ -286,10 +286,10 @@ public class ConfigScreen extends Screen {
 
         // ── Bottom buttons ──────────────────────────────────────────────
         int btnY = Math.min(y + 16, height - DONE_BUTTON_H - DONE_BOTTOM_MARGIN);
-        doneButton = addDrawableChild(new FlatButtonWidget(
+        doneButton = addRenderableWidget(new FlatButtonWidget(
                 width / 2 - 50, btnY, 100, DONE_BUTTON_H,
-                Text.literal("Done"),
-                this::close
+                Component.literal("Done"),
+                this::onClose
         ));
 
         viewport.update(VIEWPORT_TOP, btnY - CARD_GAP, y - VIEWPORT_TOP);
@@ -299,15 +299,15 @@ public class ConfigScreen extends Screen {
      * Adds a card control that scrolls with the viewport. These aren't drawable children because
      * {@link #render} draws them clipped to the viewport.
      */
-    private <T extends ClickableWidget> T addScrolling(T widget) {
-        return addSelectableChild(viewport.track(widget));
+    private <T extends AbstractWidget> T addScrolling(T widget) {
+        return addWidget(viewport.track(widget));
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, width, height, UiStyle.SCREEN_BACKGROUND);
 
-        CompatibilityHelper.drawScreenTitle(context, textRenderer, width, "\u00a7b\u00a7lAVOUTILS \u00a7f\u00a7lCONFIGS");
+        CompatibilityHelper.drawScreenTitle(context, font, width, "\u00a7b\u00a7lAVOUTILS \u00a7f\u00a7lCONFIGS");
 
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
@@ -317,43 +317,43 @@ public class ConfigScreen extends Screen {
 
         // ── Chat Bridge ──────────────────────────────────────────────────
         drawSectionCard(context, y, CARD_SINGLE_H, "Chat Bridge");
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Enabled (requires guild membership)"), cardLeft + 16, y + 32, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Enabled (requires guild membership)"), cardLeft + 16, y + 32, 0xFFFFFFFF);
         y += CARD_SINGLE_H + CARD_GAP;
 
         // ── Emojis ──────────────────────────────────────────────────────
         drawSectionCard(context, y, CARD_DOUBLE_H, "Emojis");
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Enabled"), cardLeft + 16, y + 32, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Emoji Autocomplete"), cardLeft + 16, y + 50, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Enabled"), cardLeft + 16, y + 32, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Emoji Autocomplete"), cardLeft + 16, y + 50, 0xFFFFFFFF);
         y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Party Finder ────────────────────────────────────────────────
         drawSectionCard(context, y, CARD_DOUBLE_H, "Party Finder");
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77New Party Notifications"),
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77New Party Notifications"),
                 cardLeft + 16, y + 32, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Notification Sounds"),
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Notification Sounds"),
                 cardLeft + 16, y + 50, 0xFFFFFFFF);
         y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Guild Storage ───────────────────────────────────────────────
         drawSectionCard(context, y, CARD_QUAD_H, "Guild Rewards Storage");
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Notifications (requires guild membership)"),
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Notifications (requires guild membership)"),
                 cardLeft + 16, y + 32, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Notification Sounds"),
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Notification Sounds"),
                 cardLeft + 16, y + 50, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Emerald threshold"),
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Emerald threshold"),
                 cardLeft + 16, y + 68, 0xFFFFFFFF);
         drawRightText(context, config.guildStorageEmeraldThresholdPercent + "%",
                 cardRight - 13, y + 68, UiStyle.ACCENT_BLUE);
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Aspect threshold"),
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Aspect threshold"),
                 cardLeft + 16, y + 86, 0xFFFFFFFF);
         drawRightText(context, config.guildStorageAspectThresholdPercent + "%",
                 cardRight - 13, y + 86, UiStyle.ACCENT_BLUE);
@@ -365,29 +365,29 @@ public class ConfigScreen extends Screen {
         UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
 
         drawSectionCard(context, y, updateCardHasAction ? CARD_DOUBLE_H : CARD_SINGLE_H, "Updates");
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a77Update Reminders"), cardLeft + 16, y + 32, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a77Update Reminders"), cardLeft + 16, y + 32, 0xFFFFFFFF);
 
         // Show update status text only when an action or status is present
         if (updateCardHasAction && updateFeature != null) {
             if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
                 UpdateCheckResult result = updateFeature.getLastCheckResult();
                 if (result != null) {
-                    CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                            Text.literal("\u00a7aUpdate available: v" + result.latestVersion()),
+                    CompatibilityHelper.drawTextWithShadow(context, font,
+                            Component.literal("\u00a7aUpdate available: v" + result.latestVersion()),
                             cardLeft + 16, y + 50, 0xFFFFFFFF);
                 }
             } else if (updateState == UpdateFeature.UpdateState.DOWNLOADING) {
-                CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                        Text.literal("\u00a77Downloading update..."),
+                CompatibilityHelper.drawTextWithShadow(context, font,
+                        Component.literal("\u00a77Downloading update..."),
                         cardLeft + 16, y + 50, 0xFFFFFFFF);
             } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
-                CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                        Text.literal("\u00a7aUpdate ready — restart to apply"),
+                CompatibilityHelper.drawTextWithShadow(context, font,
+                        Component.literal("\u00a7aUpdate ready — restart to apply"),
                         cardLeft + 16, y + 50, 0xFFFFFFFF);
             } else if (updateState == UpdateFeature.UpdateState.ERROR) {
-                CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                        Text.literal("\u00a7cUpdate check failed"),
+                CompatibilityHelper.drawTextWithShadow(context, font,
+                        Component.literal("\u00a7cUpdate check failed"),
                         cardLeft + 16, y + 50, 0xFFFFFFFF);
             }
         }
@@ -401,7 +401,7 @@ public class ConfigScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubleClick) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
         // Controls scrolled under the title or Done button are clipped there, so they must not take
         // the click; outside the viewport only Done is interactive
         if (!viewport.contains(click.y())) {
@@ -420,7 +420,7 @@ public class ConfigScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(MouseButtonEvent click) {
         boolean handled = super.mouseReleased(click);
         saveSliderChanges();
         return handled;
@@ -440,21 +440,21 @@ public class ConfigScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput keyInput) {
+    public boolean keyPressed(KeyEvent keyInput) {
         if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
-            this.close();
+            this.onClose();
             return true;
         }
         return super.keyPressed(keyInput);
     }
 
-    private void drawRightText(DrawContext context, String text, int rightX, int y, int color) {
-        int width = textRenderer.getWidth(Text.literal(text));
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal(text), rightX - width, y, color);
+    private void drawRightText(GuiGraphics context, String text, int rightX, int y, int color) {
+        int width = font.width(Component.literal(text));
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal(text), rightX - width, y, color);
     }
 
-    private void drawSectionCard(DrawContext context, int y, int cardH, String label) {
+    private void drawSectionCard(GuiGraphics context, int y, int cardH, String label) {
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
         int cardY = y + 2;
@@ -466,8 +466,8 @@ public class ConfigScreen extends Screen {
 
         context.fill(cardLeft, cardY + 1, cardLeft + 2, cardY + cardH - 1, UiStyle.ACCENT_BAR);
 
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer,
-                Text.literal("\u00a7b\u00a7l" + label), cardLeft + 16, cardY + 11, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font,
+                Component.literal("\u00a7b\u00a7l" + label), cardLeft + 16, cardY + 11, 0xFFFFFFFF);
     }
 
     private static boolean hasUpdateAction(UpdateFeature.UpdateState state) {

@@ -10,22 +10,21 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.text.OrderedText;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import org.lwjgl.glfw.GLFW;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
@@ -59,14 +58,14 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     private String initialRole = null;
     private int reservedSlots = 0;
     private final Set<String> selectedRegions = new HashSet<>();
-    private TextFieldWidget noteField;
+    private EditBox noteField;
     private boolean ping = true;
     private FlatToggleWidget pingToggle;
     private FlatSliderWidget reservedSlider;
 
     private String statusMessage = null;
     private int statusColor = 0xFFFFFF;
-    private List<OrderedText> wrappedStatus = null;
+    private List<FormattedCharSequence> wrappedStatus = null;
     private boolean submitting = false;
 
     // Button references for visual toggling
@@ -79,8 +78,8 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     public CreatePartyModal(PartyListScreen parent, PartyFinderClient apiClient, PartyData partyToEdit) {
-        super(MinecraftClient.getInstance(), MinecraftClient.getInstance().textRenderer,
-                Text.literal(partyToEdit != null ? "Edit Party" : "Create Party"));
+        super(Minecraft.getInstance(), Minecraft.getInstance().font,
+                Component.literal(partyToEdit != null ? "Edit Party" : "Create Party"));
         this.parent = parent;
         this.apiClient = apiClient;
         this.partyToEdit = partyToEdit;
@@ -112,10 +111,10 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public void initModal(MinecraftClient client, int width, int height) {
+    public void initModal(Minecraft client, int width, int height) {
         this.width = width;
         this.height = height;
-        this.clearAndInit();
+        this.rebuildWidgets();
     }
 
     @Override
@@ -126,10 +125,10 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         modalY = (height - modalH) / 2;
         bodyViewport.clearTracked();
 
-        closeButton = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Text.literal("✕"), () -> parent.closeModal());
+        closeButton = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Component.literal("✕"), () -> parent.closeModal());
         closeButton.setDanger(true);
         closeButton.setBorderless(true);
-        addDrawableChild(closeButton);
+        addRenderableWidget(closeButton);
 
         int y = modalY + 38;
 
@@ -137,7 +136,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         int btnX = modalX + modalW - 250;
         activityButtons.clear();
         for (String activity : ACTIVITIES) {
-            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 42, 18, Text.literal(activity), () -> toggleActivity(activity));
+            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 42, 18, Component.literal(activity), () -> toggleActivity(activity));
             activityButtons.add(btn);
             addBody(btn);
             btnX += 47;
@@ -150,7 +149,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         for (int i = 0; i < ROLES.length; i++) {
             final String roleVal = ROLE_VALUES[i];
             String icon = RoleIconUtil.getStyledRolePrefix(roleVal);
-            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 55, 18, Text.literal(icon + " " + ROLES[i]), () -> selectRole(roleVal));
+            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 55, 18, Component.literal(icon + " " + ROLES[i]), () -> selectRole(roleVal));
             switch (roleVal) {
                 case "dps" -> btn.setSelectedColors(0xFFFF4D4D, 0x25FF4D4D, 0xFFFF4D4D);
                 case "healer" -> btn.setSelectedColors(0xFFFF66FF, 0x25FF66FF, 0xFFFF66FF);
@@ -168,7 +167,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         regionButtons.clear();
         for (String reg : REGIONS) {
             final String r = reg;
-            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 50, 18, Text.literal(reg), () -> toggleRegion(r));
+            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 50, 18, Component.literal(reg), () -> toggleRegion(r));
             regionButtons.add(btn);
             addBody(btn);
             btnX += 55;
@@ -176,13 +175,13 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         y += 38;
 
         // Note field
-        String currentNote = (noteField != null) ? noteField.getText() : (partyToEdit != null && partyToEdit.note != null ? partyToEdit.note : "");
+        String currentNote = (noteField != null) ? noteField.getValue() : (partyToEdit != null && partyToEdit.note != null ? partyToEdit.note : "");
         boolean wasFocused = (noteField != null && noteField.isFocused());
-        noteField = new TextFieldWidget(textRenderer, modalX + 16, y + 24, modalW - 32, 10, Text.literal("Note"));
-        noteField.setPlaceholder(Text.literal("Note (optional)"));
+        noteField = new EditBox(font, modalX + 16, y + 24, modalW - 32, 10, Component.literal("Note"));
+        noteField.setHint(Component.literal("Note (optional)"));
         noteField.setMaxLength(100);
-        noteField.setDrawsBackground(false);
-        noteField.setText(currentNote);
+        noteField.setBordered(false);
+        noteField.setValue(currentNote);
         noteField.setFocused(wasFocused);
         if (wasFocused) {
             setFocused(noteField);
@@ -212,8 +211,8 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         bodyContentBottom = y + 32; // bottom edge of the Ping card
 
         // Submit
-        saveButton = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Text.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
-        addDrawableChild(saveButton);
+        saveButton = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Component.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
+        addRenderableWidget(saveButton);
         updateWrappedStatus();
         updateBodyViewport();
     }
@@ -222,8 +221,8 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
      * Adds a form widget that scrolls with the body. These aren't drawable children because
      * {@link #render} draws them clipped to the body.
      */
-    private <T extends ClickableWidget> T addBody(T widget) {
-        return addSelectableChild(bodyViewport.track(widget));
+    private <T extends AbstractWidget> T addBody(T widget) {
+        return addWidget(bodyViewport.track(widget));
     }
 
     /**
@@ -297,7 +296,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             }
             region = String.join("/", sortedRegions);
         }
-        String note = noteField.getText().trim().isEmpty() ? null : noteField.getText().trim();
+        String note = noteField.getValue().trim().isEmpty() ? null : noteField.getValue().trim();
 
         if (partyToEdit != null) {
             apiClient.editParty(
@@ -373,7 +372,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     private void runOnClient(Runnable action) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(action);
         }
@@ -387,8 +386,8 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     private void updateWrappedStatus() {
-        if (statusMessage != null && textRenderer != null) {
-            wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+        if (statusMessage != null && font != null) {
+            wrappedStatus = font.split(Component.literal(statusMessage), modalW - 24);
         } else {
             wrappedStatus = null;
         }
@@ -406,14 +405,14 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         CompatibilityHelper.drawModalFrame(context, modalX, modalY, modalW, modalH);
 
         // Title
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(partyToEdit != null ? "§b§lEdit Party" : "§b§lCreate Party"), width / 2, modalY + 8, 0xFFFFFFFF);
+        context.drawCenteredString(font, Component.literal(partyToEdit != null ? "§b§lEdit Party" : "§b§lCreate Party"), width / 2, modalY + 8, 0xFFFFFFFF);
 
         // The status height decides where the body ends, so wrap it before laying out the body
-        if (statusMessage != null && wrappedStatus == null && textRenderer != null) {
+        if (statusMessage != null && wrappedStatus == null && font != null) {
             updateWrappedStatus();
         }
         updateBodyViewport();
@@ -436,7 +435,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
         if (partyToEdit == null) {
             drawSectionCard(context, "Reserved Slots", y, 30, false);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(String.valueOf(reservedSlots)), modalX + modalW - 24, y + 13, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(String.valueOf(reservedSlots)), modalX + modalW - 24, y + 13, 0xFFFFFFFF);
             y += 38;
         }
 
@@ -464,8 +463,8 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         // Status message
         if (hasWrappedStatus()) {
             int currentY = statusTopY();
-            for (OrderedText line : wrappedStatus) {
-                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+            for (FormattedCharSequence line : wrappedStatus) {
+                context.drawString(font, line, modalX + (modalW - font.width(line)) / 2, currentY, statusColor, true);
                 currentY += 10;
             }
         }
@@ -475,7 +474,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubleClick) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
         double mouseX = click.x();
         double mouseY = click.y();
         // Click outside modal closes it
@@ -503,7 +502,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public boolean keyPressed(KeyInput keyInput) {
+    public boolean keyPressed(KeyEvent keyInput) {
         if (keyInput.key() == GLFW.GLFW_KEY_ENTER || keyInput.key() == GLFW.GLFW_KEY_KP_ENTER) {
             submit();
             return true;
@@ -511,7 +510,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         return super.keyPressed(keyInput);
     }
 
-    private void drawSectionCard(DrawContext context, String label, int y, int cardH, boolean highlightBorder) {
+    private void drawSectionCard(GuiGraphics context, String label, int y, int cardH, boolean highlightBorder) {
         int cardY = y + 2;
         
         // Card background
@@ -526,6 +525,6 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         
         // Section label text
         int textOffset = (cardH == 30) ? 11 : 6;
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7" + label), modalX + 16, cardY + textOffset, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§7" + label), modalX + 16, cardY + textOffset, 0xFFFFFFFF);
     }
 }

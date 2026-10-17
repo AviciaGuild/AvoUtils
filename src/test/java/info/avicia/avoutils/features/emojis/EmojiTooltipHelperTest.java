@@ -1,12 +1,13 @@
 package info.avicia.avoutils.features.emojis;
 
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 
 class EmojiTooltipHelperTest {
 
@@ -47,7 +48,7 @@ class EmojiTooltipHelperTest {
 
     @Test
     void parseEmojiHoverReturnsNullForNonEmojiText() {
-        HoverEvent hover = new HoverEvent.ShowText(Text.literal("Normal text tooltip"));
+        HoverEvent hover = new HoverEvent.ShowText(Component.literal("Normal text tooltip"));
         assertNull(EmojiTooltipHelper.parseEmojiHover(hover));
     }
 
@@ -59,13 +60,13 @@ class EmojiTooltipHelperTest {
 
     @Test
     void parseEmojiHoverReturnsNullForMalformedPrefix() {
-        HoverEvent missingColon = new HoverEvent.ShowText(Text.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + "nocolon"));
+        HoverEvent missingColon = new HoverEvent.ShowText(Component.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + "nocolon"));
         assertNull(EmojiTooltipHelper.parseEmojiHover(missingColon));
 
-        HoverEvent trailingColon = new HoverEvent.ShowText(Text.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + "onlyreplacement:"));
+        HoverEvent trailingColon = new HoverEvent.ShowText(Component.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + "onlyreplacement:"));
         assertNull(EmojiTooltipHelper.parseEmojiHover(trailingColon));
 
-        HoverEvent leadingColon = new HoverEvent.ShowText(Text.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + ":noname"));
+        HoverEvent leadingColon = new HoverEvent.ShowText(Component.literal(EmojiTooltipHelper.EMOJI_HOVER_PREFIX + ":noname"));
         assertNull(EmojiTooltipHelper.parseEmojiHover(leadingColon));
     }
 

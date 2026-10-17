@@ -4,12 +4,11 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.UsernameResolver;
-import net.minecraft.text.Text;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.network.chat.Component;
 
 /**
  * Shared parser for in-game party chat messages.
@@ -80,7 +79,7 @@ public final class PartyMessageParser {
     /**
      * Parse a chat message with optional Text component context for resolving player nicknames via hover text.
      */
-    public static Result parse(String text, Text message) {
+    public static Result parse(String text, Component message) {
         if (text == null) {
             return null;
         }

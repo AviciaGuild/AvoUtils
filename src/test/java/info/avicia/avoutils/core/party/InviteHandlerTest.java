@@ -1,7 +1,6 @@
 package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.testutil.TestReflection;
-import net.minecraft.client.MinecraftClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -75,7 +75,7 @@ class InviteHandlerTest {
 
     @Test
     void tickDoesNothingWhenPlayerIsNull() {
-        MinecraftClient client = mock(MinecraftClient.class);
+        Minecraft client = mock(Minecraft.class);
 
         handler.queueInvites(List.of("Bob"));
         handler.tick(client);

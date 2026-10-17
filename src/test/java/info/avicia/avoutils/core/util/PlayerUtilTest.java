@@ -1,7 +1,5 @@
 package info.avicia.avoutils.core.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.session.Session;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -12,6 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.User;
 
 class PlayerUtilTest {
 
@@ -49,12 +50,12 @@ class PlayerUtilTest {
 
     @Test
     void selfNameReturnsSessionUsername() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
-            Session session = mock(Session.class);
-            when(client.getSession()).thenReturn(session);
-            when(session.getUsername()).thenReturn("Steve");
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
+            User session = mock(User.class);
+            when(client.getUser()).thenReturn(session);
+            when(session.getName()).thenReturn("Steve");
 
             assertEquals("Steve", PlayerUtil.selfName());
         }
@@ -62,10 +63,10 @@ class PlayerUtilTest {
 
     @Test
     void selfNameReturnsNullWithoutSession() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
-            when(client.getSession()).thenReturn(null);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
+            when(client.getUser()).thenReturn(null);
 
             assertNull(PlayerUtil.selfName());
         }
@@ -73,8 +74,8 @@ class PlayerUtilTest {
 
     @Test
     void selfNameReturnsNullWhenClientIsNull() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            mc.when(MinecraftClient::getInstance).thenReturn(null);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            mc.when(Minecraft::getInstance).thenReturn(null);
             assertNull(PlayerUtil.selfName());
         }
     }
@@ -86,12 +87,12 @@ class PlayerUtilTest {
 
     @Test
     void isSelfMatchesSessionNameWhenPlayerEntityNull() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
-            Session session = mock(Session.class);
-            when(client.getSession()).thenReturn(session);
-            when(session.getUsername()).thenReturn("Steve");
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
+            User session = mock(User.class);
+            when(client.getUser()).thenReturn(session);
+            when(session.getName()).thenReturn("Steve");
 
             assertTrue(PlayerUtil.isSelf("Steve"));
             assertTrue(PlayerUtil.isSelf("steve"));

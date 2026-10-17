@@ -2,13 +2,13 @@ package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.testutil.TestReflection;
 import info.avicia.avoutils.testutil.TextFixtures;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.util.Set;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -55,9 +55,9 @@ class InGamePartyTrackerTest {
 
     @Test
     void joinMarksInPartyAndRequestsPartyList() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
 
             assertFalse(tracker.onChatMessage("Steve has joined your party, say hello!"));
             assertTrue(tracker.isInParty());
@@ -67,9 +67,9 @@ class InGamePartyTrackerTest {
 
     @Test
     void kickRemovesMemberImmediately() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
 
             tracker.onChatMessage("Party members: CupBoi, and LargeMug");
             assertEquals(Set.of("CupBoi", "LargeMug"), tracker.getLastPartyListMembers());
@@ -81,9 +81,9 @@ class InGamePartyTrackerTest {
 
     @Test
     void leaveRemovesMemberImmediately() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
 
             tracker.onChatMessage("Party members: CupBoi, and LargeMug");
             assertEquals(Set.of("CupBoi", "LargeMug"), tracker.getLastPartyListMembers());
@@ -95,9 +95,9 @@ class InGamePartyTrackerTest {
 
     @Test
     void triggerPartyListDebouncesRapidCalls() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
             org.mockito.Mockito.doAnswer(invocation -> {
                 ((Runnable) invocation.getArgument(0)).run();
                 return null;
@@ -115,14 +115,14 @@ class InGamePartyTrackerTest {
 
     @Test
     void kickWithClassNicknameAndHoverRemovesRealMember() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
 
             tracker.onChatMessage("Party members: CupBoi, and LargeMug");
             assertEquals(Set.of("CupBoi", "LargeMug"), tracker.getLastPartyListMembers());
 
-            Text message = TextFixtures.hoverText(
+            Component message = TextFixtures.hoverText(
                     "avo ignis war dps has been kicked from the party!",
                     "'s real name is CupBoi");
             tracker.onChatMessage(message);
@@ -132,9 +132,9 @@ class InGamePartyTrackerTest {
 
     @Test
     void kickWithClassNicknameTriggersSyncEvenWithoutHover() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
             org.mockito.Mockito.doAnswer(invocation -> {
                 ((Runnable) invocation.getArgument(0)).run();
                 return null;

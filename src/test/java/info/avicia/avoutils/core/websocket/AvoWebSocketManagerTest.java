@@ -5,13 +5,13 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.testutil.TestReflection;
-import net.minecraft.client.MinecraftClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -85,9 +85,9 @@ class AvoWebSocketManagerTest {
 
     @Test
     void handleIncomingEventDispatchesToListeners() {
-        try (MockedStatic<MinecraftClient> mc = mockStatic(MinecraftClient.class)) {
-            MinecraftClient client = mock(MinecraftClient.class);
-            mc.when(MinecraftClient::getInstance).thenReturn(client);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
             doAnswer(inv -> {
                 ((Runnable) inv.getArgument(0)).run();
                 return null;

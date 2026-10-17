@@ -1,14 +1,14 @@
 package info.avicia.avoutils.core.gui;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
-public class FlatButtonWidget extends ClickableWidget {
+public class FlatButtonWidget extends AbstractWidget {
     private final Runnable onPress;
     private boolean selected = false;
     private boolean isDanger = false;
@@ -18,7 +18,7 @@ public class FlatButtonWidget extends ClickableWidget {
     private Integer selectedBgColor = null;
     private Integer selectedTextColor = null;
 
-    public FlatButtonWidget(int x, int y, int width, int height, Text message, Runnable onPress) {
+    public FlatButtonWidget(int x, int y, int width, int height, Component message, Runnable onPress) {
         super(x, y, width, height, message);
         this.onPress = onPress;
     }
@@ -42,7 +42,7 @@ public class FlatButtonWidget extends ClickableWidget {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean boolean_arg) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean boolean_arg) {
         if (this.active && this.visible && click.button() == 0) {
             int x = getX();
             int y = getY();
@@ -51,7 +51,7 @@ public class FlatButtonWidget extends ClickableWidget {
             double mouseX = click.x();
             double mouseY = click.y();
             if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
-                this.playDownSound(MinecraftClient.getInstance().getSoundManager());
+                this.playDownSound(Minecraft.getInstance().getSoundManager());
                 if (onPress != null) {
                     onPress.run();
                 }
@@ -62,7 +62,7 @@ public class FlatButtonWidget extends ClickableWidget {
     }
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
         int x = getX();
         int y = getY();
         int w = getWidth();
@@ -102,8 +102,8 @@ public class FlatButtonWidget extends ClickableWidget {
         }
 
         // Text formatting and drawing
-        TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-        int textW = textRenderer.getWidth(getMessage());
+        Font textRenderer = Minecraft.getInstance().font;
+        int textW = textRenderer.width(getMessage());
         int textX = x + (w - textW) / 2;
         int textY = y + (h - 8) / 2;
 
@@ -120,7 +120,7 @@ public class FlatButtonWidget extends ClickableWidget {
     }
 
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
         // No-op
     }
 }

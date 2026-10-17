@@ -1,12 +1,12 @@
 package info.avicia.avoutils.core.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 
 /**
  * Utility for drawing styled Wynncraft resource-pack compatible pills
@@ -18,8 +18,8 @@ public final class WynnPillUtil {
     private static final String PILL_BG_BACK = "\uE00F";
     private static final String PILL_BG_FRONT = "\uE012";
 
-    private static final Formatting PILL_FG = Formatting.BLACK;
-    private static final Formatting ARROW_COLOR = Formatting.GRAY;
+    private static final ChatFormatting PILL_FG = ChatFormatting.BLACK;
+    private static final ChatFormatting ARROW_COLOR = ChatFormatting.GRAY;
 
     private static volatile Boolean usePillOverride = null;
 
@@ -37,34 +37,34 @@ public final class WynnPillUtil {
         usePillOverride = override;
     }
 
-    public static MutableText create(String label, Formatting backgroundColor, Formatting foregroundColor) {
+    public static MutableComponent create(String label, ChatFormatting backgroundColor, ChatFormatting foregroundColor) {
         if (!canUsePill()) {
             return createFallback(label, backgroundColor, foregroundColor);
         }
-        MutableText pill = Text.empty();
-        pill.append(Text.literal(PILL_CORNER_LEFT)
+        MutableComponent pill = Component.empty();
+        pill.append(Component.literal(PILL_CORNER_LEFT)
                 .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
 
         for (int i = 0; i < label.length(); i++) {
             String glyph = toWynncraftGlyph(label.charAt(i));
-            pill.append(Text.literal(PILL_BG_BACK)
+            pill.append(Component.literal(PILL_BG_BACK)
                     .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
-            pill.append(Text.literal(PILL_BG_FRONT + glyph)
+            pill.append(Component.literal(PILL_BG_FRONT + glyph)
                     .setStyle(Style.EMPTY.withColor(foregroundColor).withoutShadow()));
         }
 
-        pill.append(Text.literal(PILL_CORNER_RIGHT)
+        pill.append(Component.literal(PILL_CORNER_RIGHT)
                 .setStyle(Style.EMPTY.withColor(backgroundColor).withoutShadow()));
         return pill;
     }
 
-    public static MutableText createFallback(String label, Formatting backgroundColor, Formatting foregroundColor) {
-        return Text.empty().append(Text.literal("[" + label + "]").formatted(backgroundColor, Formatting.BOLD));
+    public static MutableComponent createFallback(String label, ChatFormatting backgroundColor, ChatFormatting foregroundColor) {
+        return Component.empty().append(Component.literal("[" + label + "]").withStyle(backgroundColor, ChatFormatting.BOLD));
     }
 
-    public static MutableText createPrefixedPill(String label, boolean isError) {
-        Formatting bg = isError ? Formatting.RED : Formatting.AQUA;
-        return create(label, bg, PILL_FG).append(Text.literal(" \u203A\u203A ").formatted(ARROW_COLOR));
+    public static MutableComponent createPrefixedPill(String label, boolean isError) {
+        ChatFormatting bg = isError ? ChatFormatting.RED : ChatFormatting.AQUA;
+        return create(label, bg, PILL_FG).append(Component.literal(" \u203A\u203A ").withStyle(ARROW_COLOR));
     }
 
     /**
@@ -73,12 +73,12 @@ public final class WynnPillUtil {
      * @param messagePrefix e.g. "Chat bridge is now " or "Storage threshold notifications are now "
      */
     public static void sendToggleFeedback(String pillLabel, String messagePrefix, boolean enabled) {
-        Formatting statusColor = enabled ? Formatting.GREEN : Formatting.RED;
+        ChatFormatting statusColor = enabled ? ChatFormatting.GREEN : ChatFormatting.RED;
         String statusWord = enabled ? "enabled" : "disabled";
-        MutableText msg = createPrefixedPill(pillLabel, false)
-                .append(Text.literal(messagePrefix).formatted(Formatting.GRAY))
-                .append(Text.literal(statusWord).formatted(statusColor))
-                .append(Text.literal(".").formatted(Formatting.GRAY));
+        MutableComponent msg = createPrefixedPill(pillLabel, false)
+                .append(Component.literal(messagePrefix).withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(statusWord).withStyle(statusColor))
+                .append(Component.literal(".").withStyle(ChatFormatting.GRAY));
         sendToPlayer(msg);
     }
 
@@ -86,30 +86,30 @@ public final class WynnPillUtil {
      * Sends a not-a-member feedback message with the given error text.
      */
     public static void sendNotMemberFeedback(String pillLabel, String message) {
-        MutableText msg = createPrefixedPill(pillLabel, true)
-                .append(Text.literal(message).formatted(Formatting.RED));
+        MutableComponent msg = createPrefixedPill(pillLabel, true)
+                .append(Component.literal(message).withStyle(ChatFormatting.RED));
         sendToPlayer(msg);
     }
 
-    private static void sendToPlayer(Text message) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    private static void sendToPlayer(Component message) {
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(() -> {
                 if (mc.player != null) {
-                    mc.player.sendMessage(message, false);
+                    mc.player.displayClientMessage(message, false);
                 }
             });
         }
     }
 
-    public static MutableText createClickable(String label, Formatting backgroundColor, Formatting foregroundColor, String command, String hoverText) {
-        MutableText pill = create(label, backgroundColor, foregroundColor);
+    public static MutableComponent createClickable(String label, ChatFormatting backgroundColor, ChatFormatting foregroundColor, String command, String hoverText) {
+        MutableComponent pill = create(label, backgroundColor, foregroundColor);
         ClickEvent clickEvent = new ClickEvent.RunCommand(command);
-        HoverEvent hoverEvent = hoverText != null ? new HoverEvent.ShowText(Text.literal(hoverText)) : null;
-        pill.styled(style -> style.withClickEvent(clickEvent).withHoverEvent(hoverEvent));
-        for (Text sibling : pill.getSiblings()) {
-            if (sibling instanceof MutableText mutableSibling) {
-                mutableSibling.styled(style -> style.withClickEvent(clickEvent).withHoverEvent(hoverEvent));
+        HoverEvent hoverEvent = hoverText != null ? new HoverEvent.ShowText(Component.literal(hoverText)) : null;
+        pill.withStyle(style -> style.withClickEvent(clickEvent).withHoverEvent(hoverEvent));
+        for (Component sibling : pill.getSiblings()) {
+            if (sibling instanceof MutableComponent mutableSibling) {
+                mutableSibling.withStyle(style -> style.withClickEvent(clickEvent).withHoverEvent(hoverEvent));
             }
         }
         return pill;

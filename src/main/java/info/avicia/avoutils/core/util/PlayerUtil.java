@@ -1,8 +1,7 @@
 package info.avicia.avoutils.core.util;
 
-import net.minecraft.client.MinecraftClient;
-
 import java.util.Locale;
+import net.minecraft.client.Minecraft;
 
 /**
  * Shared helpers for the local player's identity and case-insensitive name matching.
@@ -16,14 +15,14 @@ public final class PlayerUtil {
      * The local player's account username, or null if not available (e.g. before login).
      */
     public static String selfName() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.player != null && mc.player.getName() != null) {
             String name = mc.player.getName().getString();
             if (name != null && !name.isBlank()) {
                 return name;
             }
         }
-        return (mc != null && mc.getSession() != null) ? mc.getSession().getUsername() : null;
+        return (mc != null && mc.getUser() != null) ? mc.getUser().getName() : null;
     }
 
     /**
@@ -34,7 +33,7 @@ public final class PlayerUtil {
         if (name == null) {
             return false;
         }
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.player != null && namesEqual(name, mc.player.getName().getString())) {
             return true;
         }

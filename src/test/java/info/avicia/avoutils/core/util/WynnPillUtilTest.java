@@ -1,16 +1,17 @@
 package info.avicia.avoutils.core.util;
 
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Text;
-import net.minecraft.text.TextColor;
-import net.minecraft.util.Formatting;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.TextColor;
 
 class WynnPillUtilTest {
 
@@ -30,7 +31,7 @@ class WynnPillUtilTest {
 
         @Test
         void createBuildsPillStructure() {
-            Text pill = WynnPillUtil.create("a", Formatting.AQUA, Formatting.BLACK);
+            Component pill = WynnPillUtil.create("a", ChatFormatting.AQUA, ChatFormatting.BLACK);
             String text = pill.getString();
 
             assertNotNull(text);
@@ -42,7 +43,7 @@ class WynnPillUtilTest {
 
         @Test
         void createLowercasesLettersAndMapsDigits() {
-            String text = WynnPillUtil.create("A1", Formatting.AQUA, Formatting.BLACK).getString();
+            String text = WynnPillUtil.create("A1", ChatFormatting.AQUA, ChatFormatting.BLACK).getString();
 
             assertTrue(text.contains("\uE040")); // 'a'
             assertTrue(text.contains("\uE061")); // '1'
@@ -50,7 +51,7 @@ class WynnPillUtilTest {
 
         @Test
         void createKeepsUnknownCharactersAsIs() {
-            String text = WynnPillUtil.create("!", Formatting.AQUA, Formatting.BLACK).getString();
+            String text = WynnPillUtil.create("!", ChatFormatting.AQUA, ChatFormatting.BLACK).getString();
             assertTrue(text.contains("!"));
         }
 
@@ -70,7 +71,7 @@ class WynnPillUtilTest {
 
         @Test
         void createClickableAttachesClickAndHoverEvents() {
-            var pill = WynnPillUtil.createClickable("UPDATE", Formatting.GREEN, Formatting.BLACK,
+            var pill = WynnPillUtil.createClickable("UPDATE", ChatFormatting.GREEN, ChatFormatting.BLACK,
                     "/avo update download", "Click to update");
 
             assertNotNull(pill.getStyle().getClickEvent());
@@ -90,61 +91,61 @@ class WynnPillUtilTest {
 
         @Test
         void createReturnsBracketedFallback() {
-            Text fallback = WynnPillUtil.create("AvoUtils", Formatting.AQUA, Formatting.BLACK);
+            Component fallback = WynnPillUtil.create("AvoUtils", ChatFormatting.AQUA, ChatFormatting.BLACK);
             assertEquals("[AvoUtils]", fallback.getString());
             assertFalse(fallback.getStyle().isBold());
             assertEquals(1, fallback.getSiblings().size());
-            Text pillPart = fallback.getSiblings().get(0);
+            Component pillPart = fallback.getSiblings().get(0);
             assertTrue(pillPart.getStyle().isBold());
-            assertEquals(TextColor.fromFormatting(Formatting.AQUA), pillPart.getStyle().getColor());
+            assertEquals(TextColor.fromLegacyFormat(ChatFormatting.AQUA), pillPart.getStyle().getColor());
             assertFalse(fallback.getString().contains("\uE010"));
             assertFalse(fallback.getString().contains("\uE011"));
         }
 
         @Test
         void createPrefixedPillReturnsBracketedWithArrowsAndDoesNotBleedBold() {
-            Text prefixed = WynnPillUtil.createPrefixedPill("AvoUtils", false);
+            Component prefixed = WynnPillUtil.createPrefixedPill("AvoUtils", false);
             assertEquals("[AvoUtils] \u203A\u203A ", prefixed.getString());
             assertFalse(prefixed.getStyle().isBold());
 
             // Badge is bold and colored
-            Text badge = prefixed.getSiblings().get(0);
+            Component badge = prefixed.getSiblings().get(0);
             assertTrue(badge.getStyle().isBold());
-            assertEquals(TextColor.fromFormatting(Formatting.AQUA), badge.getStyle().getColor());
+            assertEquals(TextColor.fromLegacyFormat(ChatFormatting.AQUA), badge.getStyle().getColor());
 
             // Arrow separator is NOT bold
-            Text arrow = prefixed.getSiblings().get(1);
+            Component arrow = prefixed.getSiblings().get(1);
             assertFalse(arrow.getStyle().isBold());
 
             // Subsequent message appended to the prefix is NOT bold
-            Text fullMessage = prefixed.copy().append(Text.literal("Downloading update...").formatted(Formatting.GRAY));
-            Text messageBody = fullMessage.getSiblings().get(2);
+            Component fullMessage = prefixed.copy().append(Component.literal("Downloading update...").withStyle(ChatFormatting.GRAY));
+            Component messageBody = fullMessage.getSiblings().get(2);
             assertFalse(messageBody.getStyle().isBold());
             assertFalse(prefixed.getString().contains("\uE010"));
         }
 
         @Test
         void createPrefixedPillSupportsErrorVariant() {
-            Text prefixed = WynnPillUtil.createPrefixedPill("AvoUtils", true);
+            Component prefixed = WynnPillUtil.createPrefixedPill("AvoUtils", true);
             assertEquals("[AvoUtils] \u203A\u203A ", prefixed.getString());
             assertFalse(prefixed.getStyle().isBold());
 
-            Text badge = prefixed.getSiblings().get(0);
+            Component badge = prefixed.getSiblings().get(0);
             assertTrue(badge.getStyle().isBold());
-            assertEquals(TextColor.fromFormatting(Formatting.RED), badge.getStyle().getColor());
+            assertEquals(TextColor.fromLegacyFormat(ChatFormatting.RED), badge.getStyle().getColor());
         }
 
         @Test
         void createClickableAttachesEventsToFallback() {
-            var clickable = WynnPillUtil.createClickable("UPDATE", Formatting.GREEN, Formatting.BLACK,
+            var clickable = WynnPillUtil.createClickable("UPDATE", ChatFormatting.GREEN, ChatFormatting.BLACK,
                     "/avo update download", "Click to update");
 
             assertEquals("[UPDATE]", clickable.getString());
             assertFalse(clickable.getStyle().isBold());
 
-            Text badge = clickable.getSiblings().get(0);
+            Component badge = clickable.getSiblings().get(0);
             assertTrue(badge.getStyle().isBold());
-            assertEquals(TextColor.fromFormatting(Formatting.GREEN), badge.getStyle().getColor());
+            assertEquals(TextColor.fromLegacyFormat(ChatFormatting.GREEN), badge.getStyle().getColor());
             assertNotNull(badge.getStyle().getClickEvent());
             assertInstanceOf(ClickEvent.RunCommand.class, badge.getStyle().getClickEvent());
             assertEquals("/avo update download", ((ClickEvent.RunCommand) badge.getStyle().getClickEvent()).command());
@@ -155,12 +156,12 @@ class WynnPillUtilTest {
 
         @Test
         void createFallbackDirectMethod() {
-            Text fallback = WynnPillUtil.createFallback("RESTART", Formatting.GREEN, Formatting.BLACK);
+            Component fallback = WynnPillUtil.createFallback("RESTART", ChatFormatting.GREEN, ChatFormatting.BLACK);
             assertEquals("[RESTART]", fallback.getString());
             assertFalse(fallback.getStyle().isBold());
-            Text badge = fallback.getSiblings().get(0);
+            Component badge = fallback.getSiblings().get(0);
             assertTrue(badge.getStyle().isBold());
-            assertEquals(TextColor.fromFormatting(Formatting.GREEN), badge.getStyle().getColor());
+            assertEquals(TextColor.fromLegacyFormat(ChatFormatting.GREEN), badge.getStyle().getColor());
         }
     }
 

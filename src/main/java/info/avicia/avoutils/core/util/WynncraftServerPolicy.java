@@ -3,9 +3,8 @@ package info.avicia.avoutils.core.util;
 import info.avicia.avoutils.AvoUtilsMod;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ServerInfo;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -77,15 +76,15 @@ public final class WynncraftServerPolicy {
         if (scopeOverride != null) {
             return scopeOverride.get();
         }
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) {
             return Scope.BLOCKED;
         }
         Scope scope = classifyCurrentServer(
                 currentServerAddress(),
-                mc.isInSingleplayer() || mc.isIntegratedServerRunning(),
-                mc.isInSingleplayer(),
-                mc.getNetworkHandler() != null
+                mc.isLocalServer() || mc.hasSingleplayerServer(),
+                mc.isLocalServer(),
+                mc.getConnection() != null
         );
         if (scope == Scope.UNKNOWN && lastScope != Scope.BLOCKED) {
             return lastScope;
@@ -185,11 +184,11 @@ public final class WynncraftServerPolicy {
     }
 
     private static String currentServerAddress() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) return null;
         try {
-            ServerInfo serverData = mc.getCurrentServerEntry();
-            return serverData != null ? serverData.address : null;
+            ServerData serverData = mc.getCurrentServer();
+            return serverData != null ? serverData.ip : null;
         } catch (Exception e) {
             return null;
         }

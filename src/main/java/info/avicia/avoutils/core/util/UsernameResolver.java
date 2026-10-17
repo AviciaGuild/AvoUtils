@@ -1,14 +1,13 @@
 package info.avicia.avoutils.core.util;
 
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
 
 /**
  * Resolves displayed names (or class nicknames) to real Minecraft usernames
@@ -34,7 +33,7 @@ public final class UsernameResolver {
      * Checks hover text in the message component first.
      * Falls back to displayedName if it is already a valid Minecraft username.
      */
-    public static String resolve(Text message, String displayedName) {
+    public static String resolve(Component message, String displayedName) {
         if (message != null) {
             String hover = findHoverForName(message, displayedName);
             if (hover != null) {
@@ -54,7 +53,7 @@ public final class UsernameResolver {
      * Checks spans that match or overlap displayedName, then falls back to any
      * real username hover in the message.
      */
-    public static String findHoverForName(Text message, String name) {
+    public static String findHoverForName(Component message, String name) {
         if (message == null) return null;
 
         String targetName = name != null ? name.trim().toLowerCase(Locale.ROOT) : "";
@@ -86,7 +85,7 @@ public final class UsernameResolver {
         if (style == null) return null;
         HoverEvent hoverEvent = style.getHoverEvent();
         if (!(hoverEvent instanceof HoverEvent.ShowText showTextEvent)) return null;
-        Text hoverComponent = showTextEvent.value();
+        Component hoverComponent = showTextEvent.value();
         if (hoverComponent == null) return null;
         String hoverText = hoverComponent.getString()
                 .replace('\u2019', '\'')

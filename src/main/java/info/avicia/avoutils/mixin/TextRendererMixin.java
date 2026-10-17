@@ -4,11 +4,11 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.emojis.animation.AnimatedBakedGlyph;
-import net.minecraft.client.font.BakedGlyph;
-import net.minecraft.client.font.GlyphProvider;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.text.Style;
-import net.minecraft.text.StyleSpriteSource;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GlyphSource;
+import net.minecraft.client.gui.font.glyphs.BakedGlyph;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.network.chat.Style;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,11 +20,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * to the active frame's glyph while locking glyph metrics (advance) to the base frame.
  * This eliminates horizontal text jitter and prevents following text from moving.
  */
-@Mixin(TextRenderer.class)
+@Mixin(Font.class)
 public abstract class TextRendererMixin {
 
     @Shadow
-    abstract GlyphProvider getGlyphs(StyleSpriteSource font);
+    abstract GlyphSource getGlyphSource(FontDescription font);
 
     @Inject(method = "getGlyph", at = @At("HEAD"), cancellable = true)
     private void avoutils$redirectAnimatedGlyph(int codePoint, Style style, CallbackInfoReturnable<BakedGlyph> cir) {
@@ -42,14 +42,14 @@ public abstract class TextRendererMixin {
         int activeCodePoint = feature.getAnimatedFrameCodePoint(codePoint);
         if (activeCodePoint == codePoint) return;
 
-        GlyphProvider provider = this.getGlyphs(style.getFont());
+        GlyphSource provider = this.getGlyphSource(style.getFont());
         if (provider == null) return;
 
-        BakedGlyph baseGlyph = provider.get(codePoint);
-        BakedGlyph activeGlyph = provider.get(activeCodePoint);
+        BakedGlyph baseGlyph = provider.getGlyph(codePoint);
+        BakedGlyph activeGlyph = provider.getGlyph(activeCodePoint);
 
         if (activeGlyph != null && baseGlyph != null) {
-            cir.setReturnValue(new AnimatedBakedGlyph(activeGlyph, baseGlyph.getMetrics()));
+            cir.setReturnValue(new AnimatedBakedGlyph(activeGlyph, baseGlyph.info()));
         }
     }
 }

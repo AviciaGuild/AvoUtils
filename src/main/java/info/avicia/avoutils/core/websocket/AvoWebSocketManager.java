@@ -6,15 +6,14 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import info.avicia.avoutils.core.util.ClientVersion;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
@@ -70,7 +69,7 @@ public class AvoWebSocketManager {
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             if (++tickCounter >= TICK_INTERVAL) {
                 tickCounter = 0;
-                if (MinecraftClient.getInstance().player != null) {
+                if (Minecraft.getInstance().player != null) {
                     tickConnection();
                 }
             }
@@ -173,7 +172,7 @@ public class AvoWebSocketManager {
                 return;
             }
 
-            MinecraftClient.getInstance().execute(() -> {
+            Minecraft.getInstance().execute(() -> {
                 connectWithToken(token);
             });
         });
@@ -224,7 +223,7 @@ public class AvoWebSocketManager {
     }
 
     private void handleIncomingEvent(String type, JsonObject json) {
-        MinecraftClient.getInstance().execute(() -> {
+        Minecraft.getInstance().execute(() -> {
             List<Consumer<JsonObject>> list = listeners.get(type);
             if (list != null) {
                 for (Consumer<JsonObject> listener : list) {
@@ -240,16 +239,16 @@ public class AvoWebSocketManager {
 
     private void notifyVersionUnsupported() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             if (mc != null) {
                 mc.execute(() -> {
                     try {
                         if (mc.player != null) {
-                            MutableText warning = WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                                    .append(Text.literal("WARNING: ").formatted(Formatting.DARK_RED, Formatting.BOLD))
-                                    .append(Text.literal("Your AvoUtils mod is outdated! Please update to use online features.")
-                                            .formatted(Formatting.RED));
-                            mc.player.sendMessage(warning, false);
+                            MutableComponent warning = WynnPillUtil.createPrefixedPill("AvoUtils", true)
+                                    .append(Component.literal("WARNING: ").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD))
+                                    .append(Component.literal("Your AvoUtils mod is outdated! Please update to use online features.")
+                                            .withStyle(ChatFormatting.RED));
+                            mc.player.displayClientMessage(warning, false);
                         }
                     } catch (Throwable ignored) {
                     }

@@ -7,11 +7,10 @@ import info.avicia.avoutils.core.util.ClientVersion;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -171,12 +170,12 @@ public class UpdateFeature implements AvoFeature {
 
         if (!state.compareAndSet(UpdateState.UPDATE_AVAILABLE, UpdateState.DOWNLOADING)) {
             if (state.get() == UpdateState.DOWNLOADING) {
-                sendChatMessage("Download already in progress...", Formatting.GRAY);
+                sendChatMessage("Download already in progress...", ChatFormatting.GRAY);
             }
             return CompletableFuture.completedFuture(null);
         }
-        MutableText downloadingMsg = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Text.literal("Downloading v" + result.latestVersion() + "...").formatted(Formatting.GRAY));
+        MutableComponent downloadingMsg = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                .append(Component.literal("Downloading v" + result.latestVersion() + "...").withStyle(ChatFormatting.GRAY));
         sendChatMessage(downloadingMsg);
 
         return checker.downloadUpdate(result).thenAccept(pendingJar -> {
@@ -224,7 +223,7 @@ public class UpdateFeature implements AvoFeature {
         }
 
         if (force) {
-            sendChatMessage("Checking for updates...", Formatting.GRAY);
+            sendChatMessage("Checking for updates...", ChatFormatting.GRAY);
         }
         checkForUpdate(force).thenAccept(result -> {
             if (result == null) {
@@ -250,7 +249,7 @@ public class UpdateFeature implements AvoFeature {
 
         checkForUpdate().thenAccept(result -> {
             if (result == null || !result.updateAvailable()) {
-                sendChatMessage("No update available.", Formatting.GRAY);
+                sendChatMessage("No update available.", ChatFormatting.GRAY);
                 return;
             }
             downloadAndApplyUpdate();
@@ -270,14 +269,14 @@ public class UpdateFeature implements AvoFeature {
             return;
         }
 
-        sendChatMessage("Restarting Minecraft to apply update...", Formatting.GRAY);
+        sendChatMessage("Restarting Minecraft to apply update...", ChatFormatting.GRAY);
         stopClient();
     }
 
     void stopClient() {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
-            client.execute(client::stop);
+            client.execute(client::destroy);
         }
     }
 
@@ -290,12 +289,12 @@ public class UpdateFeature implements AvoFeature {
         sendChatMessage(buildUpdateDownloadedMessage(version));
     }
 
-    static MutableText buildUpdateDownloadedMessage(String version) {
+    static MutableComponent buildUpdateDownloadedMessage(String version) {
         return WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Text.literal("Update ").formatted(Formatting.GRAY))
-                .append(Text.literal("v" + version).formatted(Formatting.WHITE))
-                .append(Text.literal(" downloaded! ").formatted(Formatting.GRAY))
-                .append(WynnPillUtil.createClickable("RESTART", Formatting.GREEN, Formatting.BLACK,
+                .append(Component.literal("Update ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("v" + version).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" downloaded! ").withStyle(ChatFormatting.GRAY))
+                .append(WynnPillUtil.createClickable("RESTART", ChatFormatting.GREEN, ChatFormatting.BLACK,
                         "/avo update restart", "Click to restart Minecraft now"));
     }
 
@@ -306,12 +305,12 @@ public class UpdateFeature implements AvoFeature {
         sendChatMessage(buildPendingReadyMessage(version));
     }
 
-    static MutableText buildPendingReadyMessage(String version) {
+    static MutableComponent buildPendingReadyMessage(String version) {
         return WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Text.literal("A previously downloaded update (").formatted(Formatting.GRAY))
-                .append(Text.literal("v" + version).formatted(Formatting.WHITE))
-                .append(Text.literal(") is ready to install! ").formatted(Formatting.GRAY))
-                .append(WynnPillUtil.createClickable("RESTART", Formatting.GREEN, Formatting.BLACK,
+                .append(Component.literal("A previously downloaded update (").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("v" + version).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(") is ready to install! ").withStyle(ChatFormatting.GRAY))
+                .append(WynnPillUtil.createClickable("RESTART", ChatFormatting.GREEN, ChatFormatting.BLACK,
                         "/avo update restart", "Click to restart Minecraft now"));
     }
 
@@ -322,33 +321,33 @@ public class UpdateFeature implements AvoFeature {
         sendChatMessage(buildUpdateAvailableMessage(result));
     }
 
-    static MutableText buildUpdateAvailableMessage(UpdateCheckResult result) {
+    static MutableComponent buildUpdateAvailableMessage(UpdateCheckResult result) {
         return WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Text.literal("Update available: ").formatted(Formatting.GRAY))
-                .append(Text.literal("v" + result.currentVersion()).formatted(Formatting.WHITE))
-                .append(Text.literal(" → ").formatted(Formatting.GRAY))
-                .append(Text.literal("v" + result.latestVersion()).formatted(Formatting.WHITE))
-                .append(Text.literal(" ").formatted(Formatting.GRAY))
-                .append(WynnPillUtil.createClickable("UPDATE", Formatting.GREEN, Formatting.BLACK,
+                .append(Component.literal("Update available: ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("v" + result.currentVersion()).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" → ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("v" + result.latestVersion()).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" ").withStyle(ChatFormatting.GRAY))
+                .append(WynnPillUtil.createClickable("UPDATE", ChatFormatting.GREEN, ChatFormatting.BLACK,
                         "/avo update download", "Click to update"));
     }
 
-    static MutableText buildUpToDateMessage(String currentVersion) {
+    static MutableComponent buildUpToDateMessage(String currentVersion) {
         return WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Text.literal("You are running the latest version (").formatted(Formatting.GRAY))
-                .append(Text.literal("v" + currentVersion).formatted(Formatting.GREEN))
-                .append(Text.literal(").").formatted(Formatting.GRAY));
+                .append(Component.literal("You are running the latest version (").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("v" + currentVersion).withStyle(ChatFormatting.GREEN))
+                .append(Component.literal(").").withStyle(ChatFormatting.GRAY));
     }
 
     /**
-     * Sends a rich {@link Text} message to the player's chat on the client thread.
+     * Sends a rich {@link Component} message to the player's chat on the client thread.
      */
-    public static void sendChatMessage(Text message) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    public static void sendChatMessage(Component message) {
+        Minecraft client = Minecraft.getInstance();
         if (client == null || client.player == null) return;
         client.execute(() -> {
             if (client.player != null) {
-                client.player.sendMessage(message, false);
+                client.player.displayClientMessage(message, false);
             }
         });
     }
@@ -356,17 +355,17 @@ public class UpdateFeature implements AvoFeature {
     /**
      * Sends a formatted update-related message to the player's chat.
      */
-    public static void sendChatMessage(String text, Formatting color) {
+    public static void sendChatMessage(String text, ChatFormatting color) {
         sendFeedbackMessage(text, color, false);
     }
 
     public static void sendErrorMessage(String text) {
-        sendFeedbackMessage(text, Formatting.RED, true);
+        sendFeedbackMessage(text, ChatFormatting.RED, true);
     }
 
-    private static void sendFeedbackMessage(String text, Formatting color, boolean isError) {
-        MutableText message = WynnPillUtil.createPrefixedPill("AvoUtils", isError)
-                .append(Text.literal(text).formatted(color));
+    private static void sendFeedbackMessage(String text, ChatFormatting color, boolean isError) {
+        MutableComponent message = WynnPillUtil.createPrefixedPill("AvoUtils", isError)
+                .append(Component.literal(text).withStyle(color));
         sendChatMessage(message);
     }
 }

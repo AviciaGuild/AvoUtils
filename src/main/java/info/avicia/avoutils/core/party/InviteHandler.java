@@ -2,13 +2,12 @@ package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.PlayerUtil;
-import net.minecraft.client.MinecraftClient;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
 
 /**
  * Queues in-game party invitations ({@code /party invite <name>}) and sends them with a cooldown.
@@ -70,9 +69,9 @@ public class InviteHandler {
     /**
      * Called every client tick to process the invite queue.
      */
-    public void tick(MinecraftClient client) {
+    public void tick(Minecraft client) {
         if (inviteQueue.isEmpty()) return;
-        if (client.player == null || client.player.networkHandler == null) return;
+        if (client.player == null || client.player.connection == null) return;
 
         if (cooldownTicks > 0) {
             cooldownTicks--;
@@ -83,7 +82,7 @@ public class InviteHandler {
         if (action != null) {
             String command = commandFor(action);
             AvoUtilsMod.LOGGER.info("[AvoUtils] Sending: /{}", command);
-            client.player.networkHandler.sendChatCommand(command);
+            client.player.connection.sendCommand(command);
             cooldownTicks = TICKS_BETWEEN_INVITES;
         }
     }

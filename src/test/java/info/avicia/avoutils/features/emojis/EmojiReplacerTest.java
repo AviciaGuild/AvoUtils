@@ -1,12 +1,13 @@
 package info.avicia.avoutils.features.emojis;
 
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+
+import net.minecraft.network.chat.Component;
 
 class EmojiReplacerTest {
 
@@ -18,14 +19,14 @@ class EmojiReplacerTest {
 
     @Test
     void replaceReturnsSameInstanceWhenNoColonsPresent() {
-        Text text = Text.literal("This is a message with no colons at all.");
+        Component text = Component.literal("This is a message with no colons at all.");
         assertSame(text, EmojiReplacer.replace(text));
         assertSame(text, EmojiReplacer.replace(text, new EmojiTrie()));
     }
 
     @Test
     void replaceReturnsSameInstanceForSingleColon() {
-        Text text = Text.literal("PlayerName: Hello world!");
+        Component text = Component.literal("PlayerName: Hello world!");
         assertSame(text, EmojiReplacer.replace(text));
         assertSame(text, EmojiReplacer.replace(text, new EmojiTrie()));
     }
@@ -35,7 +36,7 @@ class EmojiReplacerTest {
         EmojiTrie trie = new EmojiTrie();
         trie.insert(":catwat:", "\uDB80\uDC00");
 
-        Text text = Text.literal("Good game! 😀 ❤️ 👍");
+        Component text = Component.literal("Good game! 😀 ❤️ 👍");
         assertSame(text, EmojiReplacer.replace(text));
         assertSame(text, EmojiReplacer.replace(text, trie));
     }
@@ -46,8 +47,8 @@ class EmojiReplacerTest {
         String pua = Character.toString(0xF0000);
         trie.insert(":aga:", pua);
 
-        Text text = Text.literal("Look at this :aga: emoji!");
-        Text replaced = EmojiReplacer.replace(text, trie);
+        Component text = Component.literal("Look at this :aga: emoji!");
+        Component replaced = EmojiReplacer.replace(text, trie);
 
         assertNotNull(replaced);
         assertEquals("Look at this " + pua + " emoji!", replaced.getString());
@@ -58,10 +59,10 @@ class EmojiReplacerTest {
         EmojiTrie trie = new EmojiTrie();
         trie.insert(":catwat:", "\uDB80\uDC00");
 
-        Text unknown = Text.literal("Unknown :notreal: shortcode");
+        Component unknown = Component.literal("Unknown :notreal: shortcode");
         assertSame(unknown, EmojiReplacer.replace(unknown, trie));
 
-        Text invalid = Text.literal("Not a shortcode :hello world: here");
+        Component invalid = Component.literal("Not a shortcode :hello world: here");
         assertSame(invalid, EmojiReplacer.replace(invalid, trie));
     }
 
@@ -71,13 +72,13 @@ class EmojiReplacerTest {
         String pua = Character.toString(0xF0000);
         trie.insert(":aga:", pua);
 
-        Text adjacent = Text.literal("::aga:");
-        Text replacedAdjacent = EmojiReplacer.replace(adjacent, trie);
+        Component adjacent = Component.literal("::aga:");
+        Component replacedAdjacent = EmojiReplacer.replace(adjacent, trie);
         assertNotNull(replacedAdjacent);
         assertEquals(":" + pua, replacedAdjacent.getString());
 
-        Text afterUnknown = Text.literal(":unknown::aga:");
-        Text replacedAfterUnknown = EmojiReplacer.replace(afterUnknown, trie);
+        Component afterUnknown = Component.literal(":unknown::aga:");
+        Component replacedAfterUnknown = EmojiReplacer.replace(afterUnknown, trie);
         assertNotNull(replacedAfterUnknown);
         assertEquals(":unknown:" + pua, replacedAfterUnknown.getString());
     }

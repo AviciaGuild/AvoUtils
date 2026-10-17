@@ -1,12 +1,13 @@
 package info.avicia.avoutils.features.emojis;
 
-import net.minecraft.client.font.TextRenderer;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+
+import net.minecraft.client.gui.Font;
 
 class EmojiTooltipComponentTest {
 
@@ -71,18 +72,18 @@ class EmojiTooltipComponentTest {
         assertEquals("testEmoji", component.getEmojiName());
         assertEquals(32, component.getSize());
 
-        TextRenderer textRenderer = Mockito.mock(TextRenderer.class);
-        when(textRenderer.getWidth(":testEmoji:")).thenReturn(50);
+        Font textRenderer = Mockito.mock(Font.class);
+        when(textRenderer.width(":testEmoji:")).thenReturn(50);
 
         assertEquals(50, component.getWidth(textRenderer));
-        assertEquals(32 + 7 + textRenderer.fontHeight, component.getHeight(textRenderer));
+        assertEquals(32 + 7 + textRenderer.lineHeight, component.getHeight(textRenderer));
     }
 
     @Test
     void testNullEmojiNameHandledGracefully() {
         EmojiTooltipComponent component = new EmojiTooltipComponent("\uDB80\uDC00", null, 32);
-        TextRenderer textRenderer = Mockito.mock(TextRenderer.class);
-        when(textRenderer.getWidth("")).thenReturn(0);
+        Font textRenderer = Mockito.mock(Font.class);
+        when(textRenderer.width("")).thenReturn(0);
 
         assertEquals(32, component.getWidth(textRenderer));
     }

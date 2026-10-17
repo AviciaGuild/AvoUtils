@@ -5,13 +5,12 @@ import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
-import net.minecraft.client.MinecraftClient;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
 
 /**
  * Partyfinder-specific side effects for in-game party tracking.
@@ -91,10 +90,10 @@ public class PartyFinderPartySyncer {
     }
 
     private void onPartyListParsed(List<String> members) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(() -> {
-                if (mc.currentScreen instanceof PartyListScreen screen) {
+                if (mc.screen instanceof PartyListScreen screen) {
                     screen.onPartyListUpdated();
                 }
             });

@@ -4,8 +4,8 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.tree.CommandNode;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.network.chat.Component;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,7 +135,7 @@ class AvoCommandsTest {
         WynncraftServerPolicy.setScopeOverride(() -> WynncraftServerPolicy.Scope.BLOCKED);
 
         dispatcher.execute("avo pf", source);
-        ArgumentCaptor<Text> captor = ArgumentCaptor.forClass(Text.class);
+        ArgumentCaptor<Component> captor = ArgumentCaptor.forClass(Component.class);
         verify(source).sendFeedback(captor.capture());
         assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE));
 
@@ -160,7 +160,7 @@ class AvoCommandsTest {
         WynncraftServerPolicy.setScopeOverride(() -> WynncraftServerPolicy.Scope.BETA);
 
         dispatcher.execute("avo pf", source);
-        ArgumentCaptor<Text> captor = ArgumentCaptor.forClass(Text.class);
+        ArgumentCaptor<Component> captor = ArgumentCaptor.forClass(Component.class);
         verify(source).sendFeedback(captor.capture());
         assertTrue(captor.getValue().getString().contains(WynncraftServerPolicy.BETA_NETWORKING_BLOCKED_MESSAGE));
 

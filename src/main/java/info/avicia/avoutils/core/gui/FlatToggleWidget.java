@@ -1,20 +1,19 @@
 package info.avicia.avoutils.core.gui;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.text.Text;
-
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
-public class FlatToggleWidget extends ClickableWidget {
+public class FlatToggleWidget extends AbstractWidget {
     private boolean checked;
     private final Consumer<Boolean> onChanged;
 
     public FlatToggleWidget(int x, int y, int width, int height, boolean initialValue, Consumer<Boolean> onChanged) {
-        super(x, y, width, height, Text.literal(""));
+        super(x, y, width, height, Component.literal(""));
         this.checked = initialValue;
         this.onChanged = onChanged;
     }
@@ -28,7 +27,7 @@ public class FlatToggleWidget extends ClickableWidget {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean boolean_arg) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean boolean_arg) {
         if (this.active && this.visible && click.button() == 0) {
             int x = getX();
             int y = getY();
@@ -38,7 +37,7 @@ public class FlatToggleWidget extends ClickableWidget {
             double mouseY = click.y();
             if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
                 this.checked = !this.checked;
-                this.playDownSound(MinecraftClient.getInstance().getSoundManager());
+                this.playDownSound(Minecraft.getInstance().getSoundManager());
                 if (onChanged != null) {
                     onChanged.accept(this.checked);
                 }
@@ -49,7 +48,7 @@ public class FlatToggleWidget extends ClickableWidget {
     }
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+    protected void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
         int x = getX();
         int y = getY();
         int w = getWidth();
@@ -79,7 +78,7 @@ public class FlatToggleWidget extends ClickableWidget {
     }
 
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
         // No-op
     }
 }

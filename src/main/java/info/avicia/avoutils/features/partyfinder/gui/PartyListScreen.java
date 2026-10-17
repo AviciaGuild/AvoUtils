@@ -11,13 +11,6 @@ import info.avicia.avoutils.core.gui.ModalOverlay;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
@@ -25,6 +18,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 import com.google.gson.JsonObject;
 
 /**
@@ -65,7 +65,7 @@ public class PartyListScreen extends ScrollableListScreen {
 
     public PartyListScreen(PartyFinderClient apiClient, PartyFinderPartySyncer partySyncer,
                            InviteHandler inviteHandler, String joinTargetLeaderName) {
-        super(Text.literal("Party Finder"));
+        super(Component.literal("Party Finder"));
         this.apiClient = apiClient;
         this.partySyncer = partySyncer;
         this.inviteHandler = inviteHandler;
@@ -78,14 +78,14 @@ public class PartyListScreen extends ScrollableListScreen {
         int buttonY = 8;
 
         // Refresh button
-        addDrawableChild(new FlatButtonWidget(SIDE_PADDING, buttonY, 80, 20, Text.literal("⟳ Refresh"), () -> fetchParties()));
+        addRenderableWidget(new FlatButtonWidget(SIDE_PADDING, buttonY, 80, 20, Component.literal("⟳ Refresh"), () -> fetchParties()));
 
         // Create Party button
-        createPartyButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Text.literal("+ Create Party"), () -> openCreateModal()));
+        createPartyButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Component.literal("+ Create Party"), () -> openCreateModal()));
         createPartyButton.visible = true;
 
         // View Party button (when party owned)
-        viewPartyButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 80, buttonY, 80, 20, Text.literal("View Party"), () -> {
+        viewPartyButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 80, buttonY, 80, 20, Component.literal("View Party"), () -> {
             PartyData ownedParty = getOwnedParty();
             if (ownedParty != null) {
                 openDetailModal(ownedParty);
@@ -94,7 +94,7 @@ public class PartyListScreen extends ScrollableListScreen {
         viewPartyButton.visible = false;
 
         // Invite All button (when party owned)
-        inviteAllButton = addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 155, buttonY, 70, 20, Text.literal("Invite All"), () -> {
+        inviteAllButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 155, buttonY, 70, 20, Component.literal("Invite All"), () -> {
             PartyData ownedParty = getOwnedParty();
             if (ownedParty != null && ownedParty.members != null) {
                 List<String> memberNames = ownedParty.members.values().stream()
@@ -117,7 +117,7 @@ public class PartyListScreen extends ScrollableListScreen {
 
         // Re-initialize active modal if present on resize
         if (activeModal instanceof ModalOverlay modal) {
-            modal.initModal(client, width, height);
+            modal.initModal(minecraft, width, height);
         }
 
         // Fetch parties on open
@@ -199,7 +199,7 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     private void runOnClient(Runnable action) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(action);
         }
@@ -218,19 +218,19 @@ public class PartyListScreen extends ScrollableListScreen {
 
     public void openDetailModal(PartyData party) {
         PartyDetailModal modal = new PartyDetailModal(this, apiClient, inviteHandler, party);
-        modal.initModal(client, width, height);
+        modal.initModal(minecraft, width, height);
         activeModal = modal;
     }
 
     private void openCreateModal() {
         CreatePartyModal modal = new CreatePartyModal(this, apiClient);
-        modal.initModal(client, width, height);
+        modal.initModal(minecraft, width, height);
         activeModal = modal;
     }
 
     public void openEditModal(PartyData party) {
         CreatePartyModal modal = new CreatePartyModal(this, apiClient, party);
-        modal.initModal(client, width, height);
+        modal.initModal(minecraft, width, height);
         activeModal = modal;
     }
 
@@ -247,12 +247,12 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     @Override
-    public void close() {
+    public void onClose() {
         AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
         if (activeModal instanceof ModalOverlay overlay) {
             overlay.onCloseModal();
         }
-        super.close();
+        super.onClose();
     }
 
     @Override
@@ -267,18 +267,18 @@ public class PartyListScreen extends ScrollableListScreen {
     // ── Rendering ────────────────────────────────────────────────────────
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         // Background
         context.fill(0, 0, width, height, UiStyle.SCREEN_BACKGROUND);
         // Title
-        CompatibilityHelper.drawScreenTitle(context, textRenderer, width, "§b§lAVICIA §f§lPARTY FINDER");
+        CompatibilityHelper.drawScreenTitle(context, font, width, "§b§lAVICIA §f§lPARTY FINDER");
 
         if (errorMessage != null) {
-            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, "§c" + errorMessage);
+            CompatibilityHelper.drawCenteredMessage(context, font, width, height, "§c" + errorMessage);
         } else if (loading) {
-            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, "§7Loading active parties...");
+            CompatibilityHelper.drawCenteredMessage(context, font, width, height, "§7Loading active parties...");
         } else if (parties.isEmpty()) {
-            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, "§7No active parties. Create one to get started!");
+            CompatibilityHelper.drawCenteredMessage(context, font, width, height, "§7No active parties. Create one to get started!");
         } else {
             renderPartyList(context, mouseX, mouseY);
         }
@@ -293,7 +293,7 @@ public class PartyListScreen extends ScrollableListScreen {
         }
     }
 
-    private void renderPartyList(DrawContext context, int mouseX, int mouseY) {
+    private void renderPartyList(GuiGraphics context, int mouseX, int mouseY) {
         int listBottom = getListBottom();
         enableListScissor(context, LIST_TOP);
 
@@ -324,14 +324,14 @@ public class PartyListScreen extends ScrollableListScreen {
 
             // Activity label
             String activities = String.join(" / ", party.activities);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§l" + activities), leftTextX, y + 7, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§b§l" + activities), leftTextX, y + 7, 0xFFFFFFFF);
 
             // Leader name
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§7Leader: §f" + party.leaderName), leftTextX, y + 21, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§7Leader: §f" + party.leaderName), leftTextX, y + 21, 0xFFFFFFFF);
 
             // Slots badge / pill on the right
             String slotsText = party.memberCount + "/" + party.maxSize;
-            int slotsWidth = textRenderer.getWidth(slotsText);
+            int slotsWidth = font.width(slotsText);
             int badgeRight = width - SIDE_PADDING - 10;
             int badgeLeft = badgeRight - slotsWidth - 8;
 
@@ -345,13 +345,13 @@ public class PartyListScreen extends ScrollableListScreen {
 
             // Slots text inside badge
             int slotsColor = party.isFull ? UiStyle.ACCENT_RED : UiStyle.ACCENT_GREEN;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsText), badgeLeft + 4, y + 8, slotsColor);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(slotsText), badgeLeft + 4, y + 8, slotsColor);
 
             // Region label
             String regionText = party.region != null ? party.region : "Any";
             String regionLabel = "§7Region: §e" + regionText;
-            int regionWidth = textRenderer.getWidth(regionLabel);
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(regionLabel), badgeRight - regionWidth, y + 21, 0xFFFFFFFF);
+            int regionWidth = font.width(regionLabel);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(regionLabel), badgeRight - regionWidth, y + 21, 0xFFFFFFFF);
         }
 
         context.disableScissor();
@@ -360,7 +360,7 @@ public class PartyListScreen extends ScrollableListScreen {
     // ── Input handling ───────────────────────────────────────────────────
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubleClick) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
@@ -397,7 +397,7 @@ public class PartyListScreen extends ScrollableListScreen {
     // Modal widgets aren't children of this screen, so drags and releases must be forwarded too, or
     // the modal's slider never sees them
     @Override
-    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
         if (activeModal != null) {
             return activeModal.mouseDragged(click, deltaX, deltaY);
         }
@@ -405,7 +405,7 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(MouseButtonEvent click) {
         if (activeModal != null) {
             return activeModal.mouseReleased(click);
         }
@@ -413,13 +413,13 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput keyInput) {
+    public boolean keyPressed(KeyEvent keyInput) {
         int keyCode = keyInput.key();
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             if (activeModal != null) {
                 closeModal();
             } else {
-                this.close();
+                this.onClose();
             }
             return true;
         }
@@ -436,7 +436,7 @@ public class PartyListScreen extends ScrollableListScreen {
     }
 
     @Override
-    public boolean charTyped(CharInput charInput) {
+    public boolean charTyped(CharacterEvent charInput) {
         if (activeModal != null) {
             return activeModal.charTyped(charInput);
         }

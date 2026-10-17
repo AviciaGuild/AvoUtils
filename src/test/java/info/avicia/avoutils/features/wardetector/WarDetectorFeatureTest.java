@@ -7,7 +7,6 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +14,7 @@ import org.mockito.MockedStatic;
 
 import java.lang.reflect.Field;
 import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -89,13 +89,13 @@ class WarDetectorFeatureTest {
     void onSystemChatIgnoresNullOrDisconnectedOrNonMember() {
         withMockedServices(false, true, manager -> {
             WarDetectorFeature feature = new WarDetectorFeature();
-            feature.onSystemChat(Text.literal("Territory Captured"));
+            feature.onSystemChat(Component.literal("Territory Captured"));
             verify(manager, never()).sendEvent(anyString(), any(JsonObject.class));
         });
 
         withMockedServices(true, false, manager -> {
             WarDetectorFeature feature = new WarDetectorFeature();
-            feature.onSystemChat(Text.literal("Territory Captured"));
+            feature.onSystemChat(Component.literal("Territory Captured"));
             verify(manager, never()).sendEvent(anyString(), any(JsonObject.class));
         });
 
@@ -110,7 +110,7 @@ class WarDetectorFeatureTest {
     void onSystemChatDoesNotSendWhenNoActiveWar() {
         withMockedServices(true, true, manager -> {
             WarDetectorFeature feature = new WarDetectorFeature();
-            feature.onSystemChat(Text.literal("Territory Captured"));
+            feature.onSystemChat(Component.literal("Territory Captured"));
             verify(manager, never()).sendEvent(anyString(), any(JsonObject.class));
         });
     }

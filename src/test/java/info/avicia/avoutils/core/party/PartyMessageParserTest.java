@@ -1,10 +1,10 @@
 package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.testutil.TextFixtures;
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import net.minecraft.network.chat.Component;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -169,7 +169,7 @@ class PartyMessageParserTest {
 
     @Test
     void parseDetectsKickWithClassNicknameAndResolvesHoverRealName() {
-        Text message = TextFixtures.hoverText(
+        Component message = TextFixtures.hoverText(
                 "avo ignis war dps has been kicked from the party!",
                 "'s real name is CupBoi");
         PartyMessageParser.Result result =

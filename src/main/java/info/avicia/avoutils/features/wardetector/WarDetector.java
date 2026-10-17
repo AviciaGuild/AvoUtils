@@ -6,9 +6,6 @@ import com.wynntils.models.war.type.WarTowerState;
 import com.wynntils.utils.type.RangedValue;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.features.chatbridge.DiscordMarkdown;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.player.PlayerEntity;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -16,6 +13,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * Detects guild war stats and outcomes using Wynntils tower state API.
@@ -205,21 +204,21 @@ public final class WarDetector {
     }
 
     private static List<String> collectNearbyPlayers() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc == null || mc.player == null || mc.world == null) return List.of();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.player == null || mc.level == null) return List.of();
         Set<String> names = new LinkedHashSet<>();
         String local = localUsername();
         if (isValidUsername(local)) names.add(local.trim());
-        for (PlayerEntity other : mc.world.getPlayers()) {
+        for (Player other : mc.level.players()) {
             if (other == null || other == mc.player) continue;
-            if (mc.player.squaredDistanceTo(other) > TRACKING_RADIUS_SQ) continue;
+            if (mc.player.distanceToSqr(other) > TRACKING_RADIUS_SQ) continue;
             String name = extractUsername(other);
             if (isValidUsername(name)) names.add(name.trim());
         }
         return List.copyOf(names);
     }
 
-    private static String extractUsername(PlayerEntity player) {
+    private static String extractUsername(Player player) {
         if (player == null) return null;
         if (player.getGameProfile() != null && player.getGameProfile().name() != null) {
             String name = player.getGameProfile().name();
@@ -229,13 +228,13 @@ public final class WarDetector {
     }
 
     private static String localUsername() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) return null;
         if (mc.player != null) {
             String name = extractUsername(mc.player);
             if (isValidUsername(name)) return name;
         }
-        return (mc.getSession() != null) ? mc.getSession().getUsername() : null;
+        return (mc.getUser() != null) ? mc.getUser().getName() : null;
     }
 
     private static boolean isValidUsername(String name) {

@@ -1,10 +1,9 @@
 package info.avicia.avoutils.core.gui;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ClickableWidget;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
 
 /**
  * Vertical scrolling for a clipped region of a screen, such as a settings list or a modal body that
@@ -28,7 +27,7 @@ public final class ScrollViewport {
     private int contentHeight;
     private int offset;
 
-    private record TrackedWidget(ClickableWidget widget, int baseY) {}
+    private record TrackedWidget(AbstractWidget widget, int baseY) {}
 
     /**
      * Sets the visible region and the content height (measured from {@code top}), clamping the
@@ -79,7 +78,7 @@ public final class ScrollViewport {
     /**
      * Registers a widget whose current Y is its unscrolled position, and returns it.
      */
-    public <T extends ClickableWidget> T track(T widget) {
+    public <T extends AbstractWidget> T track(T widget) {
         trackedWidgets.add(new TrackedWidget(widget, widget.getY()));
         widget.setY(widget.getY() - offset);
         return widget;
@@ -94,18 +93,18 @@ public final class ScrollViewport {
 
     /**
      * Clips subsequent drawing to the visible region between {@code left} and {@code right}. Must be
-     * paired with {@link DrawContext#disableScissor()}.
+     * paired with {@link GuiGraphics#disableScissor()}.
      */
-    public void enableScissor(DrawContext context, int left, int right) {
+    public void enableScissor(GuiGraphics context, int left, int right) {
         context.enableScissor(left, top, right, bottom);
     }
 
     /**
      * Renders the tracked widgets; call between {@link #enableScissor} and
-     * {@link DrawContext#disableScissor()}. Hover is suppressed while the cursor is outside the
+     * {@link GuiGraphics#disableScissor()}. Hover is suppressed while the cursor is outside the
      * visible region, so a clipped half of a widget can't light up the visible half.
      */
-    public void renderTracked(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderTracked(GuiGraphics context, int mouseX, int mouseY, float delta) {
         int hoverY = contains(mouseY) ? mouseY : Integer.MIN_VALUE;
         for (TrackedWidget tracked : trackedWidgets) {
             tracked.widget().render(context, mouseX, hoverY, delta);
@@ -115,7 +114,7 @@ public final class ScrollViewport {
     /**
      * Draws a thin scrollbar with its left edge at {@code x}, only when the content overflows.
      */
-    public void drawScrollbar(DrawContext context, int x) {
+    public void drawScrollbar(GuiGraphics context, int x) {
         int maxOffset = getMaxOffset();
         if (maxOffset == 0) {
             return;

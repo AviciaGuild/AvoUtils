@@ -46,7 +46,7 @@ class EmojiFeatureTest {
     @Test
     void currentPackFormatMatchesTheGamesVersionFile() throws IOException {
         // What the client does at startup; reads version.json from the Minecraft jar
-        SharedConstants.createGameVersion();
+        SharedConstants.tryDetectVersion();
 
         try (InputStream in = SharedConstants.class.getResourceAsStream("/version.json")) {
             assertNotNull(in);

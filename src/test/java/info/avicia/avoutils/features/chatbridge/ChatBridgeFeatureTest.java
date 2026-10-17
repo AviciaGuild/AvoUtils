@@ -9,7 +9,6 @@ import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.testutil.TestReflection;
 import info.avicia.avoutils.testutil.TextFixtures;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
-import net.minecraft.text.Text;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +16,7 @@ import org.mockito.MockedStatic;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,19 +52,19 @@ class ChatBridgeFeatureTest {
 
     @Test
     void leadingGuildColorIsDetectedOnLeafStyle() throws Exception {
-        Text message = Text.empty().append(TextFixtures.coloredText("hi", GUILD_CHAT_COLOR));
+        Component message = Component.empty().append(TextFixtures.coloredText("hi", GUILD_CHAT_COLOR));
         assertTrue(hasLeadingGuildChatColor(message));
     }
 
     @Test
     void otherColorsAreNotGuildChat() throws Exception {
         assertFalse(hasLeadingGuildChatColor(TextFixtures.coloredText("hi", 0xFF0000)));
-        assertFalse(hasLeadingGuildChatColor(Text.literal("hi")));
+        assertFalse(hasLeadingGuildChatColor(Component.literal("hi")));
     }
 
-    private static boolean hasLeadingGuildChatColor(Text message) throws Exception {
+    private static boolean hasLeadingGuildChatColor(Component message) throws Exception {
         return TestReflection.invokeStatic(ChatBridgeFeature.class, "hasLeadingGuildChatColor",
-                new Class[]{Text.class}, message);
+                new Class[]{Component.class}, message);
     }
 
     private void withMockedServices(boolean connected, boolean guildMember, Consumer<AvoWebSocketManager> testBody) {
@@ -115,7 +115,7 @@ class ChatBridgeFeatureTest {
         withMockedServices(true, true, manager -> {
             ChatBridgeFeature feature = new ChatBridgeFeature();
             feature.initialize(new ModConfig());
-            feature.onSystemChat(Text.literal("Steve: hello"));
+            feature.onSystemChat(Component.literal("Steve: hello"));
             verify(manager, never()).sendEvent(anyString(), any(JsonObject.class));
         });
     }

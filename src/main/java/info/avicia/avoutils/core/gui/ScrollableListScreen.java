@@ -1,8 +1,8 @@
 package info.avicia.avoutils.core.gui;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
 /**
  * Base for screens that render a scrollable vertical list of cards. Provides the shared scroll
@@ -15,7 +15,7 @@ public abstract class ScrollableListScreen extends Screen {
 
     protected int scrollOffset = 0;
 
-    protected ScrollableListScreen(Text title) {
+    protected ScrollableListScreen(Component title) {
         super(title);
     }
 
@@ -53,9 +53,9 @@ public abstract class ScrollableListScreen extends Screen {
 
     /**
      * Clips drawing to the list viewport so partly scrolled rows don't paint over the top bar. Must
-     * be paired with {@link DrawContext#disableScissor()}.
+     * be paired with {@link GuiGraphics#disableScissor()}.
      */
-    protected void enableListScissor(DrawContext context, int listTop) {
+    protected void enableListScissor(GuiGraphics context, int listTop) {
         context.enableScissor(0, listTop, width, getListBottom());
     }
 }

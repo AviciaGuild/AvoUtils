@@ -2,14 +2,13 @@ package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.PlayerUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 /**
  * Single chat entry point for in-game party tracking. Parses party chat messages, keeps the
@@ -42,7 +41,7 @@ public class InGamePartyTracker {
      *
      * @return true if the message should be hidden from the chat.
      */
-    public boolean onChatMessage(Text message) {
+    public boolean onChatMessage(Component message) {
         if (message == null) return false;
         return onChatMessage(message.getString(), message);
     }
@@ -61,7 +60,7 @@ public class InGamePartyTracker {
      *
      * @return true if the message should be hidden from the chat.
      */
-    public boolean onChatMessage(String text, Text message) {
+    public boolean onChatMessage(String text, Component message) {
         PartyMessageParser.Result result = PartyMessageParser.parse(text, message);
         if (result == null) {
             return false;
@@ -124,7 +123,7 @@ public class InGamePartyTracker {
     }
 
     public void triggerPartyList() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) {
             return;
         }
@@ -134,10 +133,10 @@ public class InGamePartyTracker {
                 return;
             }
             lastTriggerTime = now;
-            if (mc.player != null && mc.player.networkHandler != null) {
+            if (mc.player != null && mc.player.connection != null) {
                 AvoUtilsMod.LOGGER.info("[AvoUtils] Triggering /party list sync");
                 hiddenPartyListExpireTime = now + PARTY_LIST_HIDE_WINDOW_MS;
-                mc.player.networkHandler.sendChatCommand("party list");
+                mc.player.connection.sendCommand("party list");
             }
         });
     }

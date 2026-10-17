@@ -1,12 +1,11 @@
 package info.avicia.avoutils.features.emojis;
 
 import info.avicia.avoutils.AvoUtilsMod;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.text.TextColor;
-
 import java.util.Optional;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 
 /**
  * Replaces emoji shortcodes in Text components
@@ -19,7 +18,7 @@ public class EmojiReplacer {
         return EmojiFeature.isValidShortcodeChar(c);
     }
 
-    public static Text replace(Text text) {
+    public static Component replace(Component text) {
         if (text == null)
             return null;
 
@@ -34,7 +33,7 @@ public class EmojiReplacer {
         return replace(text, feature.getActiveTrie());
     }
 
-    static Text replace(Text text, EmojiTrie trie) {
+    static Component replace(Component text, EmojiTrie trie) {
         if (text == null)
             return null;
         if (trie == null || trie.isEmpty())
@@ -46,19 +45,19 @@ public class EmojiReplacer {
             return text;
         }
 
-        MutableText result = Text.empty();
+        MutableComponent result = Component.empty();
         boolean[] modified = { false };
 
         text.visit((style, str) -> {
             if (str.isEmpty())
                 return Optional.empty();
 
-            MutableText replaced = replaceShortcodes(str, trie, style);
+            MutableComponent replaced = replaceShortcodes(str, trie, style);
             if (replaced != null) {
                 result.append(replaced);
                 modified[0] = true;
             } else {
-                result.append(Text.literal(str).setStyle(style));
+                result.append(Component.literal(str).setStyle(style));
             }
             return Optional.empty();
         }, Style.EMPTY);
@@ -66,13 +65,13 @@ public class EmojiReplacer {
         return modified[0] ? result : text;
     }
 
-    private static MutableText replaceShortcodes(String text, EmojiTrie trie, Style parentStyle) {
+    private static MutableComponent replaceShortcodes(String text, EmojiTrie trie, Style parentStyle) {
         int len = text.length();
         int firstColon = text.indexOf(':');
         if (firstColon == -1 || firstColon == len - 1)
             return null;
 
-        MutableText root = null;
+        MutableComponent root = null;
         int lastEnd = 0;
         int i = firstColon;
 
@@ -96,16 +95,16 @@ public class EmojiReplacer {
                     String replacement = trie.search(text, i, end + 1);
                     if (replacement != null) {
                         if (root == null)
-                            root = Text.empty();
+                            root = Component.empty();
 
                         if (i > lastEnd) {
-                            root.append(Text.literal(text.substring(lastEnd, i)).setStyle(parentStyle));
+                            root.append(Component.literal(text.substring(lastEnd, i)).setStyle(parentStyle));
                         }
 
                         String emojiName = text.substring(i + 1, end);
                         Style emojiStyle = parentStyle.withColor(EMOJI_COLOR)
                                 .withHoverEvent(EmojiTooltipHelper.createEmojiHover(replacement, emojiName));
-                        root.append(Text.literal(replacement).setStyle(emojiStyle));
+                        root.append(Component.literal(replacement).setStyle(emojiStyle));
 
                         lastEnd = end + 1;
                         i = end + 1;
@@ -122,7 +121,7 @@ public class EmojiReplacer {
             return null;
 
         if (lastEnd < len) {
-            root.append(Text.literal(text.substring(lastEnd)).setStyle(parentStyle));
+            root.append(Component.literal(text.substring(lastEnd)).setStyle(parentStyle));
         }
 
         return root;

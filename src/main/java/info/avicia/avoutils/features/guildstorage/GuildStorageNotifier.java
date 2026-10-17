@@ -11,15 +11,14 @@ import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.LoreComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemLore;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -109,9 +108,9 @@ public class GuildStorageNotifier implements AvoFeature {
 
     // ── Menu scanning (called from HandledScreenMixin) ──────────────────
 
-    public void onContainerRender(ScreenHandler handler) {
+    public void onContainerRender(AbstractContainerMenu handler) {
         if (!isActive() || handler == null) return;
-        if (MinecraftClient.getInstance().player == null) return;
+        if (Minecraft.getInstance().player == null) return;
 
         StorageSnapshot snapshot = extractSnapshot(handler);
         if (snapshot == null) return;
@@ -241,13 +240,13 @@ public class GuildStorageNotifier implements AvoFeature {
 
     private void notifyThreshold(String resourceName, long current, long max, int thresholdPercent) {
         if (!areNotifsEnabled()) return;
-        MinecraftClient.getInstance().execute(() -> {
-            if (MinecraftClient.getInstance().player != null) {
+        Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().player != null) {
                 var msg = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                        .append(Text.literal(resourceName).formatted(Formatting.GOLD))
-                        .append(Text.literal(" storage reached ").formatted(Formatting.GRAY))
-                        .append(Text.literal(thresholdPercent + "%").formatted(Formatting.GREEN));
-                MinecraftClient.getInstance().player.sendMessage(msg, false);
+                        .append(Component.literal(resourceName).withStyle(ChatFormatting.GOLD))
+                        .append(Component.literal(" storage reached ").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal(thresholdPercent + "%").withStyle(ChatFormatting.GREEN));
+                Minecraft.getInstance().player.displayClientMessage(msg, false);
             }
         });
     }
@@ -286,10 +285,10 @@ public class GuildStorageNotifier implements AvoFeature {
 
     // ── Menu snapshot extraction ────────────────────────────────────────
 
-    static StorageSnapshot extractSnapshot(ScreenHandler handler) {
+    static StorageSnapshot extractSnapshot(AbstractContainerMenu handler) {
         for (Slot slot : handler.slots) {
-            if (slot == null || !slot.hasStack()) continue;
-            StorageSnapshot snapshot = parseSnapshot(slot.getStack());
+            if (slot == null || !slot.hasItem()) continue;
+            StorageSnapshot snapshot = parseSnapshot(slot.getItem());
             if (snapshot != null) return snapshot;
         }
         return null;
@@ -297,9 +296,9 @@ public class GuildStorageNotifier implements AvoFeature {
 
     static StorageSnapshot parseSnapshot(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        LoreComponent lore = stack.get(DataComponentTypes.LORE);
+        ItemLore lore = stack.get(DataComponents.LORE);
         if (lore == null || lore.lines().isEmpty()) return null;
-        return parseSnapshotLines(lore.lines().stream().map(Text::getString).toList());
+        return parseSnapshotLines(lore.lines().stream().map(Component::getString).toList());
     }
 
     static StorageSnapshot parseSnapshotLines(List<String> rawLines) {

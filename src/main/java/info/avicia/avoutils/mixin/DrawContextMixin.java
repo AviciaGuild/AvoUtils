@@ -3,13 +3,6 @@ package info.avicia.avoutils.mixin;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiTooltipComponent;
 import info.avicia.avoutils.features.emojis.EmojiTooltipHelper;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.HoveredTooltipPositioner;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.client.gui.tooltip.TooltipPositioner;
-import net.minecraft.text.Style;
-import net.minecraft.util.Identifier;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -18,26 +11,33 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
+import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
 
 /**
  * Intercepts drawHoverEvent to render a large emoji preview when hovering over emoji text.
  */
-@Mixin(DrawContext.class)
+@Mixin(GuiGraphics.class)
 public abstract class DrawContextMixin {
 
     @Shadow
-    public abstract void drawTooltipImmediately(
-            TextRenderer textRenderer,
-            List<TooltipComponent> components,
+    public abstract void renderTooltip(
+            Font textRenderer,
+            List<ClientTooltipComponent> components,
             int x,
             int y,
-            TooltipPositioner positioner,
+            ClientTooltipPositioner positioner,
             @Nullable Identifier texture
     );
 
-    @Inject(method = "drawHoverEvent", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderComponentHoverEffect", at = @At("HEAD"), cancellable = true)
     private void avoutils$drawEmojiHoverTooltip(
-            TextRenderer textRenderer,
+            Font textRenderer,
             @Nullable Style style,
             int mouseX,
             int mouseY,
@@ -53,13 +53,13 @@ public abstract class DrawContextMixin {
 
         EmojiTooltipHelper.EmojiHoverData data = EmojiTooltipHelper.parseEmojiHover(style.getHoverEvent());
         if (data != null) {
-            List<TooltipComponent> components = List.of(new EmojiTooltipComponent(data.replacement(), data.emojiName()));
-            this.drawTooltipImmediately(
+            List<ClientTooltipComponent> components = List.of(new EmojiTooltipComponent(data.replacement(), data.emojiName()));
+            this.renderTooltip(
                     textRenderer,
                     components,
                     mouseX,
                     mouseY,
-                    HoveredTooltipPositioner.INSTANCE,
+                    DefaultTooltipPositioner.INSTANCE,
                     null
             );
             ci.cancel();

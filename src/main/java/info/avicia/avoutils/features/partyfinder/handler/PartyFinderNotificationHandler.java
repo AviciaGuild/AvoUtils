@@ -5,16 +5,16 @@ import com.google.gson.JsonElement;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.text.MutableText;
-import net.minecraft.util.Formatting;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.sounds.SoundEvents;
 
 /**
  * Handles playing sounds and printing notifications for party finder events
@@ -37,14 +37,14 @@ public class PartyFinderNotificationHandler {
                 String leaderName = json.get("leader_name").getAsString();
                 String username = json.get("username").getAsString();
 
-                MinecraftClient mc = MinecraftClient.getInstance();
+                Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null && PlayerUtil.isSelf(leaderName) && !PlayerUtil.isSelf(username)) {
-                    MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                            .append(Text.literal(username).formatted(Formatting.WHITE))
-                            .append(Text.literal(" has joined your party!").formatted(Formatting.GRAY));
-                    mc.player.sendMessage(formatted, false);
+                    MutableComponent formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                            .append(Component.literal(username).withStyle(ChatFormatting.WHITE))
+                            .append(Component.literal(" has joined your party!").withStyle(ChatFormatting.GRAY));
+                    mc.player.displayClientMessage(formatted, false);
                     if (config.notificationSoundsEnabled) {
-                        mc.player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+                        mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                     }
                 }
             }
@@ -54,13 +54,13 @@ public class PartyFinderNotificationHandler {
             if (json.has("leader_name")) {
                 String leaderName = json.get("leader_name").getAsString();
 
-                MinecraftClient mc = MinecraftClient.getInstance();
+                Minecraft mc = Minecraft.getInstance();
                 if (PlayerUtil.isSelf(leaderName) && mc.player != null) {
-                    MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                            .append(Text.literal("Your party is now full!").formatted(Formatting.GREEN));
-                    mc.player.sendMessage(formatted, false);
+                    MutableComponent formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                            .append(Component.literal("Your party is now full!").withStyle(ChatFormatting.GREEN));
+                    mc.player.displayClientMessage(formatted, false);
                     if (config.notificationSoundsEnabled) {
-                        mc.player.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                        mc.player.playSound(SoundEvents.PLAYER_LEVELUP, 1.0f, 1.0f);
                     }
                 }
             }
@@ -77,7 +77,7 @@ public class PartyFinderNotificationHandler {
             String leaderName = json.get("leader_name").getAsString();
             JsonArray activitiesArr = json.getAsJsonArray("activities");
 
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             if (mc.player == null || PlayerUtil.isSelf(leaderName)) {
                 return;
             }
@@ -90,19 +90,19 @@ public class PartyFinderNotificationHandler {
             String activityStr = String.join(", ", activityNames);
 
             // Build announcement message
-            MutableText formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                    .append(Text.literal(leaderName).formatted(Formatting.WHITE))
-                    .append(Text.literal(" started a ").formatted(Formatting.GRAY))
-                    .append(Text.literal(activityStr).formatted(Formatting.WHITE))
-                    .append(Text.literal(" party! ").formatted(Formatting.GRAY));
+            MutableComponent formatted = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                    .append(Component.literal(leaderName).withStyle(ChatFormatting.WHITE))
+                    .append(Component.literal(" started a ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal(activityStr).withStyle(ChatFormatting.WHITE))
+                    .append(Component.literal(" party! ").withStyle(ChatFormatting.GRAY));
 
-            MutableText joinPill = WynnPillUtil.createClickable("JOIN", Formatting.GREEN, Formatting.BLACK,
+            MutableComponent joinPill = WynnPillUtil.createClickable("JOIN", ChatFormatting.GREEN, ChatFormatting.BLACK,
                     "/apf join " + leaderName, "Click to join party");
             formatted.append(joinPill);
 
-            mc.player.sendMessage(formatted, false);
+            mc.player.displayClientMessage(formatted, false);
             if (config.notificationSoundsEnabled) {
-                mc.player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+                mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
             }
         });
 

@@ -184,8 +184,8 @@ class UpdateFeatureTest {
                 .filter(s -> s.getStyle().getClickEvent() != null)
                 .findFirst();
         assertTrue(restartPill.isPresent());
-        assertInstanceOf(net.minecraft.text.ClickEvent.RunCommand.class, restartPill.get().getStyle().getClickEvent());
-        assertEquals("/avo update restart", ((net.minecraft.text.ClickEvent.RunCommand) restartPill.get().getStyle().getClickEvent()).command());
+        assertInstanceOf(net.minecraft.network.chat.ClickEvent.RunCommand.class, restartPill.get().getStyle().getClickEvent());
+        assertEquals("/avo update restart", ((net.minecraft.network.chat.ClickEvent.RunCommand) restartPill.get().getStyle().getClickEvent()).command());
     }
 
     @Test
@@ -199,8 +199,8 @@ class UpdateFeatureTest {
                 .filter(s -> s.getStyle().getClickEvent() != null)
                 .findFirst();
         assertTrue(restartPill.isPresent());
-        assertInstanceOf(net.minecraft.text.ClickEvent.RunCommand.class, restartPill.get().getStyle().getClickEvent());
-        assertEquals("/avo update restart", ((net.minecraft.text.ClickEvent.RunCommand) restartPill.get().getStyle().getClickEvent()).command());
+        assertInstanceOf(net.minecraft.network.chat.ClickEvent.RunCommand.class, restartPill.get().getStyle().getClickEvent());
+        assertEquals("/avo update restart", ((net.minecraft.network.chat.ClickEvent.RunCommand) restartPill.get().getStyle().getClickEvent()).command());
     }
 
     @Test
@@ -219,8 +219,8 @@ class UpdateFeatureTest {
                 .filter(s -> s.getStyle().getClickEvent() != null)
                 .findFirst();
         assertTrue(updatePill.isPresent());
-        assertInstanceOf(net.minecraft.text.ClickEvent.RunCommand.class, updatePill.get().getStyle().getClickEvent());
-        assertEquals("/avo update download", ((net.minecraft.text.ClickEvent.RunCommand) updatePill.get().getStyle().getClickEvent()).command());
+        assertInstanceOf(net.minecraft.network.chat.ClickEvent.RunCommand.class, updatePill.get().getStyle().getClickEvent());
+        assertEquals("/avo update download", ((net.minecraft.network.chat.ClickEvent.RunCommand) updatePill.get().getStyle().getClickEvent()).command());
     }
 
     @Test

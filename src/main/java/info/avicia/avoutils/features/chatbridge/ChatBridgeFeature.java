@@ -10,15 +10,15 @@ import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.UsernameResolver;
 import info.avicia.avoutils.core.util.WynnPillUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.text.Style;
-import net.minecraft.text.TextColor;
-import net.minecraft.util.Formatting;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 
 /**
  * Chat bridge feature that relays messages between in-game guild chat and Discord.
@@ -74,13 +74,13 @@ public class ChatBridgeFeature implements AvoFeature {
             if (json.has("username") && json.has("message")) {
                 String username = json.get("username").getAsString();
                 String message = json.get("message").getAsString();
-                if (MinecraftClient.getInstance().player != null) {
-                    MutableText prefix = WynnPillUtil.createPrefixedPill("AvoBridge", false);
-                    MutableText formatted = prefix
-                            .append(Text.literal(username).formatted(Formatting.DARK_AQUA))
-                            .append(Text.literal(": ").formatted(Formatting.DARK_AQUA))
-                            .append(Text.literal(message).formatted(Formatting.AQUA));
-                    MinecraftClient.getInstance().player.sendMessage(formatted, false);
+                if (Minecraft.getInstance().player != null) {
+                    MutableComponent prefix = WynnPillUtil.createPrefixedPill("AvoBridge", false);
+                    MutableComponent formatted = prefix
+                            .append(Component.literal(username).withStyle(ChatFormatting.DARK_AQUA))
+                            .append(Component.literal(": ").withStyle(ChatFormatting.DARK_AQUA))
+                            .append(Component.literal(message).withStyle(ChatFormatting.AQUA));
+                    Minecraft.getInstance().player.displayClientMessage(formatted, false);
                 }
             }
         });
@@ -101,7 +101,7 @@ public class ChatBridgeFeature implements AvoFeature {
     }
 
     /** Called when a system message is received. */
-    public void onSystemChat(Text message) {
+    public void onSystemChat(Component message) {
         if (message == null) return;
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
         if (!isBridgeActive()) return;
@@ -158,14 +158,14 @@ public class ChatBridgeFeature implements AvoFeature {
         }
     }
 
-    private static boolean hasLeadingGuildChatColor(Text message) {
+    private static boolean hasLeadingGuildChatColor(Component message) {
         if (message == null) return false;
         TextColor rootColor = message.getStyle().getColor();
-        if (rootColor != null) return rootColor.getRgb() == GUILD_CHAT_COLOR;
+        if (rootColor != null) return rootColor.getValue() == GUILD_CHAT_COLOR;
         Optional<Boolean> leadingColorIsGuild = message.visit((style, text) -> {
             if (text == null || text.isBlank()) return Optional.empty();
             TextColor color = style.getColor();
-            return Optional.of(color != null && color.getRgb() == GUILD_CHAT_COLOR);
+            return Optional.of(color != null && color.getValue() == GUILD_CHAT_COLOR);
         }, Style.EMPTY);
         return leadingColorIsGuild.orElse(false);
     }

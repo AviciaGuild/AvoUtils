@@ -2,11 +2,10 @@ package info.avicia.avoutils.features.chatbridge;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.UsernameResolver;
-import net.minecraft.text.Text;
-
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.network.chat.Component;
 
 /**
  * Detects guild bank deposit/withdrawal messages and formats 
@@ -22,7 +21,7 @@ final class BankDetector {
             Pattern.CASE_INSENSITIVE);
     private static final String DEFAULT_ACCESS_TIER = "Unknown";
 
-    static Result tryDetect(String cleaned, Text message) {
+    static Result tryDetect(String cleaned, Component message) {
         if (cleaned == null || !cleaned.contains("Guild")
                 || (!cleaned.contains("deposited") && !cleaned.contains("withdrew"))) {
             return null;

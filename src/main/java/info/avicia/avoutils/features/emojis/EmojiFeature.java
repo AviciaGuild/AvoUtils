@@ -16,13 +16,12 @@ import info.avicia.avoutils.features.emojis.models.FontConfig;
 import info.avicia.avoutils.features.emojis.models.FontProvider;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.server.packs.PackType;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 
@@ -315,7 +314,7 @@ public class EmojiFeature implements AvoFeature {
             }
             twemojiManager.loadResources();
             loadAndCacheEmojis();
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client != null) {
                 reloadResourcesWithPacks(client);
             }
@@ -323,36 +322,36 @@ public class EmojiFeature implements AvoFeature {
     }
 
     public void handleReloadCommand() {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null && client.player != null) {
-            client.player.sendMessage(
+            client.player.displayClientMessage(
                     WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                            .append(Text.literal("Checking and updating emojis...").formatted(Formatting.GRAY)),
+                            .append(Component.literal("Checking and updating emojis...").withStyle(ChatFormatting.GRAY)),
                     false
             );
         }
         reloadEmojis().thenRun(() -> {
-            MinecraftClient c = MinecraftClient.getInstance();
+            Minecraft c = Minecraft.getInstance();
             if (c != null) {
                 c.execute(() -> {
                     if (c.player != null) {
-                        c.player.sendMessage(
+                        c.player.displayClientMessage(
                                 WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                                        .append(Text.literal("Emojis updated successfully!").formatted(Formatting.GREEN)),
+                                        .append(Component.literal("Emojis updated successfully!").withStyle(ChatFormatting.GREEN)),
                                 false
                         );
                     }
                 });
             }
         }).exceptionally(ex -> {
-            MinecraftClient c = MinecraftClient.getInstance();
+            Minecraft c = Minecraft.getInstance();
             if (c != null) {
                 c.execute(() -> {
                     if (c.player != null) {
                         String err = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
-                        c.player.sendMessage(
+                        c.player.displayClientMessage(
                                 WynnPillUtil.createPrefixedPill("AvoUtils", true)
-                                        .append(Text.literal("Failed to update emojis: " + err).formatted(Formatting.RED)),
+                                        .append(Component.literal("Failed to update emojis: " + err).withStyle(ChatFormatting.RED)),
                                 false
                         );
                     }
@@ -366,43 +365,43 @@ public class EmojiFeature implements AvoFeature {
         config.emojiEnabled = !config.emojiEnabled;
         config.save();
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        Formatting statusColor = config.emojiEnabled ? Formatting.GREEN : Formatting.RED;
+        Minecraft client = Minecraft.getInstance();
+        ChatFormatting statusColor = config.emojiEnabled ? ChatFormatting.GREEN : ChatFormatting.RED;
         String statusWord = config.emojiEnabled ? "enabled" : "disabled";
 
-        MutableText message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Text.literal("Emojis are now ").formatted(Formatting.GRAY))
-                .append(Text.literal(statusWord).formatted(statusColor))
-                .append(Text.literal(".").formatted(Formatting.GRAY));
+        MutableComponent message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                .append(Component.literal("Emojis are now ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(statusWord).withStyle(statusColor))
+                .append(Component.literal(".").withStyle(ChatFormatting.GRAY));
 
         if (client.player != null) {
-            client.player.sendMessage(message, false);
+            client.player.displayClientMessage(message, false);
             ensurePacksLoaded();
         }
     }
 
-    public static void reloadResourcesWithPacks(MinecraftClient client) {
+    public static void reloadResourcesWithPacks(Minecraft client) {
         if (client == null)
             return;
         client.execute(() -> {
-            if (client.getResourcePackManager() == null)
+            if (client.getResourcePackRepository() == null)
                 return;
-            client.getResourcePackManager().scanPacks();
-            List<String> enabled = new ArrayList<>(client.getResourcePackManager().getEnabledIds());
-            if (client.getResourcePackManager().hasProfile("avoutils/twemoji") && !enabled.contains("avoutils/twemoji")) {
+            client.getResourcePackRepository().reload();
+            List<String> enabled = new ArrayList<>(client.getResourcePackRepository().getSelectedIds());
+            if (client.getResourcePackRepository().isAvailable("avoutils/twemoji") && !enabled.contains("avoutils/twemoji")) {
                 enabled.add("avoutils/twemoji");
             }
-            if (client.getResourcePackManager().hasProfile("avoutils/emojis") && !enabled.contains("avoutils/emojis")) {
+            if (client.getResourcePackRepository().isAvailable("avoutils/emojis") && !enabled.contains("avoutils/emojis")) {
                 enabled.add("avoutils/emojis");
             }
-            client.getResourcePackManager().setEnabledProfiles(enabled);
-            client.reloadResources();
+            client.getResourcePackRepository().setSelected(enabled);
+            client.reloadResourcePacks();
         });
     }
 
     public void ensurePacksLoaded() {
         if (config != null && config.emojiEnabled && !packsLoaded) {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client != null) {
                 reloadResourcesWithPacks(client);
                 packsLoaded = true;
@@ -899,7 +898,7 @@ public class EmojiFeature implements AvoFeature {
      * The running game's resource pack format.
      */
     static int currentPackFormat() {
-        return SharedConstants.getGameVersion().packVersion(ResourceType.CLIENT_RESOURCES).major();
+        return SharedConstants.getCurrentVersion().packVersion(PackType.CLIENT_RESOURCES).major();
     }
 
     // ── pack.mcmeta structures ───────────────────────────────────────────

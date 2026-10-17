@@ -2,17 +2,17 @@ package info.avicia.avoutils.features.emojis;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.util.Colors;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.util.CommonColors;
 import org.joml.Matrix3x2fStack;
 
 /**
  * Custom tooltip component rendering a large emoji preview and shortcode name.
  */
 @Environment(EnvType.CLIENT)
-public class EmojiTooltipComponent implements TooltipComponent {
+public class EmojiTooltipComponent implements ClientTooltipComponent {
 
     private final String emojiChar;
     private final String emojiName;
@@ -41,15 +41,15 @@ public class EmojiTooltipComponent implements TooltipComponent {
     }
 
     @Override
-    public int getWidth(TextRenderer textRenderer) {
+    public int getWidth(Font textRenderer) {
         String label = emojiName != null ? ":" + emojiName + ":" : "";
-        int textWidth = textRenderer.getWidth(label);
+        int textWidth = textRenderer.width(label);
         return Math.max(size, textWidth);
     }
 
     @Override
-    public int getHeight(TextRenderer textRenderer) {
-        return size + 7 + textRenderer.fontHeight;
+    public int getHeight(Font textRenderer) {
+        return size + 7 + textRenderer.lineHeight;
     }
 
     public static float calculateScale(int size, float fontWidth, boolean isTwemoji) {
@@ -58,12 +58,12 @@ public class EmojiTooltipComponent implements TooltipComponent {
     }
 
     @Override
-    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, DrawContext context) {
+    public void renderImage(Font textRenderer, int x, int y, int width, int height, GuiGraphics context) {
         if (emojiChar == null || emojiChar.isEmpty()) {
             return;
         }
 
-        float emojiFontWidth = Math.max(1, textRenderer.getWidth(emojiChar));
+        float emojiFontWidth = Math.max(1, textRenderer.width(emojiChar));
         int codePoint = emojiChar.codePointAt(0);
         boolean isTwemoji = codePoint < 0xF0000;
         float baseHeight = isTwemoji ? 9.0f : 8.0f;
@@ -76,21 +76,21 @@ public class EmojiTooltipComponent implements TooltipComponent {
         float emojiX = x + (width - drawnWidth) / 2.0f;
         float emojiY = y + 2.0f + (size - drawnHeight) / 2.0f;
 
-        Matrix3x2fStack matrices = context.getMatrices();
+        Matrix3x2fStack matrices = context.pose();
         matrices.pushMatrix();
         try {
             matrices.translate(emojiX, emojiY);
             matrices.scale(scale, scale);
-            context.drawText(textRenderer, emojiChar, 0, localYOffset, Colors.WHITE, false);
+            context.drawString(textRenderer, emojiChar, 0, localYOffset, CommonColors.WHITE, false);
         } finally {
             matrices.popMatrix();
         }
 
         String label = emojiName != null ? ":" + emojiName + ":" : "";
-        int textWidth = textRenderer.getWidth(label);
+        int textWidth = textRenderer.width(label);
         int textX = x + Math.max(0, (width - textWidth) / 2);
         int textY = y + size + 5;
-        context.drawTextWithShadow(textRenderer, label, textX, textY, 0xFFAAAAAA);
+        context.drawString(textRenderer, label, textX, textY, 0xFFAAAAAA);
     }
 }
 

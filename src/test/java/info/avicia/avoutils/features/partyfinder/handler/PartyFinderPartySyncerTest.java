@@ -4,7 +4,6 @@ import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.features.partyfinder.api.ApiResponse;
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
-import net.minecraft.client.MinecraftClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -16,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.client.Minecraft;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -87,10 +87,10 @@ class PartyFinderPartySyncerTest {
 
     @Test
     void onPartyListParsedNeverAutoKicksReservedPlaceholder() throws Exception {
-        try (MockedStatic<MinecraftClient> mcStatic = mockStatic(MinecraftClient.class);
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
              MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
 
-            mcStatic.when(MinecraftClient::getInstance).thenReturn(null);
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Alice")).thenReturn(false);
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
@@ -113,10 +113,10 @@ class PartyFinderPartySyncerTest {
 
     @Test
     void onPartyListParsedAutoKicksInGameMemberWhoLeaves() throws Exception {
-        try (MockedStatic<MinecraftClient> mcStatic = mockStatic(MinecraftClient.class);
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
              MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
 
-            mcStatic.when(MinecraftClient::getInstance).thenReturn(null);
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
@@ -141,10 +141,10 @@ class PartyFinderPartySyncerTest {
 
     @Test
     void onPartyListParsedWithEmptyMembersDoesNotAutoKick() throws Exception {
-        try (MockedStatic<MinecraftClient> mcStatic = mockStatic(MinecraftClient.class);
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
              MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
 
-            mcStatic.when(MinecraftClient::getInstance).thenReturn(null);
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
@@ -168,10 +168,10 @@ class PartyFinderPartySyncerTest {
 
     @Test
     void onPartyListParsedKickingMemberRollsBackOnFailure() throws Exception {
-        try (MockedStatic<MinecraftClient> mcStatic = mockStatic(MinecraftClient.class);
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
              MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
 
-            mcStatic.when(MinecraftClient::getInstance).thenReturn(null);
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
             playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();

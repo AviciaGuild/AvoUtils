@@ -2,8 +2,6 @@ package info.avicia.avoutils.features.chatbridge;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.UsernameResolver;
-import net.minecraft.text.Text;
-
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -12,6 +10,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import net.minecraft.network.chat.Component;
 
 /**
  * Detects raid completions from system chat and returns structured data
@@ -32,7 +31,7 @@ final class RaidDetector {
 
     record RaidResult(String formattedMessage, int emeralds, int aspects) {}
 
-    static RaidResult tryDetect(String cleaned, Text message) {
+    static RaidResult tryDetect(String cleaned, Component message) {
         if (cleaned == null || !isRaidCandidateText(cleaned)) return null;
         cleaned = cleaned.replace(",and ", ", and ");
 
@@ -94,7 +93,7 @@ final class RaidDetector {
                 .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }
 
-    private static List<String> resolvePartyMembers(List<String> displayedNames, Text message) {
+    private static List<String> resolvePartyMembers(List<String> displayedNames, Component message) {
         Set<String> resolved = new LinkedHashSet<>();
         for (String displayedName : displayedNames) {
             if (displayedName.isBlank()) continue;

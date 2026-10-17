@@ -10,12 +10,6 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
 import info.avicia.avoutils.core.gui.UiStyle;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.Click;
-import net.minecraft.text.Text;
-import net.minecraft.text.OrderedText;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
@@ -25,6 +19,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import com.google.gson.JsonObject;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
@@ -58,16 +58,16 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     private final List<MemberRow> memberRows = new ArrayList<>();
  
     // Cached note wrapping layout calculations to avoid per-frame text wrapping overhead
-    private List<OrderedText> wrappedNote = null;
+    private List<FormattedCharSequence> wrappedNote = null;
     private int noteLinesCount = 0;
-    private List<OrderedText> wrappedStatus = null;
+    private List<FormattedCharSequence> wrappedStatus = null;
 
     private final Consumer<JsonObject> partyUpdateListener;
 
     public PartyDetailModal(PartyListScreen parent, PartyFinderClient apiClient,
                             InviteHandler inviteHandler,
                             PartyData party) {
-        super(MinecraftClient.getInstance(), MinecraftClient.getInstance().textRenderer, Text.literal("Party Details"));
+        super(Minecraft.getInstance(), Minecraft.getInstance().font, Component.literal("Party Details"));
         this.parent = parent;
         this.apiClient = apiClient;
         this.inviteHandler = inviteHandler;
@@ -81,10 +81,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public void initModal(MinecraftClient client, int width, int height) {
+    public void initModal(Minecraft client, int width, int height) {
         this.width = width;
         this.height = height;
-        this.clearAndInit();
+        this.rebuildWidgets();
     }
 
     @Override
@@ -135,37 +135,37 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int btnX = modalX + (modalW - totalButtonsWidth) / 2;
 
         // Close button
-        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Text.literal("✕"), () -> parent.closeModal());
+        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Component.literal("✕"), () -> parent.closeModal());
         closeBtn.setDanger(true);
         closeBtn.setBorderless(true);
-        addDrawableChild(closeBtn);
+        addRenderableWidget(closeBtn);
 
         if (isLeader) {
             // Leader controls
-            addDrawableChild(new FlatButtonWidget(btnX, btnY, 70, 20, Text.literal("Invite All"), () -> inviteAll()));
+            addRenderableWidget(new FlatButtonWidget(btnX, btnY, 70, 20, Component.literal("Invite All"), () -> inviteAll()));
             btnX += 75;
 
-            addDrawableChild(new FlatButtonWidget(btnX, btnY, 50, 20, Text.literal("Edit"), () -> parent.openEditModal(party)));
+            addRenderableWidget(new FlatButtonWidget(btnX, btnY, 50, 20, Component.literal("Edit"), () -> parent.openEditModal(party)));
             btnX += 55;
 
-            addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Reserve"), () -> reserveSlot()));
+            addRenderableWidget(new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal("Reserve"), () -> reserveSlot()));
             btnX += 65;
 
-            FlatButtonWidget disbandBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Disband"), () -> disbandParty());
+            FlatButtonWidget disbandBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal("Disband"), () -> disbandParty());
             disbandBtn.setDanger(true);
-            addDrawableChild(disbandBtn);
+            addRenderableWidget(disbandBtn);
         } else if (isInParty) {
             // Member controls
-            FlatButtonWidget leaveBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal("Leave"), () -> leaveParty());
+            FlatButtonWidget leaveBtn = new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal("Leave"), () -> leaveParty());
             leaveBtn.setDanger(true);
-            addDrawableChild(leaveBtn);
+            addRenderableWidget(leaveBtn);
 
             // Role change buttons
             btnX += 65;
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
                 String icon = RoleIconUtil.getStyledRolePrefix(r);
-                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> changeRole(r.toLowerCase(Locale.ROOT))));
+                addRenderableWidget(new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal(icon + " " + role), () -> changeRole(r.toLowerCase(Locale.ROOT))));
                 btnX += 65;
             }
         } else if (!party.isFull) {
@@ -173,7 +173,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
                 final String r = role;
                 String icon = RoleIconUtil.getStyledRolePrefix(r);
-                addDrawableChild(new FlatButtonWidget(btnX, btnY, 60, 20, Text.literal(icon + " " + role), () -> joinParty(r.toLowerCase(Locale.ROOT))));
+                addRenderableWidget(new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal(icon + " " + role), () -> joinParty(r.toLowerCase(Locale.ROOT))));
                 btnX += 65;
             }
         }
@@ -182,8 +182,8 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     }
 
     private void updateWrappedStatus() {
-        if (statusMessage != null && textRenderer != null) {
-            wrappedStatus = textRenderer.wrapLines(Text.literal(statusMessage), modalW - 24);
+        if (statusMessage != null && font != null) {
+            wrappedStatus = font.split(Component.literal(statusMessage), modalW - 24);
         } else {
             wrappedStatus = null;
         }
@@ -191,7 +191,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     private void updateWrappedNote() {
         if (party.note != null && !party.note.isEmpty()) {
-            wrappedNote = textRenderer.wrapLines(Text.literal("§7Note: §8§o" + party.note), modalW - 24);
+            wrappedNote = font.split(Component.literal("§7Note: §8§o" + party.note), modalW - 24);
             noteLinesCount = wrappedNote.size();
         } else {
             wrappedNote = null;
@@ -214,7 +214,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     }
 
     private void runOnClient(Runnable action) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(action);
         }
@@ -331,7 +331,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 this.party.leaderName = p.leaderName;
                 this.party.leaderRole = p.leaderRole;
                 this.party.creatorId = p.creatorId;
-                this.clearAndInit();
+                this.rebuildWidgets();
             });
         }).exceptionally(ex -> {
             runOnClient(() -> {
@@ -355,12 +355,12 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     // ── Rendering ────────────────────────────────────────────────────────
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         CompatibilityHelper.drawModalFrame(context, modalX, modalY, modalW, modalH);
 
         // Title
         String title = String.join(" / ", party.activities);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal("§b§l" + title), width / 2, modalY + 8, 0xFFFFFFFF);
+        context.drawCenteredString(font, Component.literal("§b§l" + title), width / 2, modalY + 8, 0xFFFFFFFF);
 
         // Metadata panel card (leader, region, note)
         int topPadding = 8;
@@ -379,7 +379,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
         // Fit the body between the header and the status text / action buttons; it scrolls when a
         // long note and a full party don't fit in a clamped modal
-        if (statusMessage != null && wrappedStatus == null && textRenderer != null) {
+        if (statusMessage != null && wrappedStatus == null && font != null) {
             updateWrappedStatus();
         }
         int bodyTop = modalY + 25;
@@ -401,27 +401,27 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         // Leader and region
         String region = party.region != null ? party.region : "Any";
         String detailsStr = "§7Leader: §f" + party.leaderName + "   §8|   §7Region: §f" + region;
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(detailsStr), modalX + 16, metaY + topPadding, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(detailsStr), modalX + 16, metaY + topPadding, 0xFFFFFFFF);
 
         // Note
         if (wrappedNote != null) {
             int noteY = metaY + topPadding + lineH + noteGap;
-            for (OrderedText line : wrappedNote) {
-                context.drawText(textRenderer, line, modalX + 16, noteY, 0xFFFFFFFF, true);
+            for (FormattedCharSequence line : wrappedNote) {
+                context.drawString(font, line, modalX + 16, noteY, 0xFFFFFFFF, true);
                 noteY += 12;
             }
         }
 
         // Members section
         int membersHeaderY = metaY + cardH + 15;
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("§b§lMembers"), textX, membersHeaderY, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§b§lMembers"), textX, membersHeaderY, 0xFFFFFFFF);
 
         // Slots counter
         String slotsText = party.memberCount + "/" + party.maxSize;
         String slotsColorCode = party.isFull ? "§c" : "§a";
-        int slotsW = textRenderer.getWidth(slotsText);
+        int slotsW = font.width(slotsText);
         int slotsX = modalX + modalW - 12 - slotsW;
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(slotsColorCode + slotsText), slotsX, membersHeaderY, 0xFFFFFFFF);
+        CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(slotsColorCode + slotsText), slotsX, membersHeaderY, 0xFFFFFFFF);
 
         // Render member rows
         int textY = membersHeaderY + 17;
@@ -452,7 +452,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             String styledLine = prefix + " " + (member.isReserved ? "§7" : "§f") + display;
 
             int nameColor = member.isReserved ? 0xFF888888 : 0xFFFFFFFF;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(styledLine), textX + 4, textY + 1, nameColor);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(styledLine), textX + 4, textY + 1, nameColor);
 
             // Kick button for leaders
             if (isLeader && member.name != null && !PlayerUtil.namesEqual(member.name, party.leaderName)) {
@@ -462,7 +462,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                     context.fill(kickX - 4, textY - 2, kickX + 10, textY + 12, 0x40FF4D4D);
                 }
                 int kickColor = kickHovered ? 0xFFFF4D4D : 0xFFAA4444;
-                CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal("✕"), kickX, textY + 1, kickColor);
+                CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("✕"), kickX, textY + 1, kickColor);
             }
 
             memberRows.add(new MemberRow(entry.getKey(), textY));
@@ -475,8 +475,8 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         // Status message
         if (hasWrappedStatus()) {
             int currentY = statusTopY();
-            for (OrderedText line : wrappedStatus) {
-                context.drawText(textRenderer, line, modalX + (modalW - textRenderer.getWidth(line)) / 2, currentY, statusColor, true);
+            for (FormattedCharSequence line : wrappedStatus) {
+                context.drawString(font, line, modalX + (modalW - font.width(line)) / 2, currentY, statusColor, true);
                 currentY += 10;
             }
         }
@@ -503,7 +503,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubleClick) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();

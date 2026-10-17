@@ -1,10 +1,10 @@
 package info.avicia.avoutils.features.chatbridge;
 
 import info.avicia.avoutils.core.util.UsernameResolver;
-import net.minecraft.text.Text;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.network.chat.Component;
 
 /**
  * Detects guild reward grants (Emeralds, Aspects, Guild Tomes) from system
@@ -19,7 +19,7 @@ final class RewardDetector {
     record RewardResult(String formattedMessage, String senderDisplay, String recipientDisplay,
                         long emeraldAmount, long aspectAmount, long tomeCount) {}
 
-    static RewardResult tryDetect(String cleaned, Text message) {
+    static RewardResult tryDetect(String cleaned, Component message) {
         if (cleaned == null || !cleaned.contains("rewarded") || !cleaned.contains(" to ")) return null;
 
         Matcher m = REWARD_GRANT_PATTERN.matcher(cleaned);

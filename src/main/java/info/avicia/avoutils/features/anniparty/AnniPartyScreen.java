@@ -8,15 +8,14 @@ import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import info.avicia.avoutils.core.party.InviteHandler;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
 /**
  * Displays the live Anni party roster from the backend. The roster is held by
@@ -43,7 +42,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
     private final List<HeaderHitbox> headerHitboxes = new ArrayList<>();
 
     public AnniPartyScreen(AnniPartyFeature feature, InviteHandler inviteHandler) {
-        super(Text.literal("Anni Parties"));
+        super(Component.literal("Anni Parties"));
         this.feature = feature;
         this.inviteHandler = inviteHandler;
     }
@@ -52,13 +51,13 @@ public class AnniPartyScreen extends ScrollableListScreen {
     protected void init() {
         feature.addRosterListener(rosterListener);
         AvoWebSocketManager.getInstance().sendEvent(REQ_ANNI_ROSTER, new JsonObject());
-        rebuildWidgets();
+        rebuildLayout();
     }
 
     @Override
-    public void close() {
+    public void onClose() {
         feature.removeRosterListener(rosterListener);
-        super.close();
+        super.onClose();
     }
 
     @Override
@@ -86,7 +85,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
     }
 
     private void onRosterUpdated(AnniRoster updatedRoster) {
-        rebuildWidgets();
+        rebuildLayout();
     }
 
     private boolean isExpanded(AnniPartyData party) {
@@ -122,14 +121,14 @@ public class AnniPartyScreen extends ScrollableListScreen {
         return total;
     }
 
-    private void rebuildWidgets() {
-        this.clearChildren();
+    private void rebuildLayout() {
+        this.clearWidgets();
         this.headerHitboxes.clear();
 
-        addDrawableChild(new FlatButtonWidget(SIDE_PADDING, 8, 80, 20, Text.literal("⟳ Refresh"), this::requestRoster));
+        addRenderableWidget(new FlatButtonWidget(SIDE_PADDING, 8, 80, 20, Component.literal("⟳ Refresh"), this::requestRoster));
 
         if (feature.getLedParty() != null) {
-            addDrawableChild(new FlatButtonWidget(width - SIDE_PADDING - 80, 8, 80, 20, Text.literal("Invite All"), this::inviteAll));
+            addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 80, 8, 80, 20, Component.literal("Invite All"), this::inviteAll));
         }
 
         List<AnniPartyData> parties = activeParties();
@@ -185,9 +184,9 @@ public class AnniPartyScreen extends ScrollableListScreen {
     // ── Rendering ────────────────────────────────────────────────────────
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, width, height, UiStyle.SCREEN_BACKGROUND);
-        CompatibilityHelper.drawScreenTitle(context, textRenderer, width, "§b§lAVICIA §f§lANNI PARTIES");
+        CompatibilityHelper.drawScreenTitle(context, font, width, "§b§lAVICIA §f§lANNI PARTIES");
 
         AnniRoster roster = roster();
         boolean active = roster != null && roster.active;
@@ -195,7 +194,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
         if (parties.isEmpty()) {
             String msg = active ? "§7No parties assigned yet..." : "§7No active Anni event. Parties will appear once generated.";
-            CompatibilityHelper.drawCenteredMessage(context, textRenderer, width, height, msg);
+            CompatibilityHelper.drawCenteredMessage(context, font, width, height, msg);
             super.render(context, mouseX, mouseY, delta);
             return;
         }
@@ -228,7 +227,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
             if (isMine) {
                 header += " §7← You";
             }
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(header), leftTextX, top + 9, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(header), leftTextX, top + 9, 0xFFFFFFFF);
 
             // Leader name
             String leaderName = "?";
@@ -239,9 +238,9 @@ public class AnniPartyScreen extends ScrollableListScreen {
                 }
             }
             String leaderText = "§7Leader: §f" + leaderName;
-            int leaderWidth = textRenderer.getWidth(Text.literal(leaderText));
+            int leaderWidth = font.width(Component.literal(leaderText));
             int leaderX = width - SIDE_PADDING - 12 - leaderWidth;
-            CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(leaderText), leaderX, top + 9, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(leaderText), leaderX, top + 9, 0xFFFFFFFF);
 
             // Member rows
             if (expanded) {
@@ -261,7 +260,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
                     if (PlayerUtil.namesEqual(member.name, selfName)) {
                         line += " §e← You";
                     }
-                    CompatibilityHelper.drawTextWithShadow(context, textRenderer, Text.literal(line), leftTextX + 8, lineY, 0xFFFFFFFF);
+                    CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(line), leftTextX + 8, lineY, 0xFFFFFFFF);
                 }
             }
         }
@@ -275,12 +274,12 @@ public class AnniPartyScreen extends ScrollableListScreen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         applyScroll(contentHeight(), LIST_TOP, verticalAmount);
-        rebuildWidgets();
+        rebuildLayout();
         return true;
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubleClick) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
         if (click.button() == 0 && isInListViewport(click.y(), LIST_TOP)) {
             for (HeaderHitbox hitbox : headerHitboxes) {
                 if (hitbox.contains(click.x(), click.y())) {
@@ -289,7 +288,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
                     } else {
                         expandedPartyIds.add(hitbox.partyId);
                     }
-                    rebuildWidgets();
+                    rebuildLayout();
                     return true;
                 }
             }
