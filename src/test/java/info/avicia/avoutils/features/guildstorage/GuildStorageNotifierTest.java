@@ -10,8 +10,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -138,6 +140,46 @@ class GuildStorageNotifierTest {
         });
     }
 
+    @Test
+    void crossingAThresholdAlertsWithASound() {
+        withMockedAuth(true, authService -> {
+            RecordingNotifier notifier = seed(new RecordingNotifier(), new ModConfig());
+
+            notifier.onRaidDelta(85, 0); // emeralds 10% → 95%, past the default 90% threshold
+
+            assertEquals(1, notifier.alerts.size());
+            assertTrue(notifier.alerts.getFirst().text().endsWith("Emeralds storage reached 90%"));
+            assertTrue(notifier.alerts.getFirst().withSound());
+        });
+    }
+
+    @Test
+    void alertsAreSilentWhenStorageSoundsAreOff() {
+        withMockedAuth(true, authService -> {
+            ModConfig config = new ModConfig();
+            config.guildStorageNotifSoundsEnabled = false;
+            RecordingNotifier notifier = seed(new RecordingNotifier(), config);
+
+            notifier.onRaidDelta(85, 0);
+
+            assertEquals(1, notifier.alerts.size());
+            assertFalse(notifier.alerts.getFirst().withSound());
+        });
+    }
+
+    @Test
+    void noAlertWhenStorageNotificationsAreOff() {
+        withMockedAuth(true, authService -> {
+            ModConfig config = new ModConfig();
+            config.guildStorageNotifsEnabled = false;
+            RecordingNotifier notifier = seed(new RecordingNotifier(), config);
+
+            notifier.onRaidDelta(85, 0);
+
+            assertTrue(notifier.alerts.isEmpty());
+        });
+    }
+
     private static void invokeApplyRemoteSnapshot(GuildStorageNotifier notifier,
                                                   long emCur, long emMax, long asCur, long asMax) {
         TestReflection.invoke(notifier, "applyRemoteSnapshot", 
@@ -145,12 +187,28 @@ class GuildStorageNotifierTest {
     }
 
     private static GuildStorageNotifier seededNotifier() {
-        GuildStorageNotifier notifier = new GuildStorageNotifier();
-        TestReflection.set(notifier, "config", new ModConfig());
+        return seed(new GuildStorageNotifier(), new ModConfig());
+    }
+
+    private static <T extends GuildStorageNotifier> T seed(T notifier, ModConfig config) {
+        TestReflection.set(notifier, "config", config);
         TestReflection.set(notifier, "emeraldCurrent", 10L);
         TestReflection.set(notifier, "emeraldMax", 100L);
         TestReflection.set(notifier, "aspectCurrent", 20L);
         TestReflection.set(notifier, "aspectMax", 100L);
         return notifier;
+    }
+
+    private record Alert(String text, boolean withSound) {
+    }
+
+    /** Records alerts instead of showing them, since tests have no game client. */
+    private static final class RecordingNotifier extends GuildStorageNotifier {
+        final List<Alert> alerts = new ArrayList<>();
+
+        @Override
+        void showAlert(Component message, boolean withSound) {
+            alerts.add(new Alert(message.getString(), withSound));
+        }
     }
 }

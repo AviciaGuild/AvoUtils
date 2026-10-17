@@ -15,6 +15,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -240,13 +241,25 @@ public class GuildStorageNotifier implements AvoFeature {
 
     private void notifyThreshold(String resourceName, long current, long max, int thresholdPercent) {
         if (!areNotifsEnabled()) return;
+        Component message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                .append(Component.literal(resourceName).withStyle(ChatFormatting.GOLD))
+                .append(Component.literal(" storage reached ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(thresholdPercent + "%").withStyle(ChatFormatting.GREEN));
+        showAlert(message, config.guildStorageNotifSoundsEnabled);
+    }
+
+    /**
+     * Shows a threshold message in chat, plus the same ping as Party Finder notifications when
+     * {@code withSound} is set. Package-private so tests can capture alerts without a game client.
+     */
+    void showAlert(Component message, boolean withSound) {
         Minecraft.getInstance().execute(() -> {
-            if (Minecraft.getInstance().player != null) {
-                var msg = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                        .append(Component.literal(resourceName).withStyle(ChatFormatting.GOLD))
-                        .append(Component.literal(" storage reached ").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal(thresholdPercent + "%").withStyle(ChatFormatting.GREEN));
-                Minecraft.getInstance().player.displayClientMessage(msg, false);
+            var player = Minecraft.getInstance().player;
+            if (player != null) {
+                player.displayClientMessage(message, false);
+                if (withSound) {
+                    player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+                }
             }
         });
     }
