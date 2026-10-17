@@ -10,6 +10,7 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
+import info.avicia.avoutils.features.partyfinder.gui.CreatePartyModalLayout.Row;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,7 +26,6 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import org.lwjgl.glfw.GLFW;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
 
@@ -43,12 +43,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     private final PartyFinderClient apiClient;
     private final PartyData partyToEdit; // null if creating, non-null if editing
 
-    // Modal dimensions
+    // Modal dimensions, copied from the layout built in init()
+    private CreatePartyModalLayout layout;
     private int modalX, modalY, modalW, modalH;
 
     // Scrolling body
     private final ScrollViewport bodyViewport = new ScrollViewport();
-    private int bodyContentBottom; // unscrolled Y of the last card's bottom edge
     private FlatButtonWidget closeButton;
     private FlatButtonWidget saveButton;
 
@@ -119,20 +119,22 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
     @Override
     protected void init() {
-        modalW = Math.min(320, width - 40);
-        modalH = Math.min(partyToEdit != null ? 296 : 334, height - 40);
-        modalX = (width - modalW) / 2;
-        modalY = (height - modalH) / 2;
+        layout = new CreatePartyModalLayout(width, height, partyToEdit != null);
+        modalW = layout.modalW();
+        modalH = layout.modalH();
+        modalX = layout.modalX();
+        modalY = layout.modalY();
         bodyViewport.clearTracked();
 
-        closeButton = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Component.literal("✕"), () -> parent.closeModal());
+        closeButton = new FlatButtonWidget(layout.closeButtonX(), layout.closeButtonY(),
+                CreatePartyModalLayout.CLOSE_BUTTON_SIZE, CreatePartyModalLayout.CLOSE_BUTTON_SIZE,
+                Component.literal("✕"), () -> parent.closeModal());
         closeButton.setDanger(true);
         closeButton.setBorderless(true);
         addRenderableWidget(closeButton);
 
-        int y = modalY + 38;
-
         // Activity selection
+        int y = layout.rowTop(Row.ACTIVITY);
         int btnX = modalX + modalW - 250;
         activityButtons.clear();
         for (String activity : ACTIVITIES) {
@@ -141,9 +143,9 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             addBody(btn);
             btnX += 47;
         }
-        y += 38;
 
         // Role selection
+        y = layout.rowTop(Row.ROLE);
         btnX = modalX + modalW - 255;
         roleButtons.clear();
         for (int i = 0; i < ROLES.length; i++) {
@@ -160,9 +162,9 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             addBody(btn);
             btnX += 60;
         }
-        y += 38;
 
         // Region buttons
+        y = layout.rowTop(Row.REGION);
         btnX = modalX + modalW - 180;
         regionButtons.clear();
         for (String reg : REGIONS) {
@@ -172,9 +174,9 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             addBody(btn);
             btnX += 55;
         }
-        y += 38;
 
         // Note field
+        y = layout.rowTop(Row.NOTE);
         String currentNote = (noteField != null) ? noteField.getValue() : (partyToEdit != null && partyToEdit.note != null ? partyToEdit.note : "");
         boolean wasFocused = (noteField != null && noteField.isFocused());
         noteField = new EditBox(font, modalX + 16, y + 24, modalW - 32, 10, Component.literal("Note"));
@@ -187,10 +189,10 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
             setFocused(noteField);
         }
         addBody(noteField);
-        y += 50;
 
         // Reserved slots
         if (partyToEdit == null) {
+            y = layout.rowTop(Row.RESERVED);
             int minReserved = countOtherInGameMembers();
             if (reservedSlots < minReserved) {
                 reservedSlots = minReserved;
@@ -200,18 +202,17 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                 reservedSlots = val;
             });
             addBody(reservedSlider);
-            y += 38;
         }
 
         // Ping toggle
+        y = layout.rowTop(Row.PING);
         pingToggle = new FlatToggleWidget(modalX + modalW - 50, y + 8, 30, 16, ping, val -> {
             ping = val;
         });
         addBody(pingToggle);
-        bodyContentBottom = y + 32; // bottom edge of the Ping card
 
         // Submit
-        saveButton = new FlatButtonWidget(modalX + (modalW - 80) / 2, modalY + modalH - 26, 80, 18, Component.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
+        saveButton = new FlatButtonWidget(modalX + (modalW - 80) / 2, layout.saveY(), 80, CreatePartyModalLayout.SAVE_BUTTON_H, Component.literal(partyToEdit != null ? "§aSave" : "§aCreate"), () -> submit());
         addRenderableWidget(saveButton);
         updateWrappedStatus();
         updateBodyViewport();
@@ -230,21 +231,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
      * there's no status), so every card stays reachable when the modal is clamped.
      */
     private void updateBodyViewport() {
-        int top = modalY + 25;
-        int bottom = hasWrappedStatus() ? statusTopY() - 2 : modalY + modalH - 32;
-        bodyViewport.update(top, bottom, bodyContentBottom - top);
+        int statusLines = hasWrappedStatus() ? wrappedStatus.size() : 0;
+        bodyViewport.update(layout.bodyTop(), layout.bodyBottom(statusLines), layout.bodyContentHeight());
     }
 
     private boolean hasWrappedStatus() {
         return statusMessage != null && wrappedStatus != null && !wrappedStatus.isEmpty();
-    }
-
-    /**
-     * Top of the wrapped status text, which sits just above the Save button.
-     */
-    private int statusTopY() {
-        int statusBottomY = modalY + modalH - 32;
-        return statusBottomY - (wrappedStatus.size() * 10 - 2);
     }
 
     // ── Form actions ─────────────────────────────────────────────────────
@@ -409,7 +401,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         CompatibilityHelper.drawModalFrame(context, modalX, modalY, modalW, modalH);
 
         // Title
-        context.drawCenteredString(font, Component.literal(partyToEdit != null ? "§b§lEdit Party" : "§b§lCreate Party"), width / 2, modalY + 8, 0xFFFFFFFF);
+        context.drawCenteredString(font, Component.literal(partyToEdit != null ? "§b§lEdit Party" : "§b§lCreate Party"), width / 2, layout.titleY(), 0xFFFFFFFF);
 
         // The status height decides where the body ends, so wrap it before laying out the body
         if (statusMessage != null && wrappedStatus == null && font != null) {
@@ -417,29 +409,20 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         }
         updateBodyViewport();
 
-        int y = modalY + 38 - bodyViewport.getOffset();
         bodyViewport.enableScissor(context, modalX + 1, modalX + modalW - 1);
 
         // Selection cards
-        drawSectionCard(context, "Activity", y, 30, false);
-        y += 38;
-
-        drawSectionCard(context, "Role", y, 30, false);
-        y += 38;
-
-        drawSectionCard(context, "Region", y, 30, false);
-        y += 38;
-
-        drawSectionCard(context, "Note", y, 42, noteField.isFocused());
-        y += 50;
+        drawSectionCard(context, "Activity", Row.ACTIVITY, false);
+        drawSectionCard(context, "Role", Row.ROLE, false);
+        drawSectionCard(context, "Region", Row.REGION, false);
+        drawSectionCard(context, "Note", Row.NOTE, noteField.isFocused());
 
         if (partyToEdit == null) {
-            drawSectionCard(context, "Reserved Slots", y, 30, false);
+            int y = drawSectionCard(context, "Reserved Slots", Row.RESERVED, false);
             CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(String.valueOf(reservedSlots)), modalX + modalW - 24, y + 13, 0xFFFFFFFF);
-            y += 38;
         }
 
-        drawSectionCard(context, "Ping LFG Roles", y, 30, false);
+        drawSectionCard(context, "Ping LFG Roles", Row.PING, false);
 
         // Highlight selected activities
         for (int i = 0; i < activityButtons.size(); i++) {
@@ -462,7 +445,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
         // Status message
         if (hasWrappedStatus()) {
-            int currentY = statusTopY();
+            int currentY = layout.statusTop(wrappedStatus.size());
             for (FormattedCharSequence line : wrappedStatus) {
                 context.drawString(font, line, modalX + (modalW - font.width(line)) / 2, currentY, statusColor, true);
                 currentY += 10;
@@ -503,14 +486,19 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
     @Override
     public boolean keyPressed(KeyEvent keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ENTER || keyInput.key() == GLFW.GLFW_KEY_KP_ENTER) {
+        if (keyInput.isConfirmation()) {
             submit();
             return true;
         }
         return super.keyPressed(keyInput);
     }
 
-    private void drawSectionCard(GuiGraphics context, String label, int y, int cardH, boolean highlightBorder) {
+    /**
+     * Draws a form card at its scrolled position and returns that Y, which the card's contents are placed from.
+     */
+    private int drawSectionCard(GuiGraphics context, String label, Row row, boolean highlightBorder) {
+        int y = layout.rowTop(row) - bodyViewport.getOffset();
+        int cardH = row.height();
         int cardY = y + 2;
         
         // Card background
@@ -526,5 +514,6 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         // Section label text
         int textOffset = (cardH == 30) ? 11 : 6;
         CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§7" + label), modalX + 16, cardY + textOffset, 0xFFFFFFFF);
+        return y;
     }
 }

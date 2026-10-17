@@ -1,7 +1,6 @@
 package info.avicia.avoutils.core.gui;
 
 import java.util.function.Consumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -26,25 +25,13 @@ public class FlatToggleWidget extends AbstractWidget {
         return checked;
     }
 
+    // AbstractWidget.mouseClicked checks it's active, the left button and the bounds, and plays the sound
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean boolean_arg) {
-        if (this.active && this.visible && click.button() == 0) {
-            int x = getX();
-            int y = getY();
-            int w = getWidth();
-            int h = getHeight();
-            double mouseX = click.x();
-            double mouseY = click.y();
-            if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
-                this.checked = !this.checked;
-                this.playDownSound(Minecraft.getInstance().getSoundManager());
-                if (onChanged != null) {
-                    onChanged.accept(this.checked);
-                }
-                return true;
-            }
+    public void onClick(MouseButtonEvent click, boolean doubleClick) {
+        this.checked = !this.checked;
+        if (onChanged != null) {
+            onChanged.accept(this.checked);
         }
-        return false;
     }
 
     @Override

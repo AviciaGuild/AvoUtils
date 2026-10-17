@@ -6,12 +6,15 @@ import net.minecraft.network.chat.Component;
 
 public class CompatibilityHelper {
 
+    /** Y of the title drawn by {@link #drawScreenTitle}. */
+    public static final int SCREEN_TITLE_Y = 12;
+
     public static void drawTextWithShadow(GuiGraphics context, Font textRenderer, Component text, int x, int y, int color) {
         context.drawString(textRenderer, text, x, y, color, true);
     }
 
     public static void drawScreenTitle(GuiGraphics context, Font textRenderer, int width, String title) {
-        context.drawCenteredString(textRenderer, Component.literal(title), width / 2, 12, UiStyle.TEXT_WHITE);
+        context.drawCenteredString(textRenderer, Component.literal(title), width / 2, SCREEN_TITLE_Y, UiStyle.TEXT_WHITE);
     }
 
     public static void drawCenteredMessage(GuiGraphics context, Font textRenderer, int width, int height, String message) {

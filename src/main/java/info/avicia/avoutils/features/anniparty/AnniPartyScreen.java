@@ -1,6 +1,7 @@
 package info.avicia.avoutils.features.anniparty;
 
 import com.google.gson.JsonObject;
+import com.mojang.blaze3d.platform.InputConstants;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
@@ -193,7 +194,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
         List<AnniPartyData> parties = activeParties();
 
         if (parties.isEmpty()) {
-            String msg = active ? "§7No parties assigned yet..." : "§7No active Anni event. Parties will appear once generated.";
+            String msg = active ? "§7No parties assigned yet..." : "§7No active parties. They will appear once generated.";
             CompatibilityHelper.drawCenteredMessage(context, font, width, height, msg);
             super.render(context, mouseX, mouseY, delta);
             return;
@@ -280,7 +281,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
-        if (click.button() == 0 && isInListViewport(click.y(), LIST_TOP)) {
+        if (click.button() == InputConstants.MOUSE_BUTTON_LEFT && isInListViewport(click.y(), LIST_TOP)) {
             for (HeaderHitbox hitbox : headerHitboxes) {
                 if (hitbox.contains(click.x(), click.y())) {
                     if (expandedPartyIds.contains(hitbox.partyId)) {

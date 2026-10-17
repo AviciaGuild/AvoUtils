@@ -1,9 +1,6 @@
 package info.avicia.avoutils.core.gui;
 
-import org.lwjgl.glfw.GLFW;
-
 import java.util.function.Consumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -34,41 +31,24 @@ public class FlatSliderWidget extends AbstractWidget {
         return value;
     }
 
+    // AbstractWidget calls these for left-button events; a click must also land on the active slider,
+    // and plays the sound
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean boolean_arg) {
-        if (this.active && this.visible && click.button() == 0) {
-            int x = getX();
-            int y = getY();
-            int w = getWidth();
-            int h = getHeight();
-            double mouseX = click.x();
-            double mouseY = click.y();
-            if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
-                this.dragging = true;
-                updateValueFromMouse(mouseX);
-                this.playDownSound(Minecraft.getInstance().getSoundManager());
-                return true;
-            }
-        }
-        return false;
+    public void onClick(MouseButtonEvent click, boolean doubleClick) {
+        this.dragging = true;
+        updateValueFromMouse(click.x());
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent click) {
-        if (click.button() == 0 && this.dragging) {
-            this.dragging = false;
-            return true;
-        }
-        return super.mouseReleased(click);
+    public void onRelease(MouseButtonEvent click) {
+        this.dragging = false;
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
-        if (click.button() == 0 && this.dragging) {
+    protected void onDrag(MouseButtonEvent click, double deltaX, double deltaY) {
+        if (this.dragging) {
             updateValueFromMouse(click.x());
-            return true;
         }
-        return super.mouseDragged(click, deltaX, deltaY);
     }
 
     private void updateValueFromMouse(double mouseX) {
@@ -93,7 +73,7 @@ public class FlatSliderWidget extends AbstractWidget {
         int h = getHeight();
         boolean dimmed = !this.active;
 
-        boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+        boolean hovered = isHovered();
 
         // Track background
         int trackBg = dimmed ? 0xFF0E0E18 : 0xFF14141E;
@@ -129,8 +109,7 @@ public class FlatSliderWidget extends AbstractWidget {
         if (!this.active || !this.visible || !this.isFocused()) return false;
 
         int step = (max - min) <= 10 ? 1 : 5;
-        int key = keyInput.key();
-        if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_DOWN) {
+        if (keyInput.isLeft() || keyInput.isDown()) {
             int newValue = Math.max(min, value - step);
             if (newValue != value) {
                 value = newValue;
@@ -138,7 +117,7 @@ public class FlatSliderWidget extends AbstractWidget {
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_RIGHT || key == GLFW.GLFW_KEY_UP) {
+        if (keyInput.isRight() || keyInput.isUp()) {
             int newValue = Math.min(max, value + step);
             if (newValue != value) {
                 value = newValue;

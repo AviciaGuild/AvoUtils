@@ -11,7 +11,7 @@ import info.avicia.avoutils.core.gui.ModalOverlay;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
@@ -369,7 +369,7 @@ public class PartyListScreen extends ScrollableListScreen {
         }
 
         // Check if a party row was clicked
-        if (button == 0 && errorMessage == null && !loading && !parties.isEmpty()) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && errorMessage == null && !loading && !parties.isEmpty()) {
             for (int i = 0; i < parties.size(); i++) {
                 int y = LIST_TOP + (i * ROW_HEIGHT) - scrollOffset;
                 if (isRowHovered(mouseX, mouseY, y)) {
@@ -414,8 +414,7 @@ public class PartyListScreen extends ScrollableListScreen {
 
     @Override
     public boolean keyPressed(KeyEvent keyInput) {
-        int keyCode = keyInput.key();
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+        if (keyInput.isEscape()) {
             if (activeModal != null) {
                 closeModal();
             } else {

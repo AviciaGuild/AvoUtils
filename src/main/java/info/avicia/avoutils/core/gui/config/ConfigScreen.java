@@ -9,6 +9,7 @@ import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
 import info.avicia.avoutils.core.gui.UiStyle;
+import info.avicia.avoutils.core.gui.config.ConfigScreenLayout.Card;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.updater.UpdateCheckResult;
@@ -20,7 +21,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Configuration screen for AvoUtils
@@ -30,20 +30,11 @@ public class ConfigScreen extends Screen {
     private final ModConfig config;
     private final Screen parent;
     private static final int SIDE_PADDING = 20;
-    private static final int CARD_SINGLE_H = 48;
-    private static final int CARD_DOUBLE_H = 66;
-    private static final int CARD_QUAD_H = 102;
-    private static final int CARD_GAP = 8;
-    // Unscrolled Y of the first card; cards scroll under the title above VIEWPORT_TOP
-    private static final int CONTENT_TOP = 38;
-    private static final int VIEWPORT_TOP = 30;
-    private static final int DONE_BUTTON_H = 20;
-    private static final int DONE_BOTTOM_MARGIN = 8;
 
     private final ScrollViewport viewport = new ScrollViewport();
     private FlatButtonWidget doneButton;
-    // Updates card height chosen in init(), so render() draws the layout the widgets were placed for
-    private boolean updateCardHasAction;
+    // Built in init(), so render() draws the layout the widgets were placed for
+    private ConfigScreenLayout layout;
     // Sliders change the config on every step; it's written to disk once on release or close
     private boolean unsavedSliderChanges;
 
@@ -68,7 +59,6 @@ public class ConfigScreen extends Screen {
     protected void init() {
         viewport.clearTracked();
         int cardRight = width - SIDE_PADDING;
-        int y = CONTENT_TOP;
 
         AvoAuthService authService = AvoAuthService.getInstance();
         if (authService.getCachedGuildMember() == null) {
@@ -84,7 +74,13 @@ public class ConfigScreen extends Screen {
             });
         }
 
+        // The Updates card is taller when it shows a button or status line, which moves Done down
+        UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
+        UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
+        layout = new ConfigScreenLayout(height, hasUpdateAction(updateState));
+
         // ── Chat Bridge ──────────────────────────────────────────────────
+        int y = layout.top(Card.CHAT_BRIDGE);
         boolean guildAuthPending = authService.getCachedGuildMember() == null;
         boolean canEnableBridge = authService.isGuildMember() || guildAuthPending;
 
@@ -112,9 +108,9 @@ public class ConfigScreen extends Screen {
             bridgeToggle[0].active = false;
         }
         addScrolling(bridgeToggle[0]);
-        y += CARD_SINGLE_H + CARD_GAP;
 
         // ── Emojis ──────────────────────────────────────────────────────
+        y = layout.top(Card.EMOJIS);
         EmojiFeature emojiFeature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
         FlatToggleWidget[] emojiAutocompleteToggle = new FlatToggleWidget[1];
         emojiAutocompleteToggle[0] = new FlatToggleWidget(
@@ -141,9 +137,9 @@ public class ConfigScreen extends Screen {
             emojiAutocompleteToggle[0].active = false;
         }
         addScrolling(emojiAutocompleteToggle[0]);
-        y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Party Finder ────────────────────────────────────────────────
+        y = layout.top(Card.PARTY_FINDER);
         FlatToggleWidget[] pfSoundsToggle = new FlatToggleWidget[1];
         pfSoundsToggle[0] = new FlatToggleWidget(
                 cardRight - 40, y + 46, 30, 16,
@@ -163,9 +159,9 @@ public class ConfigScreen extends Screen {
             pfSoundsToggle[0].active = false;
         }
         addScrolling(pfSoundsToggle[0]);
-        y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Guild Storage ───────────────────────────────────────────────
+        y = layout.top(Card.GUILD_STORAGE);
         boolean canEnableStorage = authService.isGuildMember() || guildAuthPending;
 
         FlatToggleWidget[] storageSoundsToggle = new FlatToggleWidget[1];
@@ -230,9 +226,8 @@ public class ConfigScreen extends Screen {
         }
         addScrolling(aspectSlider[0]);
 
-        y += CARD_QUAD_H + CARD_GAP;
-
         // ── Updates ─────────────────────────────────────────────────────
+        y = layout.top(Card.UPDATES);
         addScrolling(new FlatToggleWidget(
                 cardRight - 40, y + 28, 30, 16,
                 config.updateRemindersEnabled,
@@ -240,10 +235,7 @@ public class ConfigScreen extends Screen {
         ));
 
         // Check for updates if unchecked or checking so update button appears once check completes
-        UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
-        boolean hasUpdateAction = false;
         if (updateFeature != null) {
-            UpdateFeature.UpdateState updateState = updateFeature.getState();
             if (WynncraftServerPolicy.isNetworkingAllowed() && (updateState == UpdateFeature.UpdateState.UNCHECKED || updateState == UpdateFeature.UpdateState.CHECKING)) {
                 updateFeature.checkForUpdate().thenAccept(res -> {
                     Minecraft mc = Minecraft.getInstance();
@@ -254,8 +246,6 @@ public class ConfigScreen extends Screen {
                     });
                 });
             }
-
-            hasUpdateAction = hasUpdateAction(updateState);
 
             // Show update button when update is available, or restart button when ready
             if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
@@ -281,18 +271,14 @@ public class ConfigScreen extends Screen {
             }
         }
 
-        y += (hasUpdateAction ? CARD_DOUBLE_H : CARD_SINGLE_H) + CARD_GAP;
-        updateCardHasAction = hasUpdateAction;
-
         // ── Bottom buttons ──────────────────────────────────────────────
-        int btnY = Math.min(y + 16, height - DONE_BUTTON_H - DONE_BOTTOM_MARGIN);
         doneButton = addRenderableWidget(new FlatButtonWidget(
-                width / 2 - 50, btnY, 100, DONE_BUTTON_H,
+                width / 2 - 50, layout.doneY(), 100, ConfigScreenLayout.DONE_BUTTON_H,
                 Component.literal("Done"),
                 this::onClose
         ));
 
-        viewport.update(VIEWPORT_TOP, btnY - CARD_GAP, y - VIEWPORT_TOP);
+        viewport.update(layout.viewportTop(), layout.viewportBottom(), layout.contentHeight());
     }
 
     /**
@@ -311,36 +297,32 @@ public class ConfigScreen extends Screen {
 
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
-        int y = CONTENT_TOP - viewport.getOffset();
 
         viewport.enableScissor(context, 0, width);
 
         // ── Chat Bridge ──────────────────────────────────────────────────
-        drawSectionCard(context, y, CARD_SINGLE_H, "Chat Bridge");
+        int y = drawSectionCard(context, Card.CHAT_BRIDGE, "Chat Bridge");
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77Enabled (requires guild membership)"), cardLeft + 16, y + 32, 0xFFFFFFFF);
-        y += CARD_SINGLE_H + CARD_GAP;
 
         // ── Emojis ──────────────────────────────────────────────────────
-        drawSectionCard(context, y, CARD_DOUBLE_H, "Emojis");
+        y = drawSectionCard(context, Card.EMOJIS, "Emojis");
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77Enabled"), cardLeft + 16, y + 32, 0xFFFFFFFF);
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77Emoji Autocomplete"), cardLeft + 16, y + 50, 0xFFFFFFFF);
-        y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Party Finder ────────────────────────────────────────────────
-        drawSectionCard(context, y, CARD_DOUBLE_H, "Party Finder");
+        y = drawSectionCard(context, Card.PARTY_FINDER, "Party Finder");
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77New Party Notifications"),
                 cardLeft + 16, y + 32, 0xFFFFFFFF);
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77Notification Sounds"),
                 cardLeft + 16, y + 50, 0xFFFFFFFF);
-        y += CARD_DOUBLE_H + CARD_GAP;
 
         // ── Guild Storage ───────────────────────────────────────────────
-        drawSectionCard(context, y, CARD_QUAD_H, "Guild Rewards Storage");
+        y = drawSectionCard(context, Card.GUILD_STORAGE, "Guild Rewards Storage");
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77Notifications (requires guild membership)"),
                 cardLeft + 16, y + 32, 0xFFFFFFFF);
@@ -358,18 +340,16 @@ public class ConfigScreen extends Screen {
         drawRightText(context, config.guildStorageAspectThresholdPercent + "%",
                 cardRight - 13, y + 86, UiStyle.ACCENT_BLUE);
 
-        y += CARD_QUAD_H + CARD_GAP;
-
         // ── Updates ─────────────────────────────────────────────────────
         UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
         UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
 
-        drawSectionCard(context, y, updateCardHasAction ? CARD_DOUBLE_H : CARD_SINGLE_H, "Updates");
+        y = drawSectionCard(context, Card.UPDATES, "Updates");
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a77Update Reminders"), cardLeft + 16, y + 32, 0xFFFFFFFF);
 
         // Show update status text only when an action or status is present
-        if (updateCardHasAction && updateFeature != null) {
+        if (layout.updateCardHasAction() && updateFeature != null) {
             if (updateState == UpdateFeature.UpdateState.UPDATE_AVAILABLE) {
                 UpdateCheckResult result = updateFeature.getLastCheckResult();
                 if (result != null) {
@@ -441,7 +421,7 @@ public class ConfigScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
+        if (keyInput.isEscape()) {
             this.onClose();
             return true;
         }
@@ -454,7 +434,12 @@ public class ConfigScreen extends Screen {
                 Component.literal(text), rightX - width, y, color);
     }
 
-    private void drawSectionCard(GuiGraphics context, int y, int cardH, String label) {
+    /**
+     * Draws a card at its scrolled position and returns that Y, which the card's rows are placed from.
+     */
+    private int drawSectionCard(GuiGraphics context, Card card, String label) {
+        int y = layout.top(card) - viewport.getOffset();
+        int cardH = layout.height(card);
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
         int cardY = y + 2;
@@ -468,6 +453,7 @@ public class ConfigScreen extends Screen {
 
         CompatibilityHelper.drawTextWithShadow(context, font,
                 Component.literal("\u00a7b\u00a7l" + label), cardLeft + 16, cardY + 11, 0xFFFFFFFF);
+        return y;
     }
 
     private static boolean hasUpdateAction(UpdateFeature.UpdateState state) {

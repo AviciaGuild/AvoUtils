@@ -41,24 +41,12 @@ public class FlatButtonWidget extends AbstractWidget {
         this.borderless = borderless;
     }
 
+    // AbstractWidget.mouseClicked checks it's active, the left button and the bounds, and plays the sound
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean boolean_arg) {
-        if (this.active && this.visible && click.button() == 0) {
-            int x = getX();
-            int y = getY();
-            int w = getWidth();
-            int h = getHeight();
-            double mouseX = click.x();
-            double mouseY = click.y();
-            if (mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h) {
-                this.playDownSound(Minecraft.getInstance().getSoundManager());
-                if (onPress != null) {
-                    onPress.run();
-                }
-                return true;
-            }
+    public void onClick(MouseButtonEvent click, boolean doubleClick) {
+        if (onPress != null) {
+            onPress.run();
         }
-        return false;
     }
 
     @Override
@@ -69,7 +57,7 @@ public class FlatButtonWidget extends AbstractWidget {
         int h = getHeight();
         
         // Determine hover state
-        boolean hovered = active && mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+        boolean hovered = active && isHovered();
 
         if (borderless) {
             // Draw a background highlight on hover

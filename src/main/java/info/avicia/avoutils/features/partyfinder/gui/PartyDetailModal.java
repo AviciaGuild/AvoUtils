@@ -26,6 +26,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import com.google.gson.JsonObject;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
 
@@ -509,7 +510,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int button = click.button();
 
         // Check kick clicks for leader (rows scrolled out of the body are clipped and can't be kicked)
-        if (isLeader && button == 0 && party.members != null && bodyViewport.contains(mouseY)) {
+        if (isLeader && button == InputConstants.MOUSE_BUTTON_LEFT && party.members != null && bodyViewport.contains(mouseY)) {
             for (MemberRow row : memberRows) {
                 PartyData.MemberData member = party.members.get(row.memberKey);
                 if (member == null || member.name == null) continue;
