@@ -1,25 +1,26 @@
 package info.avicia.avoutils.core.gui.config;
 
+import info.avicia.avoutils.core.config.ConfigSection;
+import info.avicia.avoutils.core.config.Settings;
+
 /**
- * Vertical layout of {@link ConfigScreen}: the card positions, the scrolling viewport and the Done
- * button for a given screen height. Plain arithmetic with no Minecraft types, so tests can check it
- * at small GUI sizes without starting the game.
+ * Vertical layout of {@link ConfigScreen}: one card per {@link ConfigSection}, with a row for each
+ * of its settings, then the scrolling viewport and the Done button. Plain arithmetic with no
+ * Minecraft types, so tests can check it at small GUI sizes without starting the game.
  *
  * Card tops are unscrolled; subtract the viewport offset to draw them. Each card is drawn 2px
- * below its top, and its controls are placed relative to the top.
+ * below its top, and its rows are placed relative to the top.
  *
- * @param updateCardHasAction whether the Updates card has a second row for a button or status line
+ * @param updateCardHasAction whether the Updates card has an extra row for a button or status line
  */
 record ConfigScreenLayout(int screenHeight, boolean updateCardHasAction) {
 
-    /** The cards, top to bottom. */
-    enum Card { CHAT_BRIDGE, EMOJIS, PARTY_FINDER, GUILD_STORAGE, UPDATES }
-
     static final int DONE_BUTTON_H = 20;
 
-    private static final int CARD_SINGLE_H = 48;
-    private static final int CARD_DOUBLE_H = 66;
-    private static final int CARD_QUAD_H = 102;
+    // Card title area; each row adds ROW_H
+    private static final int CARD_HEADER_H = 30;
+    private static final int ROW_H = 18;
+    private static final int FIRST_ROW_OFFSET = 28;
     private static final int CARD_GAP = 8;
     // Unscrolled Y of the first card; cards scroll under the title above VIEWPORT_TOP
     private static final int CONTENT_TOP = 38;
@@ -27,33 +28,52 @@ record ConfigScreenLayout(int screenHeight, boolean updateCardHasAction) {
     private static final int DONE_TOP_MARGIN = 16;
     private static final int DONE_BOTTOM_MARGIN = 8;
 
-    /** Drawn height of a card. */
-    int height(Card card) {
-        return switch (card) {
-            case CHAT_BRIDGE -> CARD_SINGLE_H;
-            case EMOJIS, PARTY_FINDER -> CARD_DOUBLE_H;
-            case GUILD_STORAGE -> CARD_QUAD_H;
-            case UPDATES -> updateCardHasAction ? CARD_DOUBLE_H : CARD_SINGLE_H;
-        };
+    /** Rows in a section's card: one per setting, plus the Updates card's action row if it has one. */
+    int rows(ConfigSection section) {
+        int rows = Settings.inSection(section).size();
+        return section == ConfigSection.UPDATES && updateCardHasAction ? rows + 1 : rows;
     }
 
-    /** Unscrolled Y of a card's top. */
-    int top(Card card) {
+    /** Drawn height of a section's card. */
+    int height(ConfigSection section) {
+        return CARD_HEADER_H + rows(section) * ROW_H;
+    }
+
+    /** Unscrolled Y of a section card's top. */
+    int top(ConfigSection section) {
         int y = CONTENT_TOP;
-        for (Card above : Card.values()) {
-            if (above == card) {
+        for (ConfigSection above : ConfigSection.values()) {
+            if (above == section) {
                 return y;
             }
             y += height(above) + CARD_GAP;
         }
-        throw new IllegalArgumentException(String.valueOf(card));
+        throw new IllegalArgumentException(String.valueOf(section));
+    }
+
+    /**
+     * Offset from a card's top to a row's line. Toggles (16px) sit on the line; sliders and labels
+     * are centred on the same row.
+     */
+    static int rowOffset(int row) {
+        return FIRST_ROW_OFFSET + row * ROW_H;
+    }
+
+    /** Unscrolled Y of a row's line. */
+    int rowY(ConfigSection section, int row) {
+        return top(section) + rowOffset(row);
+    }
+
+    /** Unscrolled Y of the Updates card's action row, after its settings, for the button and status text. */
+    int updateActionRowY() {
+        return rowY(ConfigSection.UPDATES, Settings.inSection(ConfigSection.UPDATES).size());
     }
 
     /** Unscrolled Y where the content ends: below the last card and one card gap. */
     int contentBottom() {
         int y = CONTENT_TOP;
-        for (Card card : Card.values()) {
-            y += height(card) + CARD_GAP;
+        for (ConfigSection section : ConfigSection.values()) {
+            y += height(section) + CARD_GAP;
         }
         return y;
     }
@@ -77,4 +97,3 @@ record ConfigScreenLayout(int screenHeight, boolean updateCardHasAction) {
         return contentBottom() - VIEWPORT_TOP;
     }
 }
-

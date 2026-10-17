@@ -251,29 +251,6 @@ public class GuildStorageNotifier implements AvoFeature {
         });
     }
 
-    public void toggleStorage() {
-        if (!config.guildStorageNotifsEnabled) {
-            AvoAuthService.getInstance().runIfGuildMember(() -> {
-                config.guildStorageNotifsEnabled = true;
-                config.save();
-                sendStorageFeedback(true);
-            }, this::sendStorageNotMemberFeedback);
-            return;
-        }
-
-        config.guildStorageNotifsEnabled = false;
-        config.save();
-        sendStorageFeedback(false);
-    }
-
-    private void sendStorageFeedback(boolean enabled) {
-        WynnPillUtil.sendToggleFeedback("AvoUtils", "Storage threshold notifications are now ", enabled);
-    }
-
-    private void sendStorageNotMemberFeedback() {
-        WynnPillUtil.sendNotMemberFeedback("AvoUtils", "Storage notifications are unavailable: you are not in Avicia.");
-    }
-
     public void reset() {
         emeraldCurrent = -1; emeraldMax = -1;
         aspectCurrent = -1; aspectMax = -1;

@@ -60,6 +60,18 @@ class ModConfigTest {
     }
 
     @Test
+    void loadResetsOutOfRangeThresholds() throws Exception {
+        Path configPath = tempDir.resolve("avoutils.json");
+        Files.writeString(configPath,
+                "{\"guildStorageEmeraldThresholdPercent\":0,\"guildStorageAspectThresholdPercent\":150}");
+
+        ModConfig config = ModConfig.load(configPath);
+
+        assertEquals(90, config.guildStorageEmeraldThresholdPercent);
+        assertEquals(90, config.guildStorageAspectThresholdPercent);
+    }
+
+    @Test
     void loadFallsBackToDefaultsOnInvalidJson() throws Exception {
         Path configPath = tempDir.resolve("avoutils.json");
         Files.writeString(configPath, "not json");

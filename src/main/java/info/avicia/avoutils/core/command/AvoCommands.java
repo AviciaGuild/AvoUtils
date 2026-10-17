@@ -7,9 +7,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
 import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
 import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
-import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
-import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
 import info.avicia.avoutils.features.updater.UpdateFeature;
@@ -46,18 +44,6 @@ public class AvoCommands {
             return 1;
         };
 
-        // /avo bridge → toggle chat bridge
-        Command<FabricClientCommandSource> toggleBridgeCommand = context ->
-                withFeature(ChatBridgeFeature.class, ChatBridgeFeature::toggleBridge);
-
-        // /avo storage → toggle guild storage tracking
-        Command<FabricClientCommandSource> toggleStorageCommand = context ->
-                withFeature(GuildStorageNotifier.class, GuildStorageNotifier::toggleStorage);
-
-        // /avo emojis → toggle emoji feature
-        Command<FabricClientCommandSource> toggleEmojisCommand = context ->
-                withFeature(EmojiFeature.class, EmojiFeature::toggleEmojis);
-
         // /avo emojis reload / update → refresh and re-download emojis
         Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
             if (!ensureOnWynncraft(context.getSource())) return 1;
@@ -84,12 +70,6 @@ public class AvoCommands {
             });
             return 1;
         };
-
-        // /avo pf togglenotifs
-        Command<FabricClientCommandSource> toggleNotifsCommand = PartyCommand.toggleNotifsCommand();
-
-        // /avo pf togglesounds
-        Command<FabricClientCommandSource> toggleSoundsCommand = PartyCommand.toggleSoundsCommand();
 
         // /avo pf join <leaderName>
         Command<FabricClientCommandSource> joinPfCommand = context -> {
@@ -130,12 +110,7 @@ public class AvoCommands {
                             .executes(openConfigCommand)
                             .then(literal("config")
                                     .executes(openConfigCommand))
-                            .then(literal("bridge")
-                                    .executes(toggleBridgeCommand))
-                            .then(literal("storage")
-                                    .executes(toggleStorageCommand))
                             .then(literal("emojis")
-                                    .executes(toggleEmojisCommand)
                                     .then(literal("reload")
                                             .executes(reloadEmojisCommand))
                                     .then(literal("update")
@@ -144,10 +119,6 @@ public class AvoCommands {
                                     .executes(openAnniCommand))
                             .then(literal("pf")
                                     .executes(openPfCommand)
-                                    .then(literal("togglenotifs")
-                                            .executes(toggleNotifsCommand))
-                                    .then(literal("togglesounds")
-                                            .executes(toggleSoundsCommand))
                                     .then(literal("join")
                                             .then(argument("leaderName", word())
                                                     .executes(joinPfCommand))))
@@ -160,6 +131,8 @@ public class AvoCommands {
                                     .then(literal("restart")
                                             .executes(updateRestartCommand)))
             );
+            // Setting toggles
+            SettingCommands.register(dispatcher, root);
         }
     }
 

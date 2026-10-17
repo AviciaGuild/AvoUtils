@@ -14,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import net.minecraft.network.chat.Component;
 
@@ -24,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -128,77 +126,5 @@ class ChatBridgeFeatureTest {
             feature.onSystemChat(TextFixtures.coloredText("Steve: hello", GUILD_CHAT_COLOR));
             verify(manager, never()).sendEvent(anyString(), any(JsonObject.class));
         });
-    }
-
-    @Test
-    void toggleBridgeAllowsTogglingWhenAuthorized() {
-        try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class);
-             MockedStatic<AvoWebSocketManager> ws = mockStatic(AvoWebSocketManager.class)) {
-            AvoAuthService authService = mock(AvoAuthService.class);
-            AvoWebSocketManager manager = mock(AvoWebSocketManager.class);
-            auth.when(AvoAuthService::getInstance).thenReturn(authService);
-            ws.when(AvoWebSocketManager::getInstance).thenReturn(manager);
-
-            doCallRealMethod().when(authService).runIfGuildMember(any(), any());
-            when(authService.isGuildMember()).thenReturn(true);
-
-            ModConfig config = new ModConfig();
-            config.chatBridgeEnabled = false;
-            ChatBridgeFeature feature = new ChatBridgeFeature();
-            feature.initialize(config);
-
-            feature.toggleBridge();
-            assertTrue(config.chatBridgeEnabled);
-
-            feature.toggleBridge();
-            assertFalse(config.chatBridgeEnabled);
-        }
-    }
-
-    @Test
-    void toggleBridgeRejectsWhenUnauthorized() {
-        try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class);
-             MockedStatic<AvoWebSocketManager> ws = mockStatic(AvoWebSocketManager.class)) {
-            AvoAuthService authService = mock(AvoAuthService.class);
-            AvoWebSocketManager manager = mock(AvoWebSocketManager.class);
-            auth.when(AvoAuthService::getInstance).thenReturn(authService);
-            ws.when(AvoWebSocketManager::getInstance).thenReturn(manager);
-
-            doCallRealMethod().when(authService).runIfGuildMember(any(), any());
-            when(authService.isGuildMember()).thenReturn(false);
-            when(authService.getCachedGuildMember()).thenReturn(false);
-
-            ModConfig config = new ModConfig();
-            config.chatBridgeEnabled = false;
-            ChatBridgeFeature feature = new ChatBridgeFeature();
-            feature.initialize(config);
-
-            feature.toggleBridge();
-            assertFalse(config.chatBridgeEnabled);
-        }
-    }
-
-    @Test
-    void toggleBridgeResolvesMembershipWhenUncached() {
-        try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class);
-             MockedStatic<AvoWebSocketManager> ws = mockStatic(AvoWebSocketManager.class)) {
-            AvoAuthService authService = mock(AvoAuthService.class);
-            AvoWebSocketManager manager = mock(AvoWebSocketManager.class);
-            auth.when(AvoAuthService::getInstance).thenReturn(authService);
-            ws.when(AvoWebSocketManager::getInstance).thenReturn(manager);
-
-            doCallRealMethod().when(authService).runIfGuildMember(any(), any());
-            when(authService.isGuildMember()).thenReturn(false);
-            when(authService.getCachedGuildMember()).thenReturn(null);
-            when(authService.resolveGuildMembership()).thenReturn(CompletableFuture.completedFuture(true));
-
-            ModConfig config = new ModConfig();
-            config.chatBridgeEnabled = false;
-            ChatBridgeFeature feature = new ChatBridgeFeature();
-            feature.initialize(config);
-
-            feature.toggleBridge();
-            verify(authService).resolveGuildMembership();
-        }
     }
 }

@@ -11,15 +11,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class GuildStorageNotifierTest {
@@ -156,53 +152,5 @@ class GuildStorageNotifierTest {
         TestReflection.set(notifier, "aspectCurrent", 20L);
         TestReflection.set(notifier, "aspectMax", 100L);
         return notifier;
-    }
-
-    @Test
-    void toggleStorageAllowsTogglingWhenAuthorized() {
-        withMockedAuth(true, authService -> {
-            doCallRealMethod().when(authService).runIfGuildMember(any(), any());
-
-            GuildStorageNotifier notifier = seededNotifier();
-            ModConfig config = (ModConfig) TestReflection.get(notifier, "config");
-            config.guildStorageNotifsEnabled = false;
-
-            notifier.toggleStorage();
-            assertTrue(config.guildStorageNotifsEnabled);
-
-            notifier.toggleStorage();
-            assertFalse(config.guildStorageNotifsEnabled);
-        });
-    }
-
-    @Test
-    void toggleStorageRejectsWhenUnauthorized() {
-        withMockedAuth(false, authService -> {
-            doCallRealMethod().when(authService).runIfGuildMember(any(), any());
-            when(authService.getCachedGuildMember()).thenReturn(false);
-
-            GuildStorageNotifier notifier = seededNotifier();
-            ModConfig config = (ModConfig) TestReflection.get(notifier, "config");
-            config.guildStorageNotifsEnabled = false;
-
-            notifier.toggleStorage();
-            assertFalse(config.guildStorageNotifsEnabled);
-        });
-    }
-
-    @Test
-    void toggleStorageResolvesMembershipWhenUncached() {
-        withMockedAuth(false, authService -> {
-            doCallRealMethod().when(authService).runIfGuildMember(any(), any());
-            when(authService.getCachedGuildMember()).thenReturn(null);
-            when(authService.resolveGuildMembership()).thenReturn(CompletableFuture.completedFuture(true));
-
-            GuildStorageNotifier notifier = seededNotifier();
-            ModConfig config = (ModConfig) TestReflection.get(notifier, "config");
-            config.guildStorageNotifsEnabled = false;
-
-            notifier.toggleStorage();
-            verify(authService).resolveGuildMembership();
-        });
     }
 }

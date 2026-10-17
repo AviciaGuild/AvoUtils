@@ -2,18 +2,23 @@ package info.avicia.avoutils.core.gui.config;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.auth.AvoAuthService;
+import info.avicia.avoutils.core.config.ConfigSection;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.core.config.Setting;
+import info.avicia.avoutils.core.config.Settings;
+import info.avicia.avoutils.core.config.SliderSetting;
+import info.avicia.avoutils.core.config.ToggleSetting;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
 import info.avicia.avoutils.core.gui.UiStyle;
-import info.avicia.avoutils.core.gui.config.ConfigScreenLayout.Card;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
-import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.updater.UpdateCheckResult;
 import info.avicia.avoutils.features.updater.UpdateFeature;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -35,8 +40,13 @@ public class ConfigScreen extends Screen {
     private FlatButtonWidget doneButton;
     // Built in init(), so render() draws the layout the widgets were placed for
     private ConfigScreenLayout layout;
+    // Each setting's control, so they can all be refreshed after a change
+    private final List<SettingRow> rows = new ArrayList<>();
     // Sliders change the config on every step; it's written to disk once on release or close
     private boolean unsavedSliderChanges;
+
+    private record SettingRow(Setting setting, AbstractWidget control) {
+    }
 
     public ConfigScreen() {
         this(null);
@@ -58,6 +68,7 @@ public class ConfigScreen extends Screen {
     @Override
     protected void init() {
         viewport.clearTracked();
+        rows.clear();
         int cardRight = width - SIDE_PADDING;
 
         AvoAuthService authService = AvoAuthService.getInstance();
@@ -79,160 +90,20 @@ public class ConfigScreen extends Screen {
         UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
         layout = new ConfigScreenLayout(height, hasUpdateAction(updateState));
 
-        // ── Chat Bridge ──────────────────────────────────────────────────
-        int y = layout.top(Card.CHAT_BRIDGE);
-        boolean guildAuthPending = authService.getCachedGuildMember() == null;
-        boolean canEnableBridge = authService.isGuildMember() || guildAuthPending;
-
-        FlatToggleWidget[] bridgeToggle = new FlatToggleWidget[1];
-        bridgeToggle[0] = new FlatToggleWidget(
-                cardRight - 40, y + 28, 30, 16,
-                config.chatBridgeEnabled,
-                checked -> {
-                    if (checked) {
-                        authService.runIfGuildMember(() -> {
-                            config.chatBridgeEnabled = true;
-                            config.save();
-                            bridgeToggle[0].setChecked(true);
-                        }, () -> {
-                            bridgeToggle[0].setChecked(false);
-                            bridgeToggle[0].active = false;
-                        });
-                    } else {
-                        config.chatBridgeEnabled = false;
-                        config.save();
-                    }
-                }
-        );
-        if (!config.chatBridgeEnabled && !canEnableBridge) {
-            bridgeToggle[0].active = false;
+        // ── Settings: a card per section, a row per setting ─────────────
+        for (ConfigSection section : ConfigSection.values()) {
+            List<Setting> settings = Settings.inSection(section);
+            for (int row = 0; row < settings.size(); row++) {
+                Setting setting = settings.get(row);
+                AbstractWidget control = createControl(setting, cardRight, layout.rowY(section, row));
+                rows.add(new SettingRow(setting, addScrolling(control)));
+            }
         }
-        addScrolling(bridgeToggle[0]);
-
-        // ── Emojis ──────────────────────────────────────────────────────
-        y = layout.top(Card.EMOJIS);
-        EmojiFeature emojiFeature = AvoUtilsMod.getInstance().getFeature(EmojiFeature.class);
-        FlatToggleWidget[] emojiAutocompleteToggle = new FlatToggleWidget[1];
-        emojiAutocompleteToggle[0] = new FlatToggleWidget(
-                cardRight - 40, y + 46, 30, 16,
-                config.emojiAutocompleteEnabled,
-                checked -> {
-                    config.emojiAutocompleteEnabled = checked;
-                    config.save();
-                }
-        );
-        addScrolling(new FlatToggleWidget(
-                cardRight - 40, y + 28, 30, 16,
-                config.emojiEnabled,
-                checked -> {
-                    config.emojiEnabled = checked;
-                    config.save();
-                    emojiAutocompleteToggle[0].active = checked;
-                    if (checked && emojiFeature != null) {
-                        emojiFeature.ensurePacksLoaded();
-                    }
-                }
-        ));
-        if (!config.emojiEnabled) {
-            emojiAutocompleteToggle[0].active = false;
-        }
-        addScrolling(emojiAutocompleteToggle[0]);
-
-        // ── Party Finder ────────────────────────────────────────────────
-        y = layout.top(Card.PARTY_FINDER);
-        FlatToggleWidget[] pfSoundsToggle = new FlatToggleWidget[1];
-        pfSoundsToggle[0] = new FlatToggleWidget(
-                cardRight - 40, y + 46, 30, 16,
-                config.notificationSoundsEnabled,
-                checked -> { config.notificationSoundsEnabled = checked; config.save(); }
-        );
-        addScrolling(new FlatToggleWidget(
-                cardRight - 40, y + 28, 30, 16,
-                config.newPartyNotifsEnabled,
-                checked -> {
-                    config.newPartyNotifsEnabled = checked;
-                    config.save();
-                    pfSoundsToggle[0].active = checked;
-                }
-        ));
-        if (!config.newPartyNotifsEnabled) {
-            pfSoundsToggle[0].active = false;
-        }
-        addScrolling(pfSoundsToggle[0]);
-
-        // ── Guild Storage ───────────────────────────────────────────────
-        y = layout.top(Card.GUILD_STORAGE);
-        boolean canEnableStorage = authService.isGuildMember() || guildAuthPending;
-
-        FlatToggleWidget[] storageSoundsToggle = new FlatToggleWidget[1];
-        FlatSliderWidget[] emeraldSlider = new FlatSliderWidget[1];
-        FlatSliderWidget[] aspectSlider = new FlatSliderWidget[1];
-
-        FlatToggleWidget[] storageToggle = new FlatToggleWidget[1];
-        storageToggle[0] = new FlatToggleWidget(
-                cardRight - 40, y + 28, 30, 16,
-                config.guildStorageNotifsEnabled,
-                checked -> {
-                    if (checked) {
-                        authService.runIfGuildMember(() -> {
-                            config.guildStorageNotifsEnabled = true;
-                            config.save();
-                            storageToggle[0].setChecked(true);
-                            setStorageControlsActive(true, storageSoundsToggle[0], emeraldSlider[0], aspectSlider[0]);
-                        }, () -> {
-                            storageToggle[0].setChecked(false);
-                            storageToggle[0].active = false;
-                            setStorageControlsActive(false, storageSoundsToggle[0], emeraldSlider[0], aspectSlider[0]);
-                        });
-                    } else {
-                        config.guildStorageNotifsEnabled = false;
-                        config.save();
-                        setStorageControlsActive(false, storageSoundsToggle[0], emeraldSlider[0], aspectSlider[0]);
-                    }
-                }
-        );
-        if (!config.guildStorageNotifsEnabled && !canEnableStorage) {
-            storageToggle[0].active = false;
-        }
-        addScrolling(storageToggle[0]);
-
-        storageSoundsToggle[0] = new FlatToggleWidget(
-                cardRight - 40, y + 46, 30, 16,
-                config.guildStorageNotifSoundsEnabled,
-                checked -> { config.guildStorageNotifSoundsEnabled = checked; config.save(); }
-        );
-        if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
-            storageSoundsToggle[0].active = false;
-        }
-        addScrolling(storageSoundsToggle[0]);
-
-        emeraldSlider[0] = new FlatSliderWidget(
-                cardRight - 170, y + 67, 120, 10,
-                0, 100, config.guildStorageEmeraldThresholdPercent,
-                value -> { config.guildStorageEmeraldThresholdPercent = value; unsavedSliderChanges = true; }
-        );
-        if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
-            emeraldSlider[0].active = false;
-        }
-        addScrolling(emeraldSlider[0]);
-
-        aspectSlider[0] = new FlatSliderWidget(
-                cardRight - 170, y + 85, 120, 10,
-                0, 100, config.guildStorageAspectThresholdPercent,
-                value -> { config.guildStorageAspectThresholdPercent = value; unsavedSliderChanges = true; }
-        );
-        if (!config.guildStorageNotifsEnabled || !canEnableStorage) {
-            aspectSlider[0].active = false;
-        }
-        addScrolling(aspectSlider[0]);
+        updateControls();
 
         // ── Updates ─────────────────────────────────────────────────────
-        y = layout.top(Card.UPDATES);
-        addScrolling(new FlatToggleWidget(
-                cardRight - 40, y + 28, 30, 16,
-                config.updateRemindersEnabled,
-                checked -> { config.updateRemindersEnabled = checked; config.save(); }
-        ));
+        // The update/restart button is 18px tall, so it starts 2px above its row's line
+        int actionY = layout.updateActionRowY() - 2;
 
         // Check for updates if unchecked or checking so update button appears once check completes
         if (updateFeature != null) {
@@ -252,7 +123,7 @@ public class ConfigScreen extends Screen {
                 UpdateCheckResult result = updateFeature.getLastCheckResult();
                 String label = result != null ? "Update to v" + result.latestVersion() : "Update";
                 addScrolling(new FlatButtonWidget(
-                        cardRight - 110, y + 44, 100, 18,
+                        cardRight - 110, actionY, 100, 18,
                         Component.literal(label),
                         () -> {
                             this.onClose();
@@ -261,7 +132,7 @@ public class ConfigScreen extends Screen {
                 ));
             } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
                 addScrolling(new FlatButtonWidget(
-                        cardRight - 110, y + 44, 100, 18,
+                        cardRight - 110, actionY, 100, 18,
                         Component.literal("Restart Now"),
                         () -> {
                             this.onClose();
@@ -300,53 +171,26 @@ public class ConfigScreen extends Screen {
 
         viewport.enableScissor(context, 0, width);
 
-        // ── Chat Bridge ──────────────────────────────────────────────────
-        int y = drawSectionCard(context, Card.CHAT_BRIDGE, "Chat Bridge");
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Enabled (requires guild membership)"), cardLeft + 16, y + 32, 0xFFFFFFFF);
-
-        // ── Emojis ──────────────────────────────────────────────────────
-        y = drawSectionCard(context, Card.EMOJIS, "Emojis");
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Enabled"), cardLeft + 16, y + 32, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Emoji Autocomplete"), cardLeft + 16, y + 50, 0xFFFFFFFF);
-
-        // ── Party Finder ────────────────────────────────────────────────
-        y = drawSectionCard(context, Card.PARTY_FINDER, "Party Finder");
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77New Party Notifications"),
-                cardLeft + 16, y + 32, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Notification Sounds"),
-                cardLeft + 16, y + 50, 0xFFFFFFFF);
-
-        // ── Guild Storage ───────────────────────────────────────────────
-        y = drawSectionCard(context, Card.GUILD_STORAGE, "Guild Rewards Storage");
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Notifications (requires guild membership)"),
-                cardLeft + 16, y + 32, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Notification Sounds"),
-                cardLeft + 16, y + 50, 0xFFFFFFFF);
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Emerald threshold"),
-                cardLeft + 16, y + 68, 0xFFFFFFFF);
-        drawRightText(context, config.guildStorageEmeraldThresholdPercent + "%",
-                cardRight - 13, y + 68, UiStyle.ACCENT_BLUE);
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Aspect threshold"),
-                cardLeft + 16, y + 86, 0xFFFFFFFF);
-        drawRightText(context, config.guildStorageAspectThresholdPercent + "%",
-                cardRight - 13, y + 86, UiStyle.ACCENT_BLUE);
+        // ── Settings: a card per section, a label per row ───────────────
+        for (ConfigSection section : ConfigSection.values()) {
+            int y = drawSectionCard(context, section);
+            List<Setting> settings = Settings.inSection(section);
+            for (int row = 0; row < settings.size(); row++) {
+                Setting setting = settings.get(row);
+                // 8px text, centred on the 16px row
+                int textY = y + ConfigScreenLayout.rowOffset(row) + 4;
+                CompatibilityHelper.drawTextWithShadow(context, font,
+                        Component.literal("\u00a77" + setting.label()), cardLeft + 16, textY, 0xFFFFFFFF);
+                if (setting instanceof SliderSetting slider) {
+                    drawRightText(context, slider.format(config), cardRight - 13, textY, UiStyle.ACCENT_BLUE);
+                }
+            }
+        }
 
         // ── Updates ─────────────────────────────────────────────────────
         UpdateFeature updateFeature = AvoUtilsMod.getInstance().getFeature(UpdateFeature.class);
         UpdateFeature.UpdateState updateState = updateFeature != null ? updateFeature.getState() : null;
-
-        y = drawSectionCard(context, Card.UPDATES, "Updates");
-        CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a77Update Reminders"), cardLeft + 16, y + 32, 0xFFFFFFFF);
+        int statusY = layout.updateActionRowY() - viewport.getOffset() + 4;
 
         // Show update status text only when an action or status is present
         if (layout.updateCardHasAction() && updateFeature != null) {
@@ -355,20 +199,20 @@ public class ConfigScreen extends Screen {
                 if (result != null) {
                     CompatibilityHelper.drawTextWithShadow(context, font,
                             Component.literal("\u00a7aUpdate available: v" + result.latestVersion()),
-                            cardLeft + 16, y + 50, 0xFFFFFFFF);
+                            cardLeft + 16, statusY, 0xFFFFFFFF);
                 }
             } else if (updateState == UpdateFeature.UpdateState.DOWNLOADING) {
                 CompatibilityHelper.drawTextWithShadow(context, font,
                         Component.literal("\u00a77Downloading update..."),
-                        cardLeft + 16, y + 50, 0xFFFFFFFF);
+                        cardLeft + 16, statusY, 0xFFFFFFFF);
             } else if (updateState == UpdateFeature.UpdateState.READY_TO_RESTART) {
                 CompatibilityHelper.drawTextWithShadow(context, font,
                         Component.literal("\u00a7aUpdate ready — restart to apply"),
-                        cardLeft + 16, y + 50, 0xFFFFFFFF);
+                        cardLeft + 16, statusY, 0xFFFFFFFF);
             } else if (updateState == UpdateFeature.UpdateState.ERROR) {
                 CompatibilityHelper.drawTextWithShadow(context, font,
                         Component.literal("\u00a7cUpdate check failed"),
-                        cardLeft + 16, y + 50, 0xFFFFFFFF);
+                        cardLeft + 16, statusY, 0xFFFFFFFF);
             }
         }
 
@@ -435,11 +279,12 @@ public class ConfigScreen extends Screen {
     }
 
     /**
-     * Draws a card at its scrolled position and returns that Y, which the card's rows are placed from.
+     * Draws a section's card at its scrolled position and returns that Y, which the card's rows are
+     * placed from.
      */
-    private int drawSectionCard(GuiGraphics context, Card card, String label) {
-        int y = layout.top(card) - viewport.getOffset();
-        int cardH = layout.height(card);
+    private int drawSectionCard(GuiGraphics context, ConfigSection section) {
+        int y = layout.top(section) - viewport.getOffset();
+        int cardH = layout.height(section);
         int cardLeft = SIDE_PADDING;
         int cardRight = width - SIDE_PADDING;
         int cardY = y + 2;
@@ -452,7 +297,7 @@ public class ConfigScreen extends Screen {
         context.fill(cardLeft, cardY + 1, cardLeft + 2, cardY + cardH - 1, UiStyle.ACCENT_BAR);
 
         CompatibilityHelper.drawTextWithShadow(context, font,
-                Component.literal("\u00a7b\u00a7l" + label), cardLeft + 16, cardY + 11, 0xFFFFFFFF);
+                Component.literal("\u00a7b\u00a7l" + section.title()), cardLeft + 16, cardY + 11, 0xFFFFFFFF);
         return y;
     }
 
@@ -463,9 +308,32 @@ public class ConfigScreen extends Screen {
                 || state == UpdateFeature.UpdateState.ERROR;
     }
 
-    private static void setStorageControlsActive(boolean active, FlatToggleWidget sounds, FlatSliderWidget emerald, FlatSliderWidget aspect) {
-        if (sounds != null) sounds.active = active;
-        if (emerald != null) emerald.active = active;
-        if (aspect != null) aspect.active = active;
+    /**
+     * Creates the control for a setting's row: a toggle on the row's line, or a slider centred on it.
+     */
+    private AbstractWidget createControl(Setting setting, int cardRight, int rowY) {
+        return switch (setting) {
+            case ToggleSetting toggle -> new FlatToggleWidget(cardRight - 40, rowY, 30, 16, toggle.get(config),
+                    checked -> toggle.change(config, checked, this::updateControls, this::updateControls));
+            case SliderSetting slider -> new FlatSliderWidget(cardRight - 170, rowY + 3, 120, 10,
+                    slider.min(), slider.max(), slider.get(config),
+                    value -> { slider.set(config, value); unsavedSliderChanges = true; });
+        };
+    }
+
+    /**
+     * Matches the controls to the config: toggles show the stored value (a guild-only toggle a
+     * non-member tried to turn on goes back off), and controls whose setting isn't editable are
+     * disabled.
+     */
+    private void updateControls() {
+        AvoAuthService authService = AvoAuthService.getInstance();
+        boolean guildAccess = authService.isGuildMember() || authService.getCachedGuildMember() == null;
+        for (SettingRow row : rows) {
+            if (row.setting() instanceof ToggleSetting toggle && row.control() instanceof FlatToggleWidget control) {
+                control.setChecked(toggle.get(config));
+            }
+            row.control().active = row.setting().isEditable(config, guildAccess);
+        }
     }
 }

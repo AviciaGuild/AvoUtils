@@ -66,11 +66,8 @@ public class ModConfig {
      */
     private void validate() {
         apiBaseUrl = sanitizeBackendOverride(apiBaseUrl);
-        if (guildStorageEmeraldThresholdPercent < 1 || guildStorageEmeraldThresholdPercent > 100) {
-            guildStorageEmeraldThresholdPercent = 90;
-        }
-        if (guildStorageAspectThresholdPercent < 1 || guildStorageAspectThresholdPercent > 100) {
-            guildStorageAspectThresholdPercent = 90;
+        for (Setting setting : Settings.ALL) {
+            setting.validate(this);
         }
     }
 

@@ -20,7 +20,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.packs.PackType;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -359,25 +358,6 @@ public class EmojiFeature implements AvoFeature {
             }
             return null;
         });
-    }
-
-    public void toggleEmojis() {
-        config.emojiEnabled = !config.emojiEnabled;
-        config.save();
-
-        Minecraft client = Minecraft.getInstance();
-        ChatFormatting statusColor = config.emojiEnabled ? ChatFormatting.GREEN : ChatFormatting.RED;
-        String statusWord = config.emojiEnabled ? "enabled" : "disabled";
-
-        MutableComponent message = WynnPillUtil.createPrefixedPill("AvoUtils", false)
-                .append(Component.literal("Emojis are now ").withStyle(ChatFormatting.GRAY))
-                .append(Component.literal(statusWord).withStyle(statusColor))
-                .append(Component.literal(".").withStyle(ChatFormatting.GRAY));
-
-        if (client.player != null) {
-            client.player.displayClientMessage(message, false);
-            ensurePacksLoaded();
-        }
     }
 
     public static void reloadResourcesWithPacks(Minecraft client) {

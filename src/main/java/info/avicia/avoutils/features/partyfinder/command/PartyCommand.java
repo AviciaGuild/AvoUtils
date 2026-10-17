@@ -1,10 +1,10 @@
 package info.avicia.avoutils.features.partyfinder.command;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.command.AvoCommands;
-import info.avicia.avoutils.core.config.ModConfig;
-import info.avicia.avoutils.core.util.WynnPillUtil;
+import info.avicia.avoutils.core.command.SettingCommands;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.features.partyfinder.gui.PartyListScreen;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -21,33 +21,33 @@ import static com.mojang.brigadier.arguments.StringArgumentType.getString;
  */
 public class PartyCommand {
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            Command<FabricClientCommandSource> openScreenCommand = context -> {
-                if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
-                Minecraft.getInstance().execute(() -> openPartyFinderScreen(null));
-                return 1;
-            };
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> register(dispatcher));
+    }
 
-            Command<FabricClientCommandSource> joinPartyCommand = context -> {
-                if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
-                String leaderName = getString(context, "leaderName");
-                Minecraft.getInstance().execute(() -> openPartyFinderScreen(leaderName));
-                return 1;
-            };
+    public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+        Command<FabricClientCommandSource> openScreenCommand = context -> {
+            if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
+            Minecraft.getInstance().execute(() -> openPartyFinderScreen(null));
+            return 1;
+        };
 
-            // /apf
-            dispatcher.register(
-                    literal("apf")
-                            .executes(openScreenCommand)
-                            .then(literal("togglenotifs")
-                                    .executes(toggleNotifsCommand()))
-                            .then(literal("togglesounds")
-                                    .executes(toggleSoundsCommand()))
-                            .then(literal("join")
-                                    .then(argument("leaderName", word())
-                                            .executes(joinPartyCommand)))
-            );
-        });
+        Command<FabricClientCommandSource> joinPartyCommand = context -> {
+            if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
+            String leaderName = getString(context, "leaderName");
+            Minecraft.getInstance().execute(() -> openPartyFinderScreen(leaderName));
+            return 1;
+        };
+
+        // /apf
+        dispatcher.register(
+                literal("apf")
+                        .executes(openScreenCommand)
+                        .then(literal("join")
+                                .then(argument("leaderName", word())
+                                        .executes(joinPartyCommand)))
+        );
+        // /apf togglenotifs and togglesounds, the same setting toggles as /avo pf
+        SettingCommands.registerAlias(dispatcher, "apf", "pf");
     }
 
     public static void openPartyFinderScreen(String joinTargetLeaderName) {
@@ -65,29 +65,5 @@ public class PartyCommand {
                     joinTargetLeaderName
             ));
         }
-    }
-
-    public static Command<FabricClientCommandSource> toggleNotifsCommand() {
-        return context -> {
-            AvoUtilsMod mod = AvoUtilsMod.getInstance();
-            if (mod == null) return 1;
-            ModConfig config = mod.getConfig();
-            config.newPartyNotifsEnabled = !config.newPartyNotifsEnabled;
-            config.save();
-            WynnPillUtil.sendToggleFeedback("AvoUtils", "New party notifications are now ", config.newPartyNotifsEnabled);
-            return 1;
-        };
-    }
-
-    public static Command<FabricClientCommandSource> toggleSoundsCommand() {
-        return context -> {
-            AvoUtilsMod mod = AvoUtilsMod.getInstance();
-            if (mod == null) return 1;
-            ModConfig config = mod.getConfig();
-            config.notificationSoundsEnabled = !config.notificationSoundsEnabled;
-            config.save();
-            WynnPillUtil.sendToggleFeedback("AvoUtils", "Notification sounds are now ", config.notificationSoundsEnabled);
-            return 1;
-        };
     }
 }

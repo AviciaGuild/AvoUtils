@@ -177,27 +177,4 @@ public class ChatBridgeFeature implements AvoFeature {
         payload.addProperty("avatar_url", avatarUrl);
         AvoWebSocketManager.getInstance().sendEvent(eventType, payload);
     }
-
-    public void toggleBridge() {
-        if (!config.chatBridgeEnabled) {
-            AvoAuthService.getInstance().runIfGuildMember(() -> {
-                config.chatBridgeEnabled = true;
-                config.save();
-                sendBridgeFeedback(true);
-            }, this::sendBridgeNotMemberFeedback);
-            return;
-        }
-
-        config.chatBridgeEnabled = false;
-        config.save();
-        sendBridgeFeedback(false);
-    }
-
-    private void sendBridgeFeedback(boolean enabled) {
-        WynnPillUtil.sendToggleFeedback("AvoBridge", "Chat bridge is now ", enabled);
-    }
-
-    private void sendBridgeNotMemberFeedback() {
-        WynnPillUtil.sendNotMemberFeedback("AvoBridge", "Chat bridge is unavailable: you are not in Avicia.");
-    }
 }
