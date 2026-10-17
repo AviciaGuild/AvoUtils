@@ -42,7 +42,7 @@ public class PartyFinderClient {
     // ── Auth ──────────────────────────────────────────────────────────────
 
     private HttpRequest.Builder baseRequest(String path, String token) {
-        String url = config.apiBaseUrl + path;
+        String url = config.getApiBaseUrl() + path;
         return HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Authorization", "Bearer " + token)

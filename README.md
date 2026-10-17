@@ -42,7 +42,7 @@ A Minecraft Fabric client mod providing various helper utilities for Avicia guil
 
 Most settings can be changed in-game via `/avo config` (or just `/avo`). The config file lives at `config/avoutils.json`.
 
-If you're running the backend locally, change the `apiBaseUrl` field to point at your local server.
+The backend address is built into the mod. For local backend development, you can override it in the config file with a localhost address, e.g. `"apiBaseUrl": "http://localhost:8080"`; any other address is ignored. To build a test jar against a different backend, pass `-Papi_base_url=https://...` to Gradle (or set `api_base_url` in `local.properties`).
 
 ---
 

@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.partyfinder.api;
 
+import info.avicia.avoutils.BuildConfig;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ class PartyFinderClientTest {
         HttpRequest request = buildRequest("/api/parties", "token-123", "GET", null);
 
         assertEquals("GET", request.method());
-        assertEquals("https://auth.avicia.info:8443/api/parties", request.uri().toString());
+        assertEquals(BuildConfig.API_BASE_URL + "/api/parties", request.uri().toString());
         assertEquals("Bearer token-123", request.headers().firstValue("Authorization").orElseThrow());
     }
 

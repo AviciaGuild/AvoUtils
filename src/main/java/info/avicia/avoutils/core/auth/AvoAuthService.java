@@ -193,7 +193,7 @@ public class AvoAuthService {
 
         // Get challenge
         HttpRequest challengeReq = HttpRequest.newBuilder()
-                .uri(URI.create(config.apiBaseUrl + "/api/auth/challenge?uuid=" + uuidStr))
+                .uri(URI.create(config.getApiBaseUrl() + "/api/auth/challenge?uuid=" + uuidStr))
                 .GET()
                 .timeout(Duration.ofSeconds(10))
                 .build();
@@ -235,7 +235,7 @@ public class AvoAuthService {
                     body.addProperty("challenge", challenge);
 
                     HttpRequest loginReq = HttpRequest.newBuilder()
-                            .uri(URI.create(config.apiBaseUrl + "/api/auth/login"))
+                            .uri(URI.create(config.getApiBaseUrl() + "/api/auth/login"))
                             .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body)))
                             .header("Content-Type", "application/json")
                             .timeout(Duration.ofSeconds(10))

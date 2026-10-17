@@ -189,7 +189,7 @@ public class AvoWebSocketManager {
                 }
             }
 
-            URI wsUri = wsUriFor(config.apiBaseUrl);
+            URI wsUri = wsUriFor(config.getApiBaseUrl());
 
             AvoUtilsMod.LOGGER.info("[AvoUtils] [WebSocket] Connecting to: {}", wsUri);
 

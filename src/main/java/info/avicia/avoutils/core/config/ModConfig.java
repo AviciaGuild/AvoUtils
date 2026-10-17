@@ -3,12 +3,17 @@ package info.avicia.avoutils.core.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.BuildConfig;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Mod configuration
@@ -16,9 +21,9 @@ import java.nio.file.StandardCopyOption;
 public class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String CONFIG_FILE = "avoutils.json";
+    private static final Set<String> LOCAL_HOSTS = Set.of("localhost", "127.0.0.1", "[::1]");
 
-    private static final String DEFAULT_API_BASE_URL = "https://auth.avicia.info:8443";
-    public String apiBaseUrl = DEFAULT_API_BASE_URL;
+    public String apiBaseUrl = null;
     public boolean chatBridgeEnabled = true;
     public boolean emojiEnabled = true;
     public boolean emojiAutocompleteEnabled = true;
@@ -60,21 +65,69 @@ public class ModConfig {
      * Validates mutable config fields, resetting any unsafe values to their defaults
      */
     private void validate() {
-        if (apiBaseUrl == null || (!apiBaseUrl.startsWith("https://") && !apiBaseUrl.startsWith("http://localhost") && !apiBaseUrl.startsWith("http://127.0.0.1"))) {
-            AvoUtilsMod.LOGGER.warn(
-                "[AvoUtils] Config 'apiBaseUrl' is missing or does not use HTTPS (got '{}')."
-                    + " Resetting to default: {}", apiBaseUrl, DEFAULT_API_BASE_URL);
-            apiBaseUrl = DEFAULT_API_BASE_URL;
-        }
-        if (apiBaseUrl.endsWith("/")) {
-            apiBaseUrl = apiBaseUrl.substring(0, apiBaseUrl.length() - 1);
-        }
+        apiBaseUrl = sanitizeBackendOverride(apiBaseUrl);
         if (guildStorageEmeraldThresholdPercent < 1 || guildStorageEmeraldThresholdPercent > 100) {
             guildStorageEmeraldThresholdPercent = 90;
         }
         if (guildStorageAspectThresholdPercent < 1 || guildStorageAspectThresholdPercent > 100) {
             guildStorageAspectThresholdPercent = 90;
         }
+    }
+
+    /**
+     * Backend address to use: a localhost override from the config file, otherwise the address built
+     * into the jar. Checked on every read.
+     */
+    public String getApiBaseUrl() {
+        return isLocalBackend(apiBaseUrl) ? stripTrailingSlashes(apiBaseUrl) : BuildConfig.API_BASE_URL;
+    }
+
+    /**
+     * Keeps a configured override only if it points at this machine. Anything else is dropped.
+     */
+    static String sanitizeBackendOverride(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        String normalized = stripTrailingSlashes(url.trim());
+        if (isLocalBackend(normalized)) {
+            return normalized;
+        }
+        // Older versions wrote the built-in address into the file; drop that silently
+        if (!normalized.equals(BuildConfig.API_BASE_URL)) {
+            AvoUtilsMod.LOGGER.warn(
+                "[AvoUtils] Ignoring config 'apiBaseUrl' ({}): only localhost addresses can override the"
+                    + " built-in backend ({}).", normalized, BuildConfig.API_BASE_URL);
+        }
+        return null;
+    }
+
+    /**
+     * Whether {@code url} is an http(s) address whose host is exactly this machine.
+     */
+    static boolean isLocalBackend(String url) {
+        if (url == null) {
+            return false;
+        }
+        try {
+            URI uri = new URI(url.trim());
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            return ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                && host != null
+                && LOCAL_HOSTS.contains(host.toLowerCase(Locale.ROOT));
+        } catch (URISyntaxException e) {
+            return false;
+        }
+    }
+
+    private static String stripTrailingSlashes(String url) {
+        String trimmed = url.trim();
+        int end = trimmed.length();
+        while (end > 0 && trimmed.charAt(end - 1) == '/') {
+            end--;
+        }
+        return trimmed.substring(0, end);
     }
 
     /**
