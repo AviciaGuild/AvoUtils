@@ -11,6 +11,9 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
 
+// DevAuth signs runClient into your Microsoft account
+def devAuthEnabled = System.getenv('CI') == null && localProperties.getProperty('devauth', 'true').toBoolean()
+
 version = localProperties.getProperty('mod_version', project.mod_version)
 group = project.maven_group
 
@@ -21,10 +24,22 @@ base {
 repositories {
     maven { url = "https://maven.fabricmc.net/" }
     maven { url = "https://api.modrinth.com/maven" }
+    maven {
+        url = "https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1"
+        content { includeGroup "me.djtheredstoner" }
+    }
     mavenCentral()
 }
 
 loom {
+    runs {
+        client {
+            if (devAuthEnabled) {
+                property "devauth.enabled", "true"
+                property "devauth.account", localProperties.getProperty('devauth_account', 'main')
+            }
+        }
+    }
 }
 
 dependencies {
@@ -36,6 +51,9 @@ dependencies {
     modCompileOnly "maven.modrinth:modmenu:17.0.1"
     implementation "org.java-websocket:Java-WebSocket:1.6.0"
     include "org.java-websocket:Java-WebSocket:1.6.0"
+    if (devAuthEnabled) {
+        modRuntimeOnly "me.djtheredstoner:DevAuth-fabric:1.2.2"
+    }
 
     testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
     testImplementation "org.mockito:mockito-core:5.14.2"

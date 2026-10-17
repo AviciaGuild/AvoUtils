@@ -54,6 +54,8 @@ The backend address is built into the mod. For local backend development, you ca
 
 The compiled jar will be at `build/libs/avoutils-<version>.jar`.
 
+To test without installing the jar, run `./gradlew runClient`, or in VS Code run `./gradlew vscode` once and start the "Minecraft Client" launch configuration (debugging this way lets you hot-swap code changes). [DevAuth](https://github.com/DJtheRedstoner/DevAuth) signs the dev client into your Microsoft account so it can join Wynncraft. To turn DevAuth off, set `devauth=false` in `local.properties`.
+
 ---
 
 ### Release Workflow
