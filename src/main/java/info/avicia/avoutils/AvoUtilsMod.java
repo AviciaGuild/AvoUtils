@@ -61,7 +61,7 @@ public class AvoUtilsMod implements ClientModInitializer {
         WynncraftServerPolicy.addScopeChangeListener(this::onServerScopeChanged);
 
         // Register commands
-        AvoCommands.register();
+        AvoCommands.register(features);
 
         LOGGER.info("[AvoUtils] Mod initialized.");
     }

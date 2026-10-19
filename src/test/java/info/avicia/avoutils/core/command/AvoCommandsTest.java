@@ -3,6 +3,11 @@ package info.avicia.avoutils.core.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.tree.CommandNode;
+import info.avicia.avoutils.core.AvoFeature;
+import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
+import info.avicia.avoutils.features.emojis.EmojiFeature;
+import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
+import info.avicia.avoutils.features.updater.UpdateFeature;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
@@ -27,7 +32,16 @@ class AvoCommandsTest {
     void setUp() {
         dispatcher = new CommandDispatcher<>();
         source = mock(FabricClientCommandSource.class);
-        AvoCommands.register(dispatcher);
+        AvoCommands.register(dispatcher, List.of(withRealCommands(PartyFinderFeature.class),
+                withRealCommands(AnniPartyFeature.class), withRealCommands(EmojiFeature.class),
+                withRealCommands(UpdateFeature.class)));
+    }
+
+    /** A feature mock that registers its real subcommands; the real constructors need a game client. */
+    private static <T extends AvoFeature> T withRealCommands(Class<T> featureClass) {
+        T feature = mock(featureClass);
+        doCallRealMethod().when(feature).registerCommands(any());
+        return feature;
     }
 
     @AfterEach

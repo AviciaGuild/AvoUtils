@@ -5,8 +5,11 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
+import info.avicia.avoutils.core.command.AvoCommands;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.features.emojis.animation.AnimatedImageDecoder;
@@ -15,6 +18,7 @@ import info.avicia.avoutils.features.emojis.animation.AnimationMeta;
 import info.avicia.avoutils.features.emojis.models.FontConfig;
 import info.avicia.avoutils.features.emojis.models.FontProvider;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
@@ -57,6 +61,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 public class EmojiFeature implements AvoFeature {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -303,6 +309,22 @@ public class EmojiFeature implements AvoFeature {
                 packsLoaded = isEnabled();
             });
         });
+    }
+
+    @Override
+    public void registerCommands(LiteralArgumentBuilder<FabricClientCommandSource> root) {
+        // /avo emojis reload / update → refresh and re-download emojis
+        Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
+            if (AvoCommands.ensureOnWynncraft(context.getSource())) {
+                handleReloadCommand();
+            }
+            return 1;
+        };
+        root.then(literal("emojis")
+                .then(literal("reload")
+                        .executes(reloadEmojisCommand))
+                .then(literal("update")
+                        .executes(reloadEmojisCommand)));
     }
 
     public CompletableFuture<Void> reloadEmojis() {
