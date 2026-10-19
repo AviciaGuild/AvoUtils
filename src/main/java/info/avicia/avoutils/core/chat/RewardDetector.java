@@ -27,6 +27,7 @@ public final class RewardDetector {
         if (!m.matches()) return null;
 
         String senderDisplay = m.group("sender").trim();
+        if (senderDisplay.contains(":")) return null; // a player's chat line, not a reward broadcast
         String recipientDisplay = m.group("recipient").trim();
 
         String sender = UsernameResolver.resolve(message, senderDisplay);

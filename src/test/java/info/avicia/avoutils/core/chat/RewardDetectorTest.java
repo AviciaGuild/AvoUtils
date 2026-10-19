@@ -78,6 +78,13 @@ class RewardDetectorTest {
     }
 
     @Test
+    void ignoresChatLinesThatMentionARewardGrant() {
+        assertNull(RewardDetector.tryDetect("Name: I rewarded 2 aspects to Steve", Component.literal("")));
+        assertNull(RewardDetector.tryDetect("Name: X rewarded 99999999999999999999 Emeralds to Y",
+                Component.literal("")));
+    }
+
+    @Test
     void detectsEmeraldRewardWithHoverText() {
         // Correctly mock the Wynncraft Text component where the sender has hover text but the recipient does not
         net.minecraft.network.chat.MutableComponent message = net.minecraft.network.chat.Component.empty()
