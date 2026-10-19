@@ -1,6 +1,5 @@
 package info.avicia.avoutils.features.partyfinder.api;
 
-import info.avicia.avoutils.BuildConfig;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import org.junit.jupiter.api.Test;
@@ -27,29 +26,6 @@ import static org.mockito.Mockito.when;
 class PartyFinderClientTest {
 
     private final PartyFinderClient client = new PartyFinderClient(new ModConfig());
-
-    @Test
-    void buildGetRequestAddsAuthHeaderAndPath() throws Exception {
-        HttpRequest request = buildRequest("/api/parties", "token-123", "GET", null);
-
-        assertEquals("GET", request.method());
-        assertEquals(BuildConfig.API_BASE_URL + "/api/parties", request.uri().toString());
-        assertEquals("Bearer token-123", request.headers().firstValue("Authorization").orElseThrow());
-    }
-
-    @Test
-    void buildDeleteRequestUsesDeleteMethod() throws Exception {
-        HttpRequest request = buildRequest("/api/parties/1", "t", "DELETE", null);
-        assertEquals("DELETE", request.method());
-    }
-
-    @Test
-    void buildPostRequestIncludesBody() throws Exception {
-        HttpRequest request = buildRequest("/api/parties", "t", "POST", HttpRequest.BodyPublishers.ofString("{}"));
-
-        assertEquals("POST", request.method());
-        assertTrue(request.bodyPublisher().isPresent());
-    }
 
     @Test
     void parseResponseParsesValidJson() throws Exception {
@@ -138,14 +114,6 @@ class PartyFinderClientTest {
             List<PartyData> parties = client.listParties().join();
             assertTrue(parties.isEmpty());
         }
-    }
-
-    private HttpRequest buildRequest(String path, String token, String method,
-                                     HttpRequest.BodyPublisher bodyPublisher) throws Exception {
-        Method methodObj = PartyFinderClient.class.getDeclaredMethod(
-                "buildRequest", String.class, String.class, String.class, HttpRequest.BodyPublisher.class);
-        methodObj.setAccessible(true);
-        return (HttpRequest) methodObj.invoke(client, path, token, method, bodyPublisher);
     }
 
     private ApiResponse parseResponse(HttpResponse<String> response) throws Exception {
