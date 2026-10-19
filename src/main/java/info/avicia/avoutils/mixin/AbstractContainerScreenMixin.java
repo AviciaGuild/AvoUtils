@@ -2,7 +2,7 @@ package info.avicia.avoutils.mixin;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
-import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
+import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -14,10 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Hooks into {@link AbstractContainerScreen#render} to feed the current container's
- * slots to {@link GuildStorageNotifier} so it can scan for guild storage lore.
+ * slots to {@link GuildStorageFeature} so it can scan for guild storage lore.
  */
 @Mixin(AbstractContainerScreen.class)
-public abstract class HandledScreenMixin {
+public abstract class AbstractContainerScreenMixin {
 
     @Shadow
     protected abstract AbstractContainerMenu getMenu();
@@ -30,7 +30,7 @@ public abstract class HandledScreenMixin {
             }
             AvoUtilsMod mod = AvoUtilsMod.getInstance();
             if (mod != null) {
-                GuildStorageNotifier notifier = mod.getFeature(GuildStorageNotifier.class);
+                GuildStorageFeature notifier = mod.getFeature(GuildStorageFeature.class);
                 if (notifier != null) {
                     notifier.onContainerRender(getMenu());
                 }

@@ -5,7 +5,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
-import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
+import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
 import info.avicia.avoutils.testutil.TestReflection;
 import info.avicia.avoutils.testutil.TextFixtures;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
@@ -80,7 +80,7 @@ class ChatBridgeFeatureTest {
 
             when(manager.isConnected()).thenReturn(connected);
             when(authService.isGuildMember()).thenReturn(guildMember);
-            when(modInstance.getFeature(GuildStorageNotifier.class)).thenReturn(null);
+            when(modInstance.getFeature(GuildStorageFeature.class)).thenReturn(null);
 
             testBody.accept(manager);
         }

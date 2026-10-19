@@ -21,7 +21,7 @@ import net.minecraft.network.chat.Component;
  * Provides emoji autocomplete suggestions when typing shortcodes in chat.
  */
 @Mixin(CommandSuggestions.class)
-public abstract class ChatInputSuggestorMixin {
+public abstract class CommandSuggestionsMixin {
 
     @Shadow
     EditBox input;

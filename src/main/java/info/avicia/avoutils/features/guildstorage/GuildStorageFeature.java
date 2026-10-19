@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  *   Chat deltas: raid rewards (+emeralds/+aspects) and reward grants (-emeralds/-aspects)
  *   Remote snapshots: crowdsourced via AvoBot WebSocket relay
  */
-public class GuildStorageNotifier implements AvoFeature {
+public class GuildStorageFeature implements AvoFeature {
 
     private static final String EVT_GUILD_STORAGE = "guild_storage_snapshot";
     private static final long PUBLISH_INTERVAL_MS = 1_000L;
@@ -107,7 +107,7 @@ public class GuildStorageNotifier implements AvoFeature {
                 config.guildStorageEmeraldThresholdPercent, config.guildStorageAspectThresholdPercent);
     }
 
-    // ── Menu scanning (called from HandledScreenMixin) ──────────────────
+    // ── Menu scanning (called from AbstractContainerScreenMixin) ────────
 
     public void onContainerRender(AbstractContainerMenu handler) {
         if (!isActive() || handler == null) return;

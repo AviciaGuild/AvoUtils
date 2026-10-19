@@ -7,7 +7,7 @@ import info.avicia.avoutils.features.emojis.EmojiFeature;
 import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
 import info.avicia.avoutils.core.command.AvoCommands;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
-import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
+import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
 import info.avicia.avoutils.features.updater.UpdateFeature;
 import info.avicia.avoutils.features.wardetector.WarDetectorFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
@@ -48,7 +48,7 @@ public class AvoUtilsMod implements ClientModInitializer {
         registerFeature(new EmojiFeature());
         registerFeature(new ChatBridgeFeature());
         registerFeature(new WarDetectorFeature());
-        registerFeature(new GuildStorageNotifier());
+        registerFeature(new GuildStorageFeature());
         registerFeature(new UpdateFeature());
 
         // Initialize all registered features

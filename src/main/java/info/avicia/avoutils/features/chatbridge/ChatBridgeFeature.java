@@ -6,7 +6,7 @@ import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
-import info.avicia.avoutils.features.guildstorage.GuildStorageNotifier;
+import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.UsernameResolver;
 import info.avicia.avoutils.core.util.WynnPillUtil;
@@ -108,7 +108,7 @@ public class ChatBridgeFeature implements AvoFeature {
 
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
         AvoUtilsMod mod = AvoUtilsMod.getInstance();
-        GuildStorageNotifier storage = mod != null ? mod.getFeature(GuildStorageNotifier.class) : null;
+        GuildStorageFeature storage = mod != null ? mod.getFeature(GuildStorageFeature.class) : null;
 
         if (!hasLeadingGuildChatColor(message)) return;
 
