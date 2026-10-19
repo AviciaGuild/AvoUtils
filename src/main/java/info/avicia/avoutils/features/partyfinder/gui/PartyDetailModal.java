@@ -29,6 +29,7 @@ import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.InputConstants;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
+import info.avicia.avoutils.core.util.ClientThread;
 
 /**
  * Modal overlay showing a party's details
@@ -214,16 +215,9 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         setStatus("Inviting " + names.size() + " players...", 0xFF55FF55);
     }
 
-    private void runOnClient(Runnable action) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null) {
-            mc.execute(action);
-        }
-    }
-
     private void reserveSlot() {
         apiClient.reserveSlot(party.partyId, null, null).thenAccept(resp -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 if (resp.ok) {
                     setStatus("Slot reserved!", 0xFF55FF55);
                     refreshPartyState();
@@ -232,7 +226,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 }
             });
         }).exceptionally(ex -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
             });
             return null;
@@ -241,7 +235,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     private void disbandParty() {
         apiClient.disbandParty(party.partyId).thenAccept(resp -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 if (resp.ok) {
                     parent.closeModal();
                 } else {
@@ -249,7 +243,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 }
             });
         }).exceptionally(ex -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
             });
             return null;
@@ -258,7 +252,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     private void leaveParty() {
         apiClient.leaveParty(party.partyId).thenAccept(resp -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 if (resp.ok) {
                     parent.closeModal();
                 } else {
@@ -266,7 +260,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 }
             });
         }).exceptionally(ex -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
             });
             return null;
@@ -275,7 +269,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     private void joinParty(String role) {
         apiClient.joinParty(party.partyId, role).thenAccept(resp -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 if (resp.ok) {
                     setStatus(resp.message != null ? resp.message : "Joined!", 0xFF55FF55);
                     refreshPartyState();
@@ -284,7 +278,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 }
             });
         }).exceptionally(ex -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
             });
             return null;
@@ -293,7 +287,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     private void changeRole(String role) {
         apiClient.joinParty(party.partyId, role).thenAccept(resp -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 if (resp.ok) {
                     setStatus(resp.message != null ? resp.message : "Role changed!", 0xFF55FF55);
                     refreshPartyState();
@@ -302,7 +296,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 }
             });
         }).exceptionally(ex -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
             });
             return null;
@@ -314,7 +308,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
             if (p == null) {
                 return;
             }
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 this.party.memberCount = p.memberCount;
                 this.party.maxSize = p.maxSize;
                 this.party.isFull = p.isFull;
@@ -335,7 +329,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 this.rebuildWidgets();
             });
         }).exceptionally(ex -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 parent.closeModal();
             });
             return null;
@@ -518,7 +512,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 if (!PlayerUtil.namesEqual(member.name, party.leaderName)
                         && isKickButtonHovered(mouseX, mouseY, kickX, row.y)) {
                     apiClient.kickMember(party.partyId, member.name).thenAccept(resp -> {
-                        runOnClient(() -> {
+                        ClientThread.run(() -> {
                             if (resp.ok) {
                                 setStatus("Kicked " + member.name, 0xFF55FF55);
                                 refreshPartyState();
@@ -527,7 +521,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                             }
                         });
                     }).exceptionally(ex -> {
-                        runOnClient(() -> {
+                        ClientThread.run(() -> {
                             setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
                         });
                         return null;

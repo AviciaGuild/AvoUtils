@@ -13,6 +13,7 @@ import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import com.mojang.blaze3d.platform.InputConstants;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.core.util.ClientThread;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -137,7 +138,7 @@ public class PartyListScreen extends ScrollableListScreen {
         loading = true;
         errorMessage = null;
         apiClient.listParties().thenAccept(result -> {
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 parties = result;
                 loading = false;
 
@@ -190,19 +191,12 @@ public class PartyListScreen extends ScrollableListScreen {
         }).exceptionally(ex -> {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
             AvoUtilsMod.LOGGER.warn("[AvoUtils] [PartyFinder] Failed to fetch parties: {}", cause.getMessage());
-            runOnClient(() -> {
+            ClientThread.run(() -> {
                 errorMessage = cause.getMessage() != null ? cause.getMessage() : "Failed to load parties.";
                 loading = false;
             });
             return null;
         });
-    }
-
-    private void runOnClient(Runnable action) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null) {
-            mc.execute(action);
-        }
     }
 
     private PartyData getOwnedParty() {
