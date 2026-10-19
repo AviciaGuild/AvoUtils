@@ -4,27 +4,25 @@ import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
+import info.avicia.avoutils.core.chat.GuildChat;
+import info.avicia.avoutils.core.chat.RewardDetector;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.UsernameResolver;
 import info.avicia.avoutils.core.util.WynnPillUtil;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.TextColor;
 
 /**
  * Chat bridge feature that relays messages between in-game guild chat and Discord.
  */
 public class ChatBridgeFeature implements AvoFeature {
-    private static final int GUILD_CHAT_COLOR = 0x55FFFF;
     private static final Pattern CHAT_PATTERN = Pattern.compile(
             "^(?:<\\d+>\\s*)?([a-zA-Z0-9_][a-zA-Z0-9_ ]*[a-zA-Z0-9_]|[a-zA-Z0-9_]{3,16})\\s*:\\s*(.*)$",
             Pattern.DOTALL);
@@ -110,7 +108,7 @@ public class ChatBridgeFeature implements AvoFeature {
         AvoUtilsMod mod = AvoUtilsMod.getInstance();
         GuildStorageFeature storage = mod != null ? mod.getFeature(GuildStorageFeature.class) : null;
 
-        if (!hasLeadingGuildChatColor(message)) return;
+        if (!GuildChat.isGuildChat(message)) return;
 
         // ── Raid completions ──────────────────────────────────────────
         RaidDetector.RaidResult raidResult = RaidDetector.tryDetect(cleaned, message);
@@ -156,18 +154,6 @@ public class ChatBridgeFeature implements AvoFeature {
         if (!chatDeduper.isDuplicate(dedupKey)) {
             sendEvent(EVT_GUILD_CHAT, realUsername, content, AVATAR_URL_BASE + realUsername + "/128");
         }
-    }
-
-    private static boolean hasLeadingGuildChatColor(Component message) {
-        if (message == null) return false;
-        TextColor rootColor = message.getStyle().getColor();
-        if (rootColor != null) return rootColor.getValue() == GUILD_CHAT_COLOR;
-        Optional<Boolean> leadingColorIsGuild = message.visit((style, text) -> {
-            if (text == null || text.isBlank()) return Optional.empty();
-            TextColor color = style.getColor();
-            return Optional.of(color != null && color.getValue() == GUILD_CHAT_COLOR);
-        }, Style.EMPTY);
-        return leadingColorIsGuild.orElse(false);
     }
 
     private void sendEvent(String eventType, String username, String message, String avatarUrl) {

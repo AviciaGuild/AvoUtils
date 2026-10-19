@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.chat;
 
 import org.junit.jupiter.api.Test;
 
@@ -58,6 +58,16 @@ class RewardDetectorTest {
 
         assertNotNull(result);
         assertEquals("**Steve\\_Bob** rewarded **5 Emeralds** to **Alex**", result.formattedMessage());
+    }
+
+    @Test
+    void keepsTheNamesUnescapedInTheResult() {
+        RewardDetector.RewardResult result =
+                RewardDetector.tryDetect("Steve_Bob rewarded a Guild Tome to Alex_2", Component.literal(""));
+
+        assertNotNull(result);
+        assertEquals("Steve_Bob", result.sender());
+        assertEquals("Alex_2", result.recipient());
     }
 
     @Test

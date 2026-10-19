@@ -6,7 +6,6 @@ import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
-import info.avicia.avoutils.testutil.TestReflection;
 import info.avicia.avoutils.testutil.TextFixtures;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import org.junit.jupiter.api.AfterEach;
@@ -16,9 +15,6 @@ import org.mockito.MockedStatic;
 
 import java.util.function.Consumer;
 import net.minecraft.network.chat.Component;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -41,28 +37,6 @@ class ChatBridgeFeatureTest {
     @AfterEach
     void tearDown() {
         WynncraftServerPolicy.setScopeOverride(null);
-    }
-
-    @Test
-    void leadingGuildColorIsDetectedOnRootStyle() throws Exception {
-        assertTrue(hasLeadingGuildChatColor(TextFixtures.coloredText("hi", GUILD_CHAT_COLOR)));
-    }
-
-    @Test
-    void leadingGuildColorIsDetectedOnLeafStyle() throws Exception {
-        Component message = Component.empty().append(TextFixtures.coloredText("hi", GUILD_CHAT_COLOR));
-        assertTrue(hasLeadingGuildChatColor(message));
-    }
-
-    @Test
-    void otherColorsAreNotGuildChat() throws Exception {
-        assertFalse(hasLeadingGuildChatColor(TextFixtures.coloredText("hi", 0xFF0000)));
-        assertFalse(hasLeadingGuildChatColor(Component.literal("hi")));
-    }
-
-    private static boolean hasLeadingGuildChatColor(Component message) throws Exception {
-        return TestReflection.invokeStatic(ChatBridgeFeature.class, "hasLeadingGuildChatColor",
-                new Class[]{Component.class}, message);
     }
 
     private void withMockedServices(boolean connected, boolean guildMember, Consumer<AvoWebSocketManager> testBody) {

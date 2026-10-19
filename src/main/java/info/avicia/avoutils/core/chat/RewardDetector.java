@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.chat;
 
 import info.avicia.avoutils.core.util.UsernameResolver;
 import java.util.Locale;
@@ -10,16 +10,17 @@ import net.minecraft.network.chat.Component;
  * Detects guild reward grants (Emeralds, Aspects, Guild Tomes) from system
  * chat and returns data for both Discord relay and storage delta tracking.
  */
-final class RewardDetector {
+public final class RewardDetector {
 
     private static final Pattern REWARD_GRANT_PATTERN = Pattern.compile(
             "^(?<sender>.+?)\\s+rewarded\\s+(?:(?<emeraldAmount>[\\d, ]+)\\s+Emeralds?|(?<aspectAmount>an?|[\\d, ]+)\\s+Aspects?|(?<tomeAmount>an?|[\\d, ]+)\\s+Guild Tomes?)\\s+to\\s+(?<recipient>.+)$",
             Pattern.CASE_INSENSITIVE);
 
-    record RewardResult(String formattedMessage, String senderDisplay, String recipientDisplay,
-                        long emeraldAmount, long aspectAmount, long tomeCount) {}
+    /** {@code sender} and {@code recipient} are the resolved usernames; {@code formattedMessage} escapes them for Discord. */
+    public record RewardResult(String formattedMessage, String sender, String recipient,
+                               long emeraldAmount, long aspectAmount, long tomeCount) {}
 
-    static RewardResult tryDetect(String cleaned, Component message) {
+    public static RewardResult tryDetect(String cleaned, Component message) {
         if (cleaned == null || !cleaned.contains("rewarded") || !cleaned.contains(" to ")) return null;
 
         Matcher m = REWARD_GRANT_PATTERN.matcher(cleaned);
@@ -32,14 +33,14 @@ final class RewardDetector {
         if (sender == null) sender = senderDisplay;
         String recipient = UsernameResolver.resolve(message, recipientDisplay);
         if (recipient == null) recipient = recipientDisplay;
-        sender = DiscordMarkdown.escapeUsername(sender);
-        recipient = DiscordMarkdown.escapeUsername(recipient);
+        String escapedSender = DiscordMarkdown.escapeUsername(sender);
+        String escapedRecipient = DiscordMarkdown.escapeUsername(recipient);
 
         String emeraldAmount = m.group("emeraldAmount");
         if (emeraldAmount != null) {
             long amount = parseNumber(emeraldAmount);
-            String formatted = "**" + sender + "** rewarded **" + String.format(Locale.US, "%,d", amount)
-                    + " Emeralds** to **" + recipient + "**";
+            String formatted = "**" + escapedSender + "** rewarded **" + String.format(Locale.US, "%,d", amount)
+                    + " Emeralds** to **" + escapedRecipient + "**";
             return new RewardResult(formatted, sender, recipient, amount, 0, 0);
         }
 
@@ -47,8 +48,8 @@ final class RewardDetector {
         if (aspectAmount != null) {
             long amount = parseArticleAmount(aspectAmount);
             if (amount <= 0) return null;
-            String formatted = "**" + sender + "** rewarded **" + amount + " Aspect"
-                    + (amount != 1 ? "s" : "") + "** to **" + recipient + "**";
+            String formatted = "**" + escapedSender + "** rewarded **" + amount + " Aspect"
+                    + (amount != 1 ? "s" : "") + "** to **" + escapedRecipient + "**";
             return new RewardResult(formatted, sender, recipient, 0, amount, 0);
         }
 
@@ -56,8 +57,8 @@ final class RewardDetector {
         if (tomeAmount != null) {
             long amount = parseArticleAmount(tomeAmount);
             if (amount <= 0) return null;
-            String formatted = "**" + sender + "** rewarded **" + amount + " Guild Tome"
-                    + (amount != 1 ? "s" : "") + "** to **" + recipient + "**";
+            String formatted = "**" + escapedSender + "** rewarded **" + amount + " Guild Tome"
+                    + (amount != 1 ? "s" : "") + "** to **" + escapedRecipient + "**";
             return new RewardResult(formatted, sender, recipient, 0, 0, amount);
         }
 
