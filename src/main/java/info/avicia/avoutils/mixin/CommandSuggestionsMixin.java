@@ -4,6 +4,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
+import info.avicia.avoutils.features.emojis.EmojiAutocomplete;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -66,7 +67,7 @@ public abstract class CommandSuggestionsMixin {
 
         String textBeforeCursor = text.substring(0, cursor);
 
-        EmojiFeature.AutocompletePrefix prefixInfo = EmojiFeature.findAutocompletePrefix(textBeforeCursor);
+        EmojiAutocomplete.AutocompletePrefix prefixInfo = EmojiAutocomplete.findAutocompletePrefix(textBeforeCursor);
         if (prefixInfo == null) {
             return;
         }
