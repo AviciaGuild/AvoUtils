@@ -4,6 +4,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import info.avicia.avoutils.features.rewards.RewardsFeature;
 import info.avicia.avoutils.features.wardetector.WarDetectorFeature;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -29,6 +30,7 @@ public class ClientPacketListenerMixin {
             if (!WynncraftServerPolicy.isOnWynncraft()) {
                 return;
             }
+            avoutils$notifyRewards(packet);
             if (packet.content() != null && AvoUtilsMod.getInstance() != null) {
                 if (InGamePartyTracker.getInstance().onChatMessage(packet.content())) {
                     ci.cancel();
@@ -44,6 +46,18 @@ public class ClientPacketListenerMixin {
             }
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("[AvoUtils] Error handling game message in mixin", e);
+        }
+    }
+
+    private static void avoutils$notifyRewards(ClientboundSystemChatPacket packet) {
+        try {
+            AvoUtilsMod mod = AvoUtilsMod.getInstance();
+            RewardsFeature rewards = mod != null ? mod.getFeature(RewardsFeature.class) : null;
+            if (rewards != null && packet.content() != null) {
+                rewards.onSystemChat(packet.content());
+            }
+        } catch (Exception e) {
+            AvoUtilsMod.LOGGER.error("[AvoUtils] [Rewards] Error handling game message", e);
         }
     }
 }
