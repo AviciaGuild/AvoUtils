@@ -9,6 +9,7 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ModalOverlay;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
+import info.avicia.avoutils.core.gui.UiIcons;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -79,10 +80,10 @@ public class PartyListScreen extends ScrollableListScreen {
         int buttonY = 8;
 
         // Refresh button
-        addRenderableWidget(new FlatButtonWidget(SIDE_PADDING, buttonY, 80, 20, Component.literal("⟳ Refresh"), () -> fetchParties()));
+        addRenderableWidget(new FlatButtonWidget(SIDE_PADDING, buttonY, 80, 20, Component.literal("Refresh"), () -> fetchParties()).withIcon(UiIcons.REFRESH));
 
         // Create Party button
-        createPartyButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Component.literal("+ Create Party"), () -> openCreateModal()));
+        createPartyButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Component.literal("Create Party"), () -> openCreateModal()).withIcon(UiIcons.PLUS));
         createPartyButton.visible = true;
 
         // View Party button (when party owned)

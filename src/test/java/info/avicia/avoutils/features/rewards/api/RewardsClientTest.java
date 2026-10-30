@@ -122,4 +122,17 @@ class RewardsClientTest {
 
         assertEquals(409, failure(client.unlock("u1", RewardKind.TOME)).status());
     }
+
+    @Test
+    void claimSendsExactFreeformRewardType() {
+        reply(200, "{\"ok\":true,\"claimed\":1,\"pending\":0}");
+
+        RewardsResponse response = client.claim("u1", RewardKind.fromApiName("Shiny Warp"), 1, "claim-9").join();
+
+        assertTrue(response.ok);
+        JsonObject body = sentBody("/api/rewards/claim");
+        assertEquals("u1", body.get("uuid").getAsString());
+        assertEquals("Shiny Warp", body.get("type").getAsString());
+        assertEquals(1, body.get("amount").getAsLong());
+    }
 }

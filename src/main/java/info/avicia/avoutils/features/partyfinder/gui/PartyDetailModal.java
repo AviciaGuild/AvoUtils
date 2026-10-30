@@ -9,6 +9,7 @@ import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
+import info.avicia.avoutils.core.gui.UiIcons;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
@@ -137,7 +138,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         int btnX = modalX + (modalW - totalButtonsWidth) / 2;
 
         // Close button
-        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Component.literal("✕"), () -> parent.closeModal());
+        FlatButtonWidget closeBtn = new FlatButtonWidget(modalX + modalW - 16, modalY + 6, 12, 12, Component.empty(), () -> parent.closeModal()).withIcon(UiIcons.CROSS);
         closeBtn.setDanger(true);
         closeBtn.setBorderless(true);
         addRenderableWidget(closeBtn);
@@ -457,7 +458,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                     context.fill(kickX - 4, textY - 2, kickX + 10, textY + 12, 0x40FF4D4D);
                 }
                 int kickColor = kickHovered ? 0xFFFF4D4D : 0xFFAA4444;
-                CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("✕"), kickX, textY + 1, kickColor);
+                UiIcons.CROSS.draw(context, kickX - 4, textY - 2, 14, 14, kickColor);
             }
 
             memberRows.add(new MemberRow(entry.getKey(), textY));

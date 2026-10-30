@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Hooks into {@link AbstractContainerScreen}: {@code render} feeds the current container's slots to
  * {@link GuildStorageFeature} so it can scan for guild storage lore, and draws {@link RewardsFeature}'s panel, which
- * also gets the clicks and the scroll wheel, and during a hand-out the releases and the keys.
+ * also gets the clicks, the scroll wheel and its slider's drags, and during a hand-out the releases and the keys.
  */
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
@@ -79,11 +79,24 @@ public abstract class AbstractContainerScreenMixin {
     private void avoutils$onMouseReleased(MouseButtonEvent click, CallbackInfoReturnable<Boolean> cir) {
         try {
             RewardsFeature rewards = avoutils$rewards();
-            if (rewards != null && rewards.onMouseReleased(avoutils$self())) {
+            if (rewards != null && rewards.onMouseReleased(avoutils$self(), click)) {
                 cir.setReturnValue(true);
             }
         } catch (Exception e) {
             AvoUtilsMod.LOGGER.error("[AvoUtils] [Rewards] Error in release hook", e);
+        }
+    }
+
+    @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
+    private void avoutils$onMouseDragged(MouseButtonEvent event, double dragX, double dragY,
+                                         CallbackInfoReturnable<Boolean> cir) {
+        try {
+            RewardsFeature rewards = avoutils$rewards();
+            if (rewards != null && rewards.onMouseDragged(avoutils$self(), event, dragX, dragY)) {
+                cir.setReturnValue(true);
+            }
+        } catch (Exception e) {
+            AvoUtilsMod.LOGGER.error("[AvoUtils] [Rewards] Error in drag hook", e);
         }
     }
 

@@ -10,6 +10,7 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
+import info.avicia.avoutils.core.gui.UiIcons;
 import info.avicia.avoutils.features.partyfinder.gui.CreatePartyModalLayout.Row;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -129,7 +130,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
         closeButton = new FlatButtonWidget(layout.closeButtonX(), layout.closeButtonY(),
                 CreatePartyModalLayout.CLOSE_BUTTON_SIZE, CreatePartyModalLayout.CLOSE_BUTTON_SIZE,
-                Component.literal("✕"), () -> parent.closeModal());
+                Component.empty(), () -> parent.closeModal()).withIcon(UiIcons.CROSS);
         closeButton.setDanger(true);
         closeButton.setBorderless(true);
         addRenderableWidget(closeButton);

@@ -62,12 +62,10 @@ public final class GuildRewardMenu {
 
     private static boolean isRewardLabel(String label, RewardKind kind) {
         String lower = label.toLowerCase(Locale.ROOT);
-        return switch (kind) {
-            case EMERALDS -> lower.startsWith("emerald");
-            case ASPECT -> lower.startsWith("aspect");
-            case TOME -> lower.contains("tome");
-            case LE -> false;
-        };
+        if (kind.equals(RewardKind.EMERALDS)) return lower.startsWith("emerald");
+        if (kind.equals(RewardKind.ASPECT)) return lower.startsWith("aspect");
+        if (kind.equals(RewardKind.TOME)) return lower.contains("tome");
+        return false;
     }
 
     /** Digits with "," or ", " separators (the normalizer turns "1,024" into "1, 024"), or a, an, one. */

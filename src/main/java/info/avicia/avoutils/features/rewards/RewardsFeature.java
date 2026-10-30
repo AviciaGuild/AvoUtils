@@ -11,17 +11,20 @@ import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
+import info.avicia.avoutils.features.rewards.RewardDistributor.Outcome;
 import info.avicia.avoutils.features.rewards.api.PlayerRewards;
 import info.avicia.avoutils.features.rewards.api.RewardsClient;
 import info.avicia.avoutils.features.rewards.gui.RewardsPanel;
 import info.avicia.avoutils.features.rewards.gui.RewardsPanelLayout;
 import info.avicia.avoutils.features.rewards.menu.GuildRewardMenu;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -42,6 +45,10 @@ public class RewardsFeature implements AvoFeature {
     /** {@code -Davoutils.debugRewards=true} logs the guild menu items and the chat lines a run sees. */
     static final boolean DEBUG = Boolean.getBoolean("avoutils.debugRewards");
     private static final long LIST_MAX_AGE_MS = 15_000;
+    private static final List<RewardKind> BUILTIN_ORDER = List.of(RewardKind.LE, RewardKind.TOME, RewardKind.ASPECT);
+    private static final Comparator<RewardKind> CUSTOM_ORDER = Comparator
+            .comparing(RewardKind::apiName, String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(RewardKind::apiName);
 
     public record PlayerEntry(String uuid, String username, boolean inGuild, Map<RewardKind, Long> rewards) {
         public String displayName() {
@@ -49,17 +56,19 @@ public class RewardsFeature implements AvoFeature {
         }
     }
 
-    /** Recording a hand-out by hand: {@code amount} of {@code max} owed. */
-    public record Stepper(String uuid, RewardKind kind, long amount, long max) {}
+    /** Recording a hand-out by hand, of up to {@code max}: what's owed. The panel's slider picks the amount. */
+    public record Stepper(String uuid, RewardKind kind, long max) {}
 
     public record StatusLine(String text, int color) {}
+
+    /** A player's tomes or aspects to hand out, by ▶ or as part of "Hand out all". */
+    private record HandOut(PlayerEntry player, RewardKind kind) {}
 
     private RewardsClient client;
     private ClaimRecorder recorder;
     private RewardsPanel panel;
 
     private List<PlayerEntry> players = List.of();
-    private final Set<String> loggedUnknownTypes = new HashSet<>();
     private boolean fetching;
     private long lastFetchStartMs;
     private long lastClaimReplyMs;
@@ -72,12 +81,16 @@ public class RewardsFeature implements AvoFeature {
     private boolean collapsed;
     private Stepper stepper;
     private StatusLine status;
-    /** Kept apart from the status, which a run's progress and result replace. */
     private StatusLine warning;
 
     private RewardDistributor run;
     private String runUuid;
     private boolean lockPending;
+    private boolean stopRequested;
+    /** "Hand out all": the hand-outs after the current one, and how many there were in all (0 when it isn't on). */
+    private final Deque<HandOut> queue = new ArrayDeque<>();
+    private int queueTotal;
+    private boolean queueSkippedAny;
     private int version;
 
     @Override
@@ -91,11 +104,7 @@ public class RewardsFeature implements AvoFeature {
     @Override
     public void onServerScopeChanged(Scope newScope) {
         if (newScope != Scope.MAIN) {
-            ClientThread.run(() -> {
-                if (run != null) {
-                    run.abort("Left the main Wynncraft servers.");
-                }
-            });
+            ClientThread.run(() -> stopEverything("Left the main Wynncraft servers."));
         }
     }
 
@@ -107,9 +116,7 @@ public class RewardsFeature implements AvoFeature {
     }
 
     private void onDisconnect() {
-        if (run != null) {
-            run.abort("Disconnected.");
-        }
+        stopEverything("Disconnected.");
         hasAccess = false;
         notManagement = false;
         players = List.of();
@@ -159,8 +166,15 @@ public class RewardsFeature implements AvoFeature {
     }
 
     /** During a run, releases are swallowed too: vanilla can still send a click from one, e.g. after a double click. */
-    public boolean onMouseReleased(AbstractContainerScreen<?> screen) {
-        return run != null && isGuildScreen(screen);
+    public boolean onMouseReleased(AbstractContainerScreen<?> screen, MouseButtonEvent click) {
+        boolean endedDrag = panel != null && panel.mouseReleased(click);
+        return (endedDrag || run != null) && isGuildScreen(screen);
+    }
+
+    /** Drags of the panel's slider; the menu doesn't see them. */
+    public boolean onMouseDragged(AbstractContainerScreen<?> screen, MouseButtonEvent event, double dragX,
+                                  double dragY) {
+        return isGuildScreen(screen) && panel != null && panelVisible() && panel.mouseDragged(event, dragX, dragY);
     }
 
     public boolean onMouseScrolled(AbstractContainerScreen<?> screen, double mouseX, double mouseY, double amount) {
@@ -207,17 +221,37 @@ public class RewardsFeature implements AvoFeature {
         return stepper;
     }
 
-    public boolean isRunActive() {
-        return run != null;
+    /** The player whose tomes or aspects are being handed out, for the panel to mark their row; null if none. */
+    public String activeUuid() {
+        return run != null ? runUuid : null;
+    }
+
+    /** How far the hand-out is, from 0 to 1, for the progress bar; negative when there's no bar to show. */
+    public double progressRatio() {
+        return run != null ? run.progressRatio() : -1;
+    }
+
+    public boolean isBusy() {
+        return run != null || lockPending || queueTotal > 0;
     }
 
     public boolean canStartRun() {
-        return run == null && !lockPending && WynncraftServerPolicy.isNetworkingAllowed();
+        return !isBusy() && WynncraftServerPolicy.isNetworkingAllowed();
     }
 
-    /** The run's progress or the last result, the last warning, then what isn't recorded yet. */
+    /** Whether "Hand out all" has anything to do: tomes or aspects for someone still in the guild. */
+    public boolean canHandOutAll() {
+        return canStartRun() && players.stream().anyMatch(player -> player.inGuild()
+                && player.rewards().keySet().stream().anyMatch(RewardKind::handedOutByMod));
+    }
+
+    /** "Hand out all" progress, the run's progress or the last result, the last warning, what isn't recorded yet. */
     public List<StatusLine> statusLines() {
         List<StatusLine> lines = new ArrayList<>();
+        if (queueTotal > 0) {
+            lines.add(new StatusLine("Handing out everything: " + (queueTotal - queue.size()) + " of " + queueTotal,
+                    UiStyle.TEXT_WHITE));
+        }
         if (run != null) {
             lines.add(new StatusLine(run.progress(), UiStyle.TEXT_WHITE));
         } else if (status != null) {
@@ -253,7 +287,7 @@ public class RewardsFeature implements AvoFeature {
                 listError = null;
                 // A claim reply that came while this loaded is fresher than this list
                 if (startedAt >= lastClaimReplyMs || players.isEmpty()) {
-                    players = entries(response.players);
+                    players = toEntries(response.players);
                 }
             } else if (cause instanceof ApiException api && api.status() == 403) {
                 hasAccess = false;
@@ -266,48 +300,34 @@ public class RewardsFeature implements AvoFeature {
         }));
     }
 
-    /** Hands out a player's tomes or aspects: takes the bot's lock, then runs for what's pending now. */
+    /** ▶: hands out a player's tomes or aspects. */
     public void startRun(PlayerEntry player, RewardKind kind) {
-        if (!canStartRun() || !player.inGuild() || !kind.handedOutByMod()) return;
-        if (!AvoAuthService.getInstance().isGuildMember()) {
-            setStatus("Only guild members can hand out rewards.", UiStyle.STATUS_ERROR);
-            return;
-        }
-        String name = player.displayName();
-        lockPending = true;
+        if (!canStartRun() || !player.inGuild() || !kind.handedOutByMod() || !isGuildMember()) return;
         warning = null;
-        setStatus("Checking what " + name + " is owed…", UiStyle.TEXT_WHITE);
-        recorder.lock(player.uuid(), kind, name, (response, error) -> {
-            lockPending = false;
-            if (error != null) {
-                setStatus(lockError(error), UiStyle.STATUS_ERROR);
-            } else if (!response.ok) {
-                String holder = response.lockedBy != null ? response.lockedBy : "Another Chief";
-                setStatus(holder + " is already handing out " + kind.plural() + " to " + name + ".",
-                        UiStyle.STATUS_WARNING);
-            } else if (response.pending == null || response.pending <= 0) {
-                setStatus("Nothing is pending for " + name + " any more.", UiStyle.STATUS_WARNING);
-                refresh();
-            } else if (!WynncraftServerPolicy.isNetworkingAllowed()) {
-                recorder.runFinished(player.uuid(), kind); // releases the lock just taken
-                setStatus("Left the main Wynncraft servers.", UiStyle.STATUS_WARNING);
-            } else {
-                runUuid = player.uuid();
-                run = new RewardDistributor(new MinecraftGame(), new RunListener(player, kind), kind,
-                        parseUuid(player.uuid()), player.username(), response.pending);
-                changed();
-                run.start();
+        handOut(new HandOut(player, kind));
+    }
+
+    /** "Hand out all": every tome and aspect on the list, one player after another. LE and custom items are traded by hand. */
+    public void startHandOutAll() {
+        if (!canHandOutAll() || !isGuildMember()) return;
+        queue.clear();
+        for (PlayerEntry player : players) {
+            if (!player.inGuild()) continue;
+            for (RewardKind kind : player.rewards().keySet()) {
+                if (kind.handedOutByMod()) {
+                    queue.add(new HandOut(player, kind));
+                }
             }
-        });
+        }
+        queueTotal = queue.size();
+        queueSkippedAny = false;
+        warning = null;
+        handOut(queue.poll());
     }
 
     /** Sends every emerald in storage to the first head of the member list, the owner. Not a bot reward. */
     public void startEmeraldRun() {
-        if (!canStartRun()) return;
-        if (!AvoAuthService.getInstance().isGuildMember()) {
-            setStatus("Only guild members can hand out rewards.", UiStyle.STATUS_ERROR);
-            return;
-        }
+        if (!canStartRun() || !isGuildMember()) return;
         warning = null;
         run = RewardDistributor.forEmeralds(new MinecraftGame(), new RewardDistributor.Listener() {
             @Override
@@ -315,31 +335,112 @@ public class RewardsFeature implements AvoFeature {
             }
 
             @Override
-            public void onFinished(String result, boolean complete) {
+            public void onFinished(String result, Outcome outcome) {
                 run = null;
-                setStatus(result, complete ? UiStyle.STATUS_SUCCESS : UiStyle.STATUS_WARNING);
+                setStatus(result, outcome == Outcome.DONE ? UiStyle.STATUS_SUCCESS : UiStyle.STATUS_WARNING);
             }
         });
         changed();
         run.start();
     }
 
+    /** Stop: ends the run, and with it "Hand out all". */
     public void stopRun() {
+        stopRequested = true;
+        queue.clear();
         if (run != null) {
             run.stop();
+        }
+        changed();
+    }
+
+    private void stopEverything(String reason) {
+        stopRequested = true;
+        queue.clear();
+        if (run != null) {
+            run.abort(reason);
+        }
+        queueTotal = 0;
+        changed();
+    }
+
+    private boolean isGuildMember() {
+        if (AvoAuthService.getInstance().isGuildMember()) return true;
+        setStatus("Only guild members can hand out rewards.", UiStyle.STATUS_ERROR);
+        return false;
+    }
+
+    /** Takes the bot's lock for a player's tomes or aspects, then runs for what's pending now. */
+    private void handOut(HandOut handOut) {
+        String uuid = handOut.player().uuid();
+        RewardKind kind = handOut.kind();
+        String name = handOut.player().displayName();
+        stopRequested = false;
+        lockPending = true;
+        setStatus("Checking what " + name + " is owed…", UiStyle.TEXT_WHITE);
+        recorder.lock(uuid, kind, name, (response, error) -> {
+            lockPending = false;
+            boolean locked = error == null && response.ok && response.pending != null && response.pending > 0;
+            if (stopRequested || (locked && !WynncraftServerPolicy.isNetworkingAllowed())) {
+                if (locked) {
+                    recorder.runFinished(uuid, kind); // releases the lock just taken
+                }
+                handOutEnded(handOut, stopRequested ? "Stopped." : "Left the main Wynncraft servers.",
+                        Outcome.INTERRUPTED);
+            } else if (locked) {
+                runUuid = uuid;
+                run = new RewardDistributor(new MinecraftGame(), new RunListener(handOut), kind, parseUuid(uuid),
+                        handOut.player().username(), response.pending);
+                changed();
+                run.start();
+            } else if (error != null) {
+                handOutEnded(handOut, lockError(error), Outcome.INTERRUPTED);
+            } else if (!response.ok) {
+                String holder = response.lockedBy != null ? response.lockedBy : "Another Chief";
+                handOutEnded(handOut, holder + " is already handing out " + kind.plural() + " to " + name + ".",
+                        Outcome.PLAYER_SKIPPED);
+            } else {
+                handOutEnded(handOut, "Nothing is pending for " + name + " any more.", Outcome.PLAYER_SKIPPED);
+                refresh();
+            }
+        });
+    }
+
+    /** A hand-out is over: show how it went, and go on with "Hand out all" unless something went wrong. */
+    private void handOutEnded(HandOut handOut, String result, Outcome outcome) {
+        if (queueTotal == 0) {
+            setStatus(result, outcome == Outcome.DONE ? UiStyle.STATUS_SUCCESS : UiStyle.STATUS_WARNING);
+            return;
+        }
+        if (outcome == Outcome.PLAYER_SKIPPED || outcome == Outcome.REWARD_UNAVAILABLE) {
+            queueSkippedAny = true;
+            WynnPillUtil.sendToPlayer(WynnPillUtil.createPrefixedPill("AvoUtils", false)
+                    .append(Component.literal(result).withStyle(ChatFormatting.GRAY)));
+        }
+        if (outcome == Outcome.REWARD_UNAVAILABLE) {
+            queue.removeIf(next -> next.kind().equals(handOut.kind()));
+        } else if (outcome == Outcome.INTERRUPTED) {
+            queue.clear();
+        }
+        HandOut next = queue.poll();
+        if (next != null) {
+            handOut(next);
+            return;
+        }
+        queueTotal = 0;
+        if (outcome == Outcome.INTERRUPTED || stopRequested) {
+            setStatus(result + " Hand out all stopped there.", UiStyle.STATUS_WARNING);
+        } else if (queueSkippedAny) {
+            setStatus("Handed out everything the mod could. Some rewards are still pending; see chat.",
+                    UiStyle.STATUS_WARNING);
+        } else {
+            setStatus("Handed out everything the mod can.", UiStyle.STATUS_SUCCESS);
         }
     }
 
     public void openStepper(PlayerEntry player, RewardKind kind) {
         long owed = player.rewards().getOrDefault(kind, 0L);
-        stepper = owed > 0 ? new Stepper(player.uuid(), kind, owed, owed) : null;
-        changed();
-    }
-
-    public void stepBy(long delta) {
-        if (stepper == null) return;
-        long amount = Math.max(1, Math.min(stepper.max(), stepper.amount() + delta));
-        stepper = new Stepper(stepper.uuid(), stepper.kind(), amount, stepper.max());
+        stepper = owed > 0 ? new Stepper(player.uuid(), kind, owed) : null;
         changed();
     }
 
@@ -348,10 +449,11 @@ public class RewardsFeature implements AvoFeature {
         changed();
     }
 
-    /** Records the stepper's amount as handed out, e.g. LE traded from the guild bank. */
-    public void recordStepper() {
+    /** Records {@code amount} of the stepper's reward as handed out by hand, e.g. LE traded from the guild bank. */
+    public void recordStepper(long amount) {
         if (stepper == null || !WynncraftServerPolicy.isNetworkingAllowed()) return;
-        recorder.add(stepper.uuid(), stepper.kind(), nameOf(stepper.uuid()), stepper.amount());
+        recorder.add(stepper.uuid(), stepper.kind(), nameOf(stepper.uuid()),
+                Math.max(1, Math.min(stepper.max(), amount)));
         stepper = null;
         status = null;
         warning = null;
@@ -360,28 +462,42 @@ public class RewardsFeature implements AvoFeature {
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
-    private List<PlayerEntry> entries(List<PlayerRewards> list) {
+    static List<PlayerEntry> toEntries(List<PlayerRewards> list) {
         if (list == null) return List.of();
         List<PlayerEntry> result = new ArrayList<>();
         for (PlayerRewards player : list) {
-            Map<RewardKind, Long> rewards = new EnumMap<>(RewardKind.class);
+            Map<RewardKind, Long> raw = new LinkedHashMap<>();
             if (player.rewards != null) {
                 player.rewards.forEach((type, amount) -> {
                     RewardKind kind = RewardKind.fromApiName(type);
-                    if (kind == null) {
-                        if (loggedUnknownTypes.add(type)) {
-                            AvoUtilsMod.LOGGER.info("[AvoUtils] [Rewards] Skipping unknown reward type '{}'", type);
-                        }
-                    } else if (amount != null && amount > 0) {
-                        rewards.put(kind, amount);
+                    if (kind != null && amount != null && amount > 0) {
+                        raw.merge(kind, amount, Long::sum);
                     }
                 });
             }
+            Map<RewardKind, Long> rewards = orderRewards(raw);
             if (player.uuid != null && !rewards.isEmpty()) {
                 result.add(new PlayerEntry(player.uuid, player.username, player.inGuild, rewards));
             }
         }
         return List.copyOf(result);
+    }
+
+    /** Places LE, Tome, Aspect first, followed by custom freeform rewards sorted alphabetically. */
+    private static Map<RewardKind, Long> orderRewards(Map<RewardKind, Long> raw) {
+        if (raw.isEmpty()) return Map.of();
+        Map<RewardKind, Long> ordered = new LinkedHashMap<>();
+        for (RewardKind builtin : BUILTIN_ORDER) {
+            Long amount = raw.get(builtin);
+            if (amount != null && amount > 0) {
+                ordered.put(builtin, amount);
+            }
+        }
+        raw.entrySet().stream()
+                .filter(entry -> entry.getKey().isCustom() && entry.getValue() != null && entry.getValue() > 0)
+                .sorted(Map.Entry.comparingByKey(CUSTOM_ORDER))
+                .forEach(entry -> ordered.put(entry.getKey(), entry.getValue()));
+        return Collections.unmodifiableMap(ordered);
     }
 
     /** Shows what a claim left pending, since claim replies are fresher than the list. */
@@ -393,22 +509,20 @@ public class RewardsFeature implements AvoFeature {
                 updated.add(player);
                 continue;
             }
-            Map<RewardKind, Long> rewards = new EnumMap<>(RewardKind.class);
-            rewards.putAll(player.rewards());
+            Map<RewardKind, Long> raw = new LinkedHashMap<>(player.rewards());
             if (pending > 0) {
-                rewards.put(kind, pending);
+                raw.put(kind, pending);
             } else {
-                rewards.remove(kind);
+                raw.remove(kind);
             }
+            Map<RewardKind, Long> rewards = orderRewards(raw);
             if (!rewards.isEmpty()) {
                 updated.add(new PlayerEntry(player.uuid(), player.username(), player.inGuild(), rewards));
             }
         }
         players = List.copyOf(updated);
-        if (stepper != null && stepper.uuid().equals(uuid) && stepper.kind() == kind) {
-            stepper = pending > 0
-                    ? new Stepper(uuid, kind, Math.min(stepper.amount(), pending), pending)
-                    : null;
+        if (stepper != null && stepper.uuid().equals(uuid) && stepper.kind().equals(kind)) {
+            stepper = pending > 0 ? new Stepper(uuid, kind, pending) : null;
         }
         changed();
     }
@@ -465,25 +579,23 @@ public class RewardsFeature implements AvoFeature {
     }
 
     private final class RunListener implements RewardDistributor.Listener {
-        private final PlayerEntry player;
-        private final RewardKind kind;
+        private final HandOut handOut;
 
-        RunListener(PlayerEntry player, RewardKind kind) {
-            this.player = player;
-            this.kind = kind;
+        RunListener(HandOut handOut) {
+            this.handOut = handOut;
         }
 
         @Override
         public void onConfirmed(long amount) {
-            recorder.add(player.uuid(), kind, player.displayName(), amount);
+            recorder.add(handOut.player().uuid(), handOut.kind(), handOut.player().displayName(), amount);
         }
 
         @Override
-        public void onFinished(String result, boolean complete) {
+        public void onFinished(String result, Outcome outcome) {
             run = null;
             runUuid = null;
-            recorder.runFinished(player.uuid(), kind);
-            setStatus(result, complete ? UiStyle.STATUS_SUCCESS : UiStyle.STATUS_WARNING);
+            recorder.runFinished(handOut.player().uuid(), handOut.kind());
+            handOutEnded(handOut, result, outcome);
         }
     }
 
@@ -507,7 +619,7 @@ public class RewardsFeature implements AvoFeature {
         }
 
         private void stopRunFor(String uuid, RewardKind kind) {
-            if (run != null && uuid.equals(runUuid) && run.kind() == kind) {
+            if (run != null && uuid.equals(runUuid) && run.kind().equals(kind)) {
                 run.stop();
             }
         }

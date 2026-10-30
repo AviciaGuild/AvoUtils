@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.rewards;
 
+import info.avicia.avoutils.features.rewards.RewardDistributor.Outcome;
 import info.avicia.avoutils.features.rewards.menu.GuildRewardMenu.GuildScreen;
 import info.avicia.avoutils.features.rewards.menu.GuildRewardMenu.MenuItem;
 import info.avicia.avoutils.testutil.TextFixtures;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RewardDistributorTest {
@@ -24,7 +26,7 @@ class RewardDistributorTest {
     private final FakeGame game = new FakeGame();
     private final List<Long> confirmed = new ArrayList<>();
     private String result;
-    private Boolean complete;
+    private Outcome outcome;
     private final RewardDistributor.Listener listener = new RewardDistributor.Listener() {
         @Override
         public void onConfirmed(long amount) {
@@ -32,9 +34,9 @@ class RewardDistributorTest {
         }
 
         @Override
-        public void onFinished(String text, boolean allDone) {
+        public void onFinished(String text, Outcome how) {
             result = text;
-            complete = allDone;
+            outcome = how;
         }
     };
 
@@ -119,8 +121,19 @@ class RewardDistributorTest {
         return game.actions.stream().filter(action -> action.startsWith("press")).toList();
     }
 
+    /** Ticks between presses, read from the distributor so these tests follow its tuning. */
+    private static int pace(RewardKind kind) {
+        return RewardDistributor.pressIntervalTicks(kind);
+    }
+
     @Test
-    void pressesOncePerUnitFiveTicksApartAndFinishesWhenAllAreConfirmed() {
+    void refusesToHandOutLe() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new RewardDistributor(game, listener, RewardKind.LE, STEVE_ID, "Steve", 1));
+    }
+
+    @Test
+    void pressesOncePerUnitAtTheRewardsPaceAndFinishesWhenAllAreConfirmed() {
         game.items = List.of(head(3, "Steve", STEVE_ID));
         RewardDistributor run = start(RewardKind.TOME, 3);
         assertEquals("Finding Steve…", run.progress());
@@ -129,12 +142,12 @@ class RewardDistributorTest {
         assertEquals(List.of("press 3 key 2"), presses());
         run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
         assertEquals("Giving Steve tomes 1/3", run.progress());
-        ticks(run, 4);
+        ticks(run, pace(RewardKind.TOME) - 1);
         assertEquals(1, presses().size());
         ticks(run, 1);
         assertEquals(2, presses().size());
         run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.TOME));
         assertEquals(3, presses().size());
         run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
         ticks(run, 2);
@@ -142,25 +155,63 @@ class RewardDistributorTest {
         assertFalse(run.isRunning());
         assertEquals(List.of(1L, 1L, 1L), confirmed);
         assertEquals("Sent 3 of 3 tomes to Steve.", result);
-        assertTrue(complete);
+        assertEquals(Outcome.DONE, outcome);
     }
 
     @Test
-    void neverResendsAndStopsPressingAfter20TicksWithoutAConfirmation() {
+    void namesOneRewardInTheSingular() {
+        game.items = List.of(head(3, "Steve", STEVE_ID));
+        RewardDistributor run = start(RewardKind.TOME, 1);
+        ticks(run, 2);
+
+        run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
+        ticks(run, 2);
+
+        assertEquals("Sent 1 of 1 tome to Steve.", result);
+    }
+
+    @Test
+    void reportsItsProgressForTheBar() {
+        game.items = List.of(head(3, "Steve", STEVE_ID));
+        RewardDistributor run = start(RewardKind.TOME, 2);
+        assertEquals(-1, run.progressRatio());
+
+        ticks(run, 2);
+        assertEquals(0, run.progressRatio());
+        run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
+        assertEquals(0.5, run.progressRatio());
+
+        RewardDistributor emeralds = RewardDistributor.forEmeralds(game, listener);
+        emeralds.start();
+        ticks(emeralds, 2);
+        assertEquals(-1, emeralds.progressRatio());
+    }
+
+    @Test
+    void pressesAtThePaceWithoutWaitingForConfirmations() {
         game.items = List.of(head(3, "Steve", STEVE_ID));
         RewardDistributor run = start(RewardKind.ASPECT, 10);
 
-        ticks(run, 22);
-        assertEquals(4, presses().size());
-        ticks(run, 39);
+        ticks(run, 2 + 2 * pace(RewardKind.ASPECT));
+
+        assertEquals(3, presses().size());
+    }
+
+    @Test
+    void pressesEachUnitOnceEvenIfNoGrantShowsUp() {
+        game.items = List.of(head(3, "Steve", STEVE_ID));
+        RewardDistributor run = start(RewardKind.ASPECT, 3);
+
+        ticks(run, 2 + 2 * pace(RewardKind.ASPECT));
+        assertEquals(3, presses().size());
+        ticks(run, RewardDistributor.LATE_CONFIRMATION_TICKS);
         assertTrue(run.isRunning());
         ticks(run, 1);
 
         assertFalse(run.isRunning());
-        assertEquals(4, presses().size());
-        assertEquals("Wynncraft stopped confirming the presses. Sent 0 of 10 aspects to Steve: 4 presses unconfirmed."
-                + " Check guild chat, then press ▶ again for the rest or record it by hand.", result);
-        assertFalse(complete);
+        assertEquals(3, presses().size());
+        assertEquals("Sent 0 of 3 aspects to Steve.", result);
+        assertEquals(Outcome.PLAYER_SKIPPED, outcome);
     }
 
     @Test
@@ -177,7 +228,7 @@ class RewardDistributorTest {
         assertEquals(1, presses().size());
         assertEquals(List.of(1L), confirmed);
         assertEquals("Stopped. Sent 1 of 2 tomes to Steve.", result);
-        assertFalse(complete);
+        assertEquals(Outcome.INTERRUPTED, outcome);
     }
 
     @Test
@@ -192,7 +243,7 @@ class RewardDistributorTest {
 
         assertFalse(run.isRunning());
         assertTrue(confirmed.isEmpty());
-        assertTrue(result.startsWith("Stopped. Sent 0 of 2 tomes to Steve: 1 press unconfirmed."));
+        assertEquals("Stopped. Sent 0 of 2 tomes to Steve.", result);
     }
 
     @Test
@@ -203,7 +254,7 @@ class RewardDistributorTest {
         run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
 
         game.show(List.of(head(3, "Alex", null), head(5, "Steve", STEVE_ID)));
-        ticks(run, 10);
+        ticks(run, pace(RewardKind.TOME) + 5); // the press comes due, the menu stays still 4 ticks, the head is found
         assertEquals(1, presses().size());
         ticks(run, 1);
 
@@ -268,7 +319,7 @@ class RewardDistributorTest {
         ticks(run, 1);
 
         assertEquals("The member list didn't load.", result);
-        assertFalse(complete);
+        assertEquals(Outcome.INTERRUPTED, outcome);
     }
 
     @Test
@@ -279,6 +330,7 @@ class RewardDistributorTest {
         ticks(run, 1);
 
         assertEquals("Steve isn't on the member list.", result);
+        assertEquals(Outcome.PLAYER_SKIPPED, outcome);
         assertTrue(game.actions.isEmpty());
     }
 
@@ -290,6 +342,7 @@ class RewardDistributorTest {
         ticks(run, 1);
 
         assertEquals("Your rank can't send tomes.", result);
+        assertEquals(Outcome.REWARD_UNAVAILABLE, outcome);
         assertTrue(presses().isEmpty());
     }
 
@@ -299,14 +352,14 @@ class RewardDistributorTest {
         RewardDistributor run = start(RewardKind.ASPECT, 3);
         ticks(run, 2);
         run.onChat(guildLine("Chief rewarded an Aspect to Steve"));
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.ASPECT));
 
         run.onChat(Component.literal("Your guild does not have enough aspects to send a reward."));
         ticks(run, 1);
 
         assertEquals(2, presses().size());
         assertEquals("The guild ran out of aspects. Sent 1 of 3 aspects to Steve.", result);
-        assertFalse(complete);
+        assertEquals(Outcome.REWARD_UNAVAILABLE, outcome);
     }
 
     @Test
@@ -320,6 +373,7 @@ class RewardDistributorTest {
 
         assertEquals(1, presses().size());
         assertEquals("You don't have permission to send tomes. Sent 0 of 2 tomes to Steve.", result);
+        assertEquals(Outcome.REWARD_UNAVAILABLE, outcome);
     }
 
     @Test
@@ -328,14 +382,14 @@ class RewardDistributorTest {
         RewardDistributor run = start(RewardKind.ASPECT, 5);
         ticks(run, 2);
         run.onChat(guildLine("Chief rewarded 2 Aspects to Steve"));
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.ASPECT));
         run.onChat(guildLine("Chief rewarded 2 Aspects to Steve"));
         ticks(run, 2);
 
         assertEquals(2, presses().size());
         assertEquals(List.of(2L, 2L), confirmed);
         assertEquals("Sent 4 of 5 aspects to Steve.", result);
-        assertFalse(complete);
+        assertEquals(Outcome.PLAYER_SKIPPED, outcome);
     }
 
     @Test
@@ -346,6 +400,7 @@ class RewardDistributorTest {
         ticks(run, 1);
 
         assertEquals("Each press sends 2 Aspects, more than the 1 owed.", result);
+        assertEquals(Outcome.PLAYER_SKIPPED, outcome);
         assertTrue(presses().isEmpty());
     }
 
@@ -358,6 +413,7 @@ class RewardDistributorTest {
         ticks(run, 1);
 
         assertEquals("The menu was closed.", result);
+        assertEquals(Outcome.INTERRUPTED, outcome);
         assertTrue(presses().isEmpty());
     }
 
@@ -374,6 +430,7 @@ class RewardDistributorTest {
 
         assertEquals(List.of(1L), confirmed);
         assertEquals("The menu was closed. Sent 1 of 2 tomes to Steve.", result);
+        assertEquals(Outcome.INTERRUPTED, outcome);
     }
 
     @Test
@@ -386,7 +443,7 @@ class RewardDistributorTest {
         game.containerId = 7; // Wynncraft opened the list again; its items come a moment later
         game.stateId = 1;
         game.items = List.of();
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.TOME));
         game.show(List.of(head(6, "Steve", STEVE_ID)));
         ticks(run, 7);
 
@@ -405,6 +462,7 @@ class RewardDistributorTest {
         }
 
         assertEquals("Stopped after 12 pages without finding Steve.", result);
+        assertEquals(Outcome.PLAYER_SKIPPED, outcome);
         assertEquals(12, game.actions.size());
     }
 
@@ -417,6 +475,7 @@ class RewardDistributorTest {
 
         assertFalse(run.isRunning());
         assertEquals("Stopped.", result);
+        assertEquals(Outcome.INTERRUPTED, outcome);
         assertTrue(presses().isEmpty());
     }
 
@@ -428,7 +487,7 @@ class RewardDistributorTest {
         run.onChat(guildLine("Chief rewarded a Guild Tome to Steve"));
 
         run.onChat(guildLine("Bob: your guild does not have enough tomes to send a reward"));
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.TOME));
 
         assertEquals(2, presses().size());
         assertTrue(run.isRunning());
@@ -440,13 +499,14 @@ class RewardDistributorTest {
         RewardDistributor run = start(RewardKind.TOME, 2);
         ticks(run, 2);
         game.show(List.of(head(5, "Steve", STEVE_ID)));
-        ticks(run, 5); // the head moved: waiting for the menu before finding it again
+        ticks(run, pace(RewardKind.TOME)); // the head moved: waiting for the menu before finding it again
 
         run.onChat(Component.literal("Your guild does not have enough tomes to send a reward."));
         ticks(run, 1);
 
         assertEquals(1, presses().size());
         assertEquals("The guild ran out of tomes. Sent 0 of 2 tomes to Steve.", result);
+        assertEquals(Outcome.REWARD_UNAVAILABLE, outcome);
     }
 
     @Test
@@ -491,29 +551,33 @@ class RewardDistributorTest {
         assertEquals(List.of("click 10", "press 2 key 3"), game.actions);
         run.onChat(guildLine("Chief rewarded 1,024 Emeralds to Krokofant"));
         assertEquals("Sending emeralds to Krokofant: 1,024", run.progress());
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.EMERALDS));
         run.onChat(guildLine("Chief rewarded 1,024 Emeralds to Krokofant"));
-        ticks(run, 5);
+        ticks(run, pace(RewardKind.EMERALDS));
         run.onChat(Component.literal("Your guild does not have enough emeralds to send a reward."));
         ticks(run, 1);
 
         assertEquals(3, presses().size());
         assertEquals("Sent 2,048 emeralds to Krokofant.", result);
-        assertTrue(complete);
+        assertEquals(Outcome.DONE, outcome);
     }
 
     @Test
-    void theEmeraldRunStopsWithoutConfirmations() {
+    void theEmeraldRunKeepsPressingUntilStorageIsEmpty() {
         game.items = List.of(head(2, "Krokofant", null));
         RewardDistributor run = RewardDistributor.forEmeralds(game, listener);
         run.start();
 
-        ticks(run, 62);
+        ticks(run, 100);
+        assertTrue(run.isRunning());
+        int sent = presses().size();
+        run.onChat(Component.literal("Your guild does not have enough emeralds to send a reward."));
+        ticks(run, RewardDistributor.LATE_CONFIRMATION_TICKS);
 
-        assertEquals(4, presses().size());
-        assertEquals("Wynncraft stopped confirming the presses. Sent 0 emeralds to Krokofant: 4 presses unconfirmed."
-                + " Check guild chat.", result);
-        assertFalse(complete);
+        assertFalse(run.isRunning());
+        assertEquals(sent, presses().size());
+        assertEquals("Sent 0 emeralds to Krokofant.", result);
+        assertEquals(Outcome.DONE, outcome);
     }
 
     @Test
@@ -527,5 +591,6 @@ class RewardDistributorTest {
 
         assertFalse(run.isRunning());
         assertEquals("Disconnected. Sent 1 of 2 tomes to Steve.", result);
+        assertEquals(Outcome.INTERRUPTED, outcome);
     }
 }

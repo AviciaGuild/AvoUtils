@@ -254,4 +254,23 @@ class ClaimRecorderTest {
         assertEquals(List.of("recorded steve LE pending 5"), events);
         verify(client, never()).unlock(anyString(), any());
     }
+
+    @Test
+    void recordsAndRetriesAFreeformItemReward() {
+        recorder.add("steve", RewardKind.fromApiName("Shiny Warp"), "Steve", 1);
+        recorder.add("steve", RewardKind.fromApiName("Shiny Warp"), "Steve", 1);
+        assertEquals(1, claims.size());
+
+        claims.get(0).reply().completeExceptionally(new IOException("timed out"));
+        assertEquals(List.of("Not recorded yet, retrying: 2× Shiny Warp for Steve"), recorder.backlog());
+
+        ticks(ClaimRecorder.FIRST_RETRY_TICKS);
+        claims.get(1).reply().complete(response(true, 1L));
+        claims.get(2).reply().complete(response(true, 0L));
+
+        assertEquals(
+                List.of("recorded steve Shiny Warp pending 1", "recorded steve Shiny Warp pending 0"),
+                events);
+        verify(client, never()).unlock(anyString(), any());
+    }
 }

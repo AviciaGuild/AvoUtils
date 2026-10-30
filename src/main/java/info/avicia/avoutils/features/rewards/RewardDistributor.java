@@ -17,14 +17,11 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Hands out tomes, aspects or emeralds to one member by pressing Wynncraft's reward key on their head in the guild
- * menus: one press per unit, {@link #PRESS_INTERVAL_TICKS} apart, never re-sent, so a run can't hand out more than
- * owed. Grants count once Wynncraft confirms them in guild chat. Driven by client ticks; the game is behind
- * {@link Game}, so tests can play it.
+ * menus: one press per unit at each reward's pace ({@link #pressIntervalTicks}), never re-sent, so a run can't hand out
+ * more than owed. A grant counts once it shows up in guild chat; anything that doesn't stays pending. Driven by
+ * client ticks; the game is behind {@link Game}, so tests can play it.
  */
 public final class RewardDistributor {
-    static final int PRESS_INTERVAL_TICKS = 5;
-    /** Pressing stops when presses are unconfirmed and no confirmation came for this long. */
-    static final int CONFIRMATION_TIMEOUT_TICKS = 20;
     /** Confirmations still count for this long after pressing stops. */
     static final int LATE_CONFIRMATION_TICKS = 40;
     /** Before the menu is read, it must stay the same this long; after a click it must change first. */
@@ -56,12 +53,23 @@ public final class RewardDistributor {
         boolean isSelf(String username);
     }
 
+    /** How a run ended, so a queue of runs knows whether to go on. */
+    public enum Outcome {
+        /** Everything owed was handed out. */
+        DONE,
+        /** Some stays pending for this player, e.g. they aren't on the member list or not every grant showed up. */
+        PLAYER_SKIPPED,
+        /** The guild can't send this reward now: storage ran out, or the rank or permission is missing. */
+        REWARD_UNAVAILABLE,
+        /** Stopped, or the menu closed or misbehaved: nothing more should be sent. */
+        INTERRUPTED
+    }
+
     public interface Listener {
         /** Wynncraft confirmed a grant of {@code amount}. */
         void onConfirmed(long amount);
 
-        /** The run is over; {@code complete} is false if anything is left or unconfirmed. */
-        void onFinished(String result, boolean complete);
+        void onFinished(String result, Outcome outcome);
     }
 
     /** {@code COUNTING_LATE}: pressing is over, but confirmations of presses already sent still count. */
@@ -74,6 +82,7 @@ public final class RewardDistributor {
     private final String username;
     /** Long.MAX_VALUE for emeralds, which go until storage runs out. */
     private final long owed;
+    private final int pressInterval;
 
     private State state = State.FINDING_HEAD;
     private long now;
@@ -101,9 +110,9 @@ public final class RewardDistributor {
     private long failedPresses;
     private long confirmedAmount;
     private long nextPressTick;
-    private long lastConfirmationTick;
     private long stoppedPressingTick;
     private String stopReason;
+    private Outcome stopOutcome;
     private boolean storageEmpty;
 
     /** Hands out {@code owed} of {@code kind} to the member with this UUID or name, once {@link #start} is called. */
@@ -114,11 +123,19 @@ public final class RewardDistributor {
         this.uuid = uuid;
         this.username = username;
         this.owed = owed;
+        this.pressInterval = pressIntervalTicks(kind);
     }
 
     /** Sends every emerald in storage to the first head of the member list, the owner. */
     public static RewardDistributor forEmeralds(Game game, Listener listener) {
         return new RewardDistributor(game, listener, RewardKind.EMERALDS, null, null, Long.MAX_VALUE);
+    }
+
+    /** Ticks between presses. */
+    static int pressIntervalTicks(RewardKind kind) {
+        if (kind.equals(RewardKind.TOME)) return 10;
+        if (kind.equals(RewardKind.ASPECT) || kind.equals(RewardKind.EMERALDS)) return 4;
+        throw new IllegalArgumentException(kind + " is handed out by trading, not by the mod");
     }
 
     /** Opens the member list if the Manage menu is open; the search starts on the next tick. */
@@ -130,7 +147,7 @@ public final class RewardDistributor {
         }
         MenuItem entry = screen == GuildScreen.MANAGE ? GuildRewardMenu.findGuildEntry(game.items()) : null;
         if (entry == null) {
-            fail("Can't find the guild's member list in this menu.");
+            fail("Can't find the guild's member list in this menu.", Outcome.INTERRUPTED);
             return;
         }
         clickAndWait(entry.slot());
@@ -153,6 +170,14 @@ public final class RewardDistributor {
                 : "Giving " + targetLabel() + " " + kind.plural() + " " + confirmedAmount + "/" + owed;
     }
 
+    /** How far the run is, from 0 to 1, for a progress bar; -1 while it's finding the head, and for emeralds. */
+    public double progressRatio() {
+        if (state == State.DONE || kind == RewardKind.EMERALDS || (pressesSent == 0 && state != State.PRESSING)) {
+            return -1;
+        }
+        return owed <= 0 ? 1 : Math.min(1, (double) confirmedAmount / owed);
+    }
+
     public void tick() {
         if (state == State.DONE) return;
         now++;
@@ -160,7 +185,7 @@ public final class RewardDistributor {
         GuildScreen screen = game.screen();
         boolean menuGone = state == State.WAITING ? screen == null : screen != GuildScreen.MEMBERS;
         if (state != State.COUNTING_LATE && menuGone) {
-            endWith("The menu was closed.");
+            endWith("The menu was closed.", Outcome.INTERRUPTED);
             return;
         }
         switch (state) {
@@ -186,7 +211,7 @@ public final class RewardDistributor {
                 storageEmpty = notEnough;
                 stopPressing(notEnough
                         ? (kind == RewardKind.EMERALDS ? null : "The guild ran out of " + kind.plural() + ".")
-                        : "You don't have permission to send " + kind.plural() + ".");
+                        : "You don't have permission to send " + kind.plural() + ".", Outcome.REWARD_UNAVAILABLE);
             }
             return;
         }
@@ -195,23 +220,19 @@ public final class RewardDistributor {
                 || !isTarget(grant.recipient())) {
             return;
         }
-        long amount = switch (kind) {
-            case EMERALDS -> grant.emeraldAmount();
-            case ASPECT -> grant.aspectAmount();
-            case TOME -> grant.tomeCount();
-            case LE -> 0;
-        };
+        long amount = kind.equals(RewardKind.EMERALDS) ? grant.emeraldAmount()
+                : kind.equals(RewardKind.ASPECT) ? grant.aspectAmount()
+                : kind.equals(RewardKind.TOME) ? grant.tomeCount() : 0;
         if (amount <= 0) return;
         confirmedPresses++;
         confirmedAmount += amount;
-        lastConfirmationTick = now;
         listener.onConfirmed(amount);
     }
 
     /** The Chief's Stop: no more presses, but late confirmations still count. */
     public void stop() {
         if (state == State.PRESSING || state == State.WAITING || state == State.FINDING_HEAD) {
-            endWith("Stopped.");
+            endWith("Stopped.", Outcome.INTERRUPTED);
         }
     }
 
@@ -219,10 +240,11 @@ public final class RewardDistributor {
     public void abort(String reason) {
         if (state == State.DONE) return;
         if (pressesSent == 0) {
-            fail(reason);
+            fail(reason, Outcome.INTERRUPTED);
             return;
         }
         if (stopReason == null) stopReason = reason;
+        if (stopOutcome == null) stopOutcome = Outcome.INTERRUPTED;
         reportResult();
     }
 
@@ -260,7 +282,7 @@ public final class RewardDistributor {
         if (changed && stableTicks >= MENU_STABLE_TICKS && game.screen() == GuildScreen.MEMBERS) {
             transition(State.FINDING_HEAD);
         } else if (ticksInState >= MENU_TIMEOUT_TICKS) {
-            endWith("The member list didn't load.");
+            endWith("The member list didn't load.", Outcome.INTERRUPTED);
         }
     }
 
@@ -286,7 +308,7 @@ public final class RewardDistributor {
         }
         RewardAction action = GuildRewardMenu.rewardAction(head.lore(), kind);
         if (action == null) {
-            endWith("Your rank can't send " + kind.plural() + ".");
+            endWith("Your rank can't send " + kind.plural() + ".", Outcome.REWARD_UNAVAILABLE);
             return;
         }
         headSlot = head.slot();
@@ -297,7 +319,8 @@ public final class RewardDistributor {
         if (plannedPresses < 0) {
             plannedPresses = owed == Long.MAX_VALUE ? Long.MAX_VALUE : owed / action.amountPerPress();
             if (plannedPresses == 0) {
-                fail("Each press sends " + kind.label(action.amountPerPress()) + ", more than the " + owed + " owed.");
+                fail("Each press sends " + kind.label(action.amountPerPress()) + ", more than the " + owed + " owed.",
+                        Outcome.PLAYER_SKIPPED);
                 return;
             }
         }
@@ -316,7 +339,7 @@ public final class RewardDistributor {
         }
         MenuItem previous = searchingBack ? GuildRewardMenu.findPreviousPage(items) : null;
         if (previous == null) {
-            endWith(capitalize(who()) + " isn't on the member list.");
+            endWith(capitalize(who()) + " isn't on the member list.", Outcome.PLAYER_SKIPPED);
             return;
         }
         turnPage(previous);
@@ -324,7 +347,8 @@ public final class RewardDistributor {
 
     private void turnPage(MenuItem pageItem) {
         if (pageChanges >= MAX_PAGE_CHANGES) {
-            endWith("Stopped after " + MAX_PAGE_CHANGES + " pages without finding " + who() + ".");
+            endWith("Stopped after " + MAX_PAGE_CHANGES + " pages without finding " + who() + ".",
+                    Outcome.PLAYER_SKIPPED);
             return;
         }
         pageChanges++;
@@ -333,11 +357,7 @@ public final class RewardDistributor {
 
     private void tickPressing() {
         if (pressesSent >= plannedPresses) {
-            stopPressing(null);
-            return;
-        }
-        if (outstanding() > 0 && now - lastConfirmationTick >= CONFIRMATION_TIMEOUT_TICKS) {
-            stopPressing("Wynncraft stopped confirming the presses.");
+            stopPressing(null, null);
             return;
         }
         if (now < nextPressTick) return;
@@ -346,12 +366,9 @@ public final class RewardDistributor {
             findHeadAgain();
             return;
         }
-        if (outstanding() == 0) {
-            lastConfirmationTick = now; // the wait for a confirmation starts with this press
-        }
         game.pressKey(headSlot, key);
         pressesSent++;
-        nextPressTick = now + PRESS_INTERVAL_TICKS;
+        nextPressTick = now + pressInterval;
     }
 
     /** The menu changed under the run, e.g. Wynncraft opened it again: once it settles, search from where it is. */
@@ -388,52 +405,52 @@ public final class RewardDistributor {
     }
 
     /** Stops pressing; confirmations of presses already sent still count for a while. */
-    private void stopPressing(String reason) {
+    private void stopPressing(String reason, Outcome outcome) {
         if (stopReason == null) stopReason = reason;
+        if (stopOutcome == null) stopOutcome = outcome;
         stoppedPressingTick = now;
         transition(State.COUNTING_LATE);
     }
 
     /** Ends with {@code reason}: as a failure before the first press, otherwise by stopping to press. */
-    private void endWith(String reason) {
+    private void endWith(String reason, Outcome outcome) {
         if (pressesSent > 0) {
-            stopPressing(reason);
+            stopPressing(reason, outcome);
         } else {
-            fail(reason);
+            fail(reason, outcome);
         }
     }
 
     /** Ends at once, before any press. */
-    private void fail(String message) {
+    private void fail(String message, Outcome outcome) {
         state = State.DONE;
-        listener.onFinished(message, false);
+        listener.onFinished(message, outcome);
     }
 
     private void reportResult() {
         state = State.DONE;
-        long unconfirmed = outstanding();
-        boolean complete = unconfirmed == 0 && (kind == RewardKind.EMERALDS ? storageEmpty : confirmedAmount >= owed);
-        listener.onFinished(summary(unconfirmed), complete);
+        boolean complete = kind == RewardKind.EMERALDS ? storageEmpty : confirmedAmount >= owed;
+        Outcome outcome;
+        if (complete) {
+            outcome = Outcome.DONE;
+        } else if (stopOutcome != null) {
+            outcome = stopOutcome;
+        } else {
+            outcome = Outcome.PLAYER_SKIPPED; // every press went out; what didn't show up in guild chat stays pending
+        }
+        listener.onFinished(summary(), outcome);
     }
 
-    private String summary(long unconfirmed) {
+    private String summary() {
         StringBuilder text = new StringBuilder();
         if (stopReason != null) text.append(stopReason).append(' ');
         text.append("Sent ");
         if (kind == RewardKind.EMERALDS) {
             text.append(String.format(Locale.US, "%,d", confirmedAmount)).append(" emeralds");
         } else {
-            text.append(confirmedAmount).append(" of ").append(owed).append(' ').append(kind.plural());
+            text.append(confirmedAmount).append(" of ").append(owed).append(' ').append(kind.noun(owed));
         }
-        text.append(" to ").append(targetLabel());
-        if (unconfirmed > 0) {
-            text.append(": ").append(unconfirmed).append(unconfirmed == 1 ? " press" : " presses")
-                    .append(" unconfirmed. Check guild chat");
-            if (kind != RewardKind.EMERALDS) {
-                text.append(", then press ▶ again for the rest or record it by hand");
-            }
-        }
-        return text.append('.').toString();
+        return text.append(" to ").append(targetLabel()).append('.').toString();
     }
 
     private String targetLabel() {
