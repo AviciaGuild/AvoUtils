@@ -1,11 +1,14 @@
 package info.avicia.avoutils.features.updater;
 
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
+import info.avicia.avoutils.core.command.AvoCommands;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.ClientVersion;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -16,6 +19,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 /**
  * Coordinates the update lifecycle: check → notify → download → stage.
@@ -85,6 +90,27 @@ public class UpdateFeature implements AvoFeature {
         });
 
         AvoUtilsMod.LOGGER.info("[AvoUtils] [Updater] Initialized");
+    }
+
+    @Override
+    public void registerCommands(LiteralArgumentBuilder<FabricClientCommandSource> root) {
+        // /avo update → check and show status; check → force re-check; download → download and stage;
+        // restart → restart Minecraft to apply the staged update
+        root.then(literal("update")
+                .executes(context -> ifNetworkingAllowed(context.getSource(), () -> handleCheckCommand(false)))
+                .then(literal("check")
+                        .executes(context -> ifNetworkingAllowed(context.getSource(), () -> handleCheckCommand(true))))
+                .then(literal("download")
+                        .executes(context -> ifNetworkingAllowed(context.getSource(), this::handleDownloadCommand)))
+                .then(literal("restart")
+                        .executes(context -> ifNetworkingAllowed(context.getSource(), this::handleRestartCommand))));
+    }
+
+    private static int ifNetworkingAllowed(FabricClientCommandSource source, Runnable action) {
+        if (AvoCommands.ensureNetworkingAllowed(source)) {
+            action.run();
+        }
+        return 1;
     }
 
     void recoverPendingUpdateIfExists() {

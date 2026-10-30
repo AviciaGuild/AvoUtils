@@ -20,7 +20,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-class GuildStorageNotifierTest {
+class GuildStorageFeatureTest {
 
     @BeforeEach
     void setUp() {
@@ -34,7 +34,7 @@ class GuildStorageNotifierTest {
 
     @Test
     void parseSnapshotLinesParsesEmeraldsAndAspects() {
-        GuildStorageNotifier.StorageSnapshot snapshot = GuildStorageNotifier.parseSnapshotLines(
+        GuildStorageFeature.StorageSnapshot snapshot = GuildStorageFeature.parseSnapshotLines(
                 List.of("Emeralds: 1,000 / 5,000", "Aspects: 500 / 1,000"));
 
         assertNotNull(snapshot);
@@ -46,7 +46,7 @@ class GuildStorageNotifierTest {
 
     @Test
     void onServerScopeChangedResetsStateWhenNotMain() {
-        GuildStorageNotifier notifier = seededNotifier();
+        GuildStorageFeature notifier = seededNotifier();
         notifier.onServerScopeChanged(WynncraftServerPolicy.Scope.BETA);
         assertEquals(-1L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
 
@@ -61,20 +61,20 @@ class GuildStorageNotifierTest {
 
     @Test
     void parseSnapshotLinesReturnsNullForUnavailableRewards() {
-        assertNull(GuildStorageNotifier.parseSnapshotLines(
+        assertNull(GuildStorageFeature.parseSnapshotLines(
                 List.of("Emeralds: 1,000 / 5,000", "Rewards are unavailable for this rank")));
     }
 
     @Test
     void parseSnapshotLinesReturnsNullForIncompleteData() {
-        assertNull(GuildStorageNotifier.parseSnapshotLines(List.of("Emeralds: 1,000 / 5,000")));
-        assertNull(GuildStorageNotifier.parseSnapshotLines(null));
-        assertNull(GuildStorageNotifier.parseSnapshotLines(List.of()));
+        assertNull(GuildStorageFeature.parseSnapshotLines(List.of("Emeralds: 1,000 / 5,000")));
+        assertNull(GuildStorageFeature.parseSnapshotLines(null));
+        assertNull(GuildStorageFeature.parseSnapshotLines(List.of()));
     }
 
     @Test
     void parseSnapshotLinesHandlesMalformedNumbers() {
-        assertNull(GuildStorageNotifier.parseSnapshotLines(
+        assertNull(GuildStorageFeature.parseSnapshotLines(
                 List.of("Emeralds: , / ,", "Aspects: 100 / 200")));
     }
 
@@ -97,7 +97,7 @@ class GuildStorageNotifierTest {
     @Test
     void onRaidDeltaIncreasesCounts() {
         withMockedAuth(true, authService -> {
-            GuildStorageNotifier notifier = seededNotifier();
+            GuildStorageFeature notifier = seededNotifier();
             notifier.onRaidDelta(10, 5);
 
             assertEquals(20L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
@@ -108,7 +108,7 @@ class GuildStorageNotifierTest {
     @Test
     void onRewardDeltaClampsAtZero() {
         withMockedAuth(true, authService -> {
-            GuildStorageNotifier notifier = seededNotifier();
+            GuildStorageFeature notifier = seededNotifier();
             notifier.onRewardDelta(-200, -200);
 
             assertEquals(0L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
@@ -118,7 +118,7 @@ class GuildStorageNotifierTest {
 
     @Test
     void resetClearsAllTrackedState() {
-        GuildStorageNotifier notifier = seededNotifier();
+        GuildStorageFeature notifier = seededNotifier();
         notifier.reset();
 
         assertEquals(-1L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
@@ -132,7 +132,7 @@ class GuildStorageNotifierTest {
     @Test
     void applyRemoteSnapshotUpdatesStateWhenNotLocallyAuthoritative() {
         withMockedAuth(true, authService -> {
-            GuildStorageNotifier notifier = seededNotifier();
+            GuildStorageFeature notifier = seededNotifier();
             invokeApplyRemoteSnapshot(notifier, 55L, 100L, 44L, 100L);
 
             assertEquals(55L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
@@ -180,17 +180,17 @@ class GuildStorageNotifierTest {
         });
     }
 
-    private static void invokeApplyRemoteSnapshot(GuildStorageNotifier notifier,
+    private static void invokeApplyRemoteSnapshot(GuildStorageFeature notifier,
                                                   long emCur, long emMax, long asCur, long asMax) {
         TestReflection.invoke(notifier, "applyRemoteSnapshot", 
                 new Class[]{long.class, long.class, long.class, long.class}, emCur, emMax, asCur, asMax);
     }
 
-    private static GuildStorageNotifier seededNotifier() {
-        return seed(new GuildStorageNotifier(), new ModConfig());
+    private static GuildStorageFeature seededNotifier() {
+        return seed(new GuildStorageFeature(), new ModConfig());
     }
 
-    private static <T extends GuildStorageNotifier> T seed(T notifier, ModConfig config) {
+    private static <T extends GuildStorageFeature> T seed(T notifier, ModConfig config) {
         TestReflection.set(notifier, "config", config);
         TestReflection.set(notifier, "emeraldCurrent", 10L);
         TestReflection.set(notifier, "emeraldMax", 100L);
@@ -203,7 +203,7 @@ class GuildStorageNotifierTest {
     }
 
     /** Records alerts instead of showing them, since tests have no game client. */
-    private static final class RecordingNotifier extends GuildStorageNotifier {
+    private static final class RecordingNotifier extends GuildStorageFeature {
         final List<Alert> alerts = new ArrayList<>();
 
         @Override

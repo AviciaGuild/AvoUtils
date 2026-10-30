@@ -2,15 +2,9 @@ package info.avicia.avoutils.core.command;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
-import info.avicia.avoutils.AvoUtilsMod;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.gui.config.ConfigScreen;
-import info.avicia.avoutils.features.anniparty.AnniPartyFeature;
-import info.avicia.avoutils.features.anniparty.AnniPartyScreen;
-import info.avicia.avoutils.features.emojis.EmojiFeature;
-import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
-import info.avicia.avoutils.features.partyfinder.command.PartyCommand;
-import info.avicia.avoutils.features.updater.UpdateFeature;
 import info.avicia.avoutils.core.util.WynnPillUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -19,24 +13,22 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import java.util.List;
-import java.util.function.Consumer;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
-import static com.mojang.brigadier.arguments.StringArgumentType.word;
-import static com.mojang.brigadier.arguments.StringArgumentType.getString;
 
 /**
- * Registration for all /avo and /avoutils subcommands.
+ * Registration for the /avo and /avoutils roots. Features add their own subcommands through
+ * {@link AvoFeature#registerCommands}.
  */
 public class AvoCommands {
     public static final List<String> COMMAND_ROOTS = List.of("avo", "avoutils");
 
-    public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> register(dispatcher));
+    public static void register(List<? extends AvoFeature> features) {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> register(dispatcher, features));
     }
 
-    public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+    public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher,
+                                List<? extends AvoFeature> features) {
         // /avo and /avo config → opens config screen
         Command<FabricClientCommandSource> openConfigCommand = context -> {
             Minecraft client = Minecraft.getInstance();
@@ -44,93 +36,16 @@ public class AvoCommands {
             return 1;
         };
 
-        // /avo emojis reload / update → refresh and re-download emojis
-        Command<FabricClientCommandSource> reloadEmojisCommand = context -> {
-            if (!ensureOnWynncraft(context.getSource())) return 1;
-            return withFeature(EmojiFeature.class, EmojiFeature::handleReloadCommand);
-        };
-
-        // /avo pf → open party finder screen
-        Command<FabricClientCommandSource> openPfCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            Minecraft.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(null));
-            return 1;
-        };
-
-        // /avo anni → open anni party screen
-        Command<FabricClientCommandSource> openAnniCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            Minecraft client = Minecraft.getInstance();
-            client.execute(() -> {
-                AnniPartyFeature anniFeature = AvoUtilsMod.getInstance().getFeature(AnniPartyFeature.class);
-                PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
-                if (anniFeature != null && pfFeature != null) {
-                    client.setScreen(new AnniPartyScreen(anniFeature, pfFeature.getInviteHandler()));
-                }
-            });
-            return 1;
-        };
-
-        // /avo pf join <leaderName>
-        Command<FabricClientCommandSource> joinPfCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            String leaderName = getString(context, "leaderName");
-            Minecraft.getInstance().execute(() -> PartyCommand.openPartyFinderScreen(leaderName));
-            return 1;
-        };
-
-        // /avo update → check for update and show status
-        Command<FabricClientCommandSource> updateCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            return withFeature(UpdateFeature.class, f -> f.handleCheckCommand(false));
-        };
-
-        // /avo update check → force re-check
-        Command<FabricClientCommandSource> updateCheckCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            return withFeature(UpdateFeature.class, f -> f.handleCheckCommand(true));
-        };
-
-        // /avo update download → download and stage update
-        Command<FabricClientCommandSource> updateDownloadCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            return withFeature(UpdateFeature.class, UpdateFeature::handleDownloadCommand);
-        };
-
-        // /avo update restart → restart Minecraft to apply staged update
-        Command<FabricClientCommandSource> updateRestartCommand = context -> {
-            if (!ensureNetworkingAllowed(context.getSource())) return 1;
-            return withFeature(UpdateFeature.class, UpdateFeature::handleRestartCommand);
-        };
-
         // Build /avo and /avoutils command trees
         for (String root : COMMAND_ROOTS) {
-            dispatcher.register(
-                    literal(root)
-                            .executes(openConfigCommand)
-                            .then(literal("config")
-                                    .executes(openConfigCommand))
-                            .then(literal("emojis")
-                                    .then(literal("reload")
-                                            .executes(reloadEmojisCommand))
-                                    .then(literal("update")
-                                            .executes(reloadEmojisCommand)))
-                            .then(literal("anni")
-                                    .executes(openAnniCommand))
-                            .then(literal("pf")
-                                    .executes(openPfCommand)
-                                    .then(literal("join")
-                                            .then(argument("leaderName", word())
-                                                    .executes(joinPfCommand))))
-                            .then(literal("update")
-                                    .executes(updateCommand)
-                                    .then(literal("check")
-                                            .executes(updateCheckCommand))
-                                    .then(literal("download")
-                                            .executes(updateDownloadCommand))
-                                    .then(literal("restart")
-                                            .executes(updateRestartCommand)))
-            );
+            LiteralArgumentBuilder<FabricClientCommandSource> tree = literal(root)
+                    .executes(openConfigCommand)
+                    .then(literal("config")
+                            .executes(openConfigCommand));
+            for (AvoFeature feature : features) {
+                feature.registerCommands(tree);
+            }
+            dispatcher.register(tree);
             // Setting toggles
             SettingCommands.register(dispatcher, root);
         }
@@ -148,7 +63,7 @@ public class AvoCommands {
         return true;
     }
 
-    private static boolean ensureOnWynncraft(FabricClientCommandSource source) {
+    public static boolean ensureOnWynncraft(FabricClientCommandSource source) {
         if (!WynncraftServerPolicy.isOnWynncraft()) {
             sendDisabledFeedback(source, WynncraftServerPolicy.NOT_ON_WYNCRAFT_MESSAGE);
             return false;
@@ -159,15 +74,5 @@ public class AvoCommands {
     public static void sendDisabledFeedback(FabricClientCommandSource source, String message) {
         source.sendFeedback(WynnPillUtil.createPrefixedPill("AvoUtils", true)
                 .append(Component.literal(message).withStyle(ChatFormatting.RED)));
-    }
-
-    private static <T extends AvoFeature> int withFeature(Class<T> cls, Consumer<T> action) {
-        AvoUtilsMod mod = AvoUtilsMod.getInstance();
-        if (mod == null) return 1;
-        T feature = mod.getFeature(cls);
-        if (feature != null) {
-            action.accept(feature);
-        }
-        return 1;
     }
 }

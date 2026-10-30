@@ -23,7 +23,7 @@ import net.minecraft.resources.Identifier;
  * Intercepts drawHoverEvent to render a large emoji preview when hovering over emoji text.
  */
 @Mixin(GuiGraphics.class)
-public abstract class DrawContextMixin {
+public abstract class GuiGraphicsMixin {
 
     @Shadow
     public abstract void renderTooltip(

@@ -86,7 +86,9 @@ jacocoTestReport {
             'info/avicia/avoutils/features/partyfinder/gui/**',
             'info/avicia/avoutils/features/partyfinder/command/**',
             'info/avicia/avoutils/features/anniparty/AnniPartyScreen*',
-            'info/avicia/avoutils/features/emojis/EmojiTooltipComponent*'
+            'info/avicia/avoutils/features/emojis/EmojiTooltipComponent*',
+            'info/avicia/avoutils/features/rewards/gui/**',
+            'info/avicia/avoutils/features/rewards/MinecraftGame*'
         ])
     }))
 }

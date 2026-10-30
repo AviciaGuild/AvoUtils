@@ -17,10 +17,16 @@ public class FlatButtonWidget extends AbstractWidget {
     private Integer selectedBorderColor = null;
     private Integer selectedBgColor = null;
     private Integer selectedTextColor = null;
+    private UiIcons.Icon icon = null;
 
     public FlatButtonWidget(int x, int y, int width, int height, Component message, Runnable onPress) {
         super(x, y, width, height, message);
         this.onPress = onPress;
+    }
+
+    public FlatButtonWidget withIcon(UiIcons.Icon icon) {
+        this.icon = icon;
+        return this;
     }
 
     public void setSelected(boolean selected) {
@@ -104,7 +110,20 @@ public class FlatButtonWidget extends AbstractWidget {
             textColor = hovered ? 0xFFFFFFFF : 0xFFA0A5B5;
         }
 
-        CompatibilityHelper.drawTextWithShadow(context, textRenderer, getMessage(), textX, textY, textColor);
+        if (icon != null) {
+            if (getMessage().getString().isEmpty()) {
+                icon.draw(context, x, y, w, h, textColor);
+            } else {
+                int iconW = icon.widthPx();
+                int gap = 4;
+                int startX = x + (w - (iconW + gap + textW)) / 2;
+                icon.draw(context, startX, textY - 1, iconW, 9, textColor);
+                CompatibilityHelper.drawTextWithShadow(context, textRenderer, getMessage(),
+                        startX + iconW + gap, textY, textColor);
+            }
+        } else {
+            CompatibilityHelper.drawTextWithShadow(context, textRenderer, getMessage(), textX, textY, textColor);
+        }
     }
 
     @Override

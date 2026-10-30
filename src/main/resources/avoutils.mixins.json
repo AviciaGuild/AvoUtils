@@ -3,14 +3,14 @@
   "package": "info.avicia.avoutils.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "ClientPlayNetworkHandlerMixin",
-    "ChatHudMixin",
-    "ChatInputSuggestorMixin",
-    "DrawContextMixin",
-    "HandledScreenMixin",
-    "ResourcePackManagerMixin",
-    "ResourcePackOrganizerMixin",
-    "TextRendererMixin"
+    "ClientPacketListenerMixin",
+    "ChatComponentMixin",
+    "CommandSuggestionsMixin",
+    "GuiGraphicsMixin",
+    "AbstractContainerScreenMixin",
+    "PackRepositoryMixin",
+    "PackSelectionModelMixin",
+    "FontMixin"
   ],
   "injectors": {
     "defaultRequire": 1

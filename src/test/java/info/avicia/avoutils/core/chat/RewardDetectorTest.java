@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.chat;
 
 import org.junit.jupiter.api.Test;
 
@@ -61,10 +61,27 @@ class RewardDetectorTest {
     }
 
     @Test
+    void keepsTheNamesUnescapedInTheResult() {
+        RewardDetector.RewardResult result =
+                RewardDetector.tryDetect("Steve_Bob rewarded a Guild Tome to Alex_2", Component.literal(""));
+
+        assertNotNull(result);
+        assertEquals("Steve_Bob", result.sender());
+        assertEquals("Alex_2", result.recipient());
+    }
+
+    @Test
     void returnsNullForNonRewardText() {
         assertNull(RewardDetector.tryDetect("Steve says hi", Component.literal("")));
         assertNull(RewardDetector.tryDetect(null, Component.literal("")));
         assertNull(RewardDetector.tryDetect("Steve rewarded something to Alex", Component.literal("")));
+    }
+
+    @Test
+    void ignoresChatLinesThatMentionARewardGrant() {
+        assertNull(RewardDetector.tryDetect("Name: I rewarded 2 aspects to Steve", Component.literal("")));
+        assertNull(RewardDetector.tryDetect("Name: X rewarded 99999999999999999999 Emeralds to Y",
+                Component.literal("")));
     }
 
     @Test

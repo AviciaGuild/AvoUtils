@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.ScrollableListScreen;
+import info.avicia.avoutils.core.gui.UiIcons;
 import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
@@ -126,7 +127,7 @@ public class AnniPartyScreen extends ScrollableListScreen {
         this.clearWidgets();
         this.headerHitboxes.clear();
 
-        addRenderableWidget(new FlatButtonWidget(SIDE_PADDING, 8, 80, 20, Component.literal("⟳ Refresh"), this::requestRoster));
+        addRenderableWidget(new FlatButtonWidget(SIDE_PADDING, 8, 80, 20, Component.literal("Refresh"), this::requestRoster).withIcon(UiIcons.REFRESH));
 
         if (feature.getLedParty() != null) {
             addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 80, 8, 80, 20, Component.literal("Invite All"), this::inviteAll));
@@ -223,12 +224,12 @@ public class AnniPartyScreen extends ScrollableListScreen {
             CompatibilityHelper.drawBorder(context, SIDE_PADDING, top, width - 2 * SIDE_PADDING, HEADER_HEIGHT - 2, isMine ? UiStyle.BORDER_GREEN : UiStyle.BORDER_FAINT);
 
             int leftTextX = SIDE_PADDING + 12;
-            String indicator = expanded ? "§b▼" : "§b▶";
-            String header = indicator + " §b§lParty " + party.partyId + " §7(" + party.getMembers().size() + "/" + MAX_ANNI_PARTY_SIZE + ")  §7World: §e" + party.getServerDisplay();
+            (expanded ? UiIcons.EXPANDED : UiIcons.PLAY).draw(context, leftTextX, top + 8, 6, 9, 0xFF55FFFF);
+            String header = "§b§lParty " + party.partyId + " §7(" + party.getMembers().size() + "/" + MAX_ANNI_PARTY_SIZE + ")  §7World: §e" + party.getServerDisplay();
             if (isMine) {
                 header += " §7← You";
             }
-            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(header), leftTextX, top + 9, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(header), leftTextX + 9, top + 9, 0xFFFFFFFF);
 
             // Leader name
             String leaderName = "?";
@@ -252,16 +253,16 @@ public class AnniPartyScreen extends ScrollableListScreen {
                     if (lineY + MEMBER_ROW_HEIGHT < LIST_TOP || lineY > listBottom) {
                         continue;
                     }
-                    String check = member.inParty ? "§a✔" : "§c✕";
+                    (member.inParty ? UiIcons.CHECK : UiIcons.CROSS).draw(context, leftTextX + 8, lineY - 1, 7, 9, member.inParty ? UiStyle.STATUS_SUCCESS : UiStyle.STATUS_ERROR);
                     String role = member.role != null && !member.role.isBlank() ? member.role : "No role";
-                    String line = check + " §f" + member.getDisplayName() + " §7(" + role + ")";
+                    String line = "§f" + member.getDisplayName() + " §7(" + role + ")";
                     if (member.isLeader) {
                         line += " §b[L]";
                     }
                     if (PlayerUtil.namesEqual(member.name, selfName)) {
                         line += " §e← You";
                     }
-                    CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(line), leftTextX + 8, lineY, 0xFFFFFFFF);
+                    CompatibilityHelper.drawTextWithShadow(context, font, Component.literal(line), leftTextX + 18, lineY, 0xFFFFFFFF);
                 }
             }
         }

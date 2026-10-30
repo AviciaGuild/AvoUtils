@@ -10,6 +10,7 @@ import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
 import info.avicia.avoutils.core.gui.FlatSliderWidget;
 import info.avicia.avoutils.core.gui.ScrollViewport;
+import info.avicia.avoutils.core.gui.UiIcons;
 import info.avicia.avoutils.features.partyfinder.gui.CreatePartyModalLayout.Row;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,6 +29,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
 import info.avicia.avoutils.core.gui.ModalOverlay;
+import info.avicia.avoutils.core.util.ClientThread;
 
 /**
  * Modal overlay for creating or editing a party
@@ -128,7 +130,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
         closeButton = new FlatButtonWidget(layout.closeButtonX(), layout.closeButtonY(),
                 CreatePartyModalLayout.CLOSE_BUTTON_SIZE, CreatePartyModalLayout.CLOSE_BUTTON_SIZE,
-                Component.literal("✕"), () -> parent.closeModal());
+                Component.empty(), () -> parent.closeModal()).withIcon(UiIcons.CROSS);
         closeButton.setDanger(true);
         closeButton.setBorderless(true);
         addRenderableWidget(closeButton);
@@ -304,7 +306,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     return CompletableFuture.completedFuture(resp);
                 }
             }).thenAccept(resp -> {
-                runOnClient(() -> {
+                ClientThread.run(() -> {
                     submitting = false;
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
@@ -316,7 +318,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     }
                 });
             }).exceptionally(ex -> {
-                runOnClient(() -> {
+                ClientThread.run(() -> {
                     submitting = false;
                     setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
                 });
@@ -331,7 +333,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     reservedSlots,
                     ping
             ).thenAccept(resp -> {
-                runOnClient(() -> {
+                ClientThread.run(() -> {
                     submitting = false;
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
@@ -354,19 +356,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     }
                 });
             }).exceptionally(ex -> {
-                runOnClient(() -> {
+                ClientThread.run(() -> {
                     submitting = false;
                     setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
                 });
                 return null;
             });
-        }
-    }
-
-    private void runOnClient(Runnable action) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null) {
-            mc.execute(action);
         }
     }
 
