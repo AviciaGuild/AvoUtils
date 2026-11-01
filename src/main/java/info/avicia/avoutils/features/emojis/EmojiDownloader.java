@@ -56,7 +56,10 @@ final class EmojiDownloader {
     private final Path animationCachePath;
     private final Path manifestPath;
 
-    public record AnimationCacheEntry(int frameCount, int[] frameDelays) {
+    public record AnimationCacheEntry(int frameCount, int[] frameDelays, int sourceFrameCount) {
+        public AnimationCacheEntry(int frameCount, int[] frameDelays) {
+            this(frameCount, frameDelays, 0);
+        }
     }
 
     public record EmojiManifest(String hash, Map<String, String> urls) {
@@ -87,6 +90,17 @@ final class EmojiDownloader {
 
     Path manifestPath() {
         return manifestPath;
+    }
+
+    static boolean isAnimationCacheStale(AnimationCacheEntry cached, int targetMaxFrames) {
+        if (cached == null || targetMaxFrames <= 0) {
+            return false;
+        }
+        if (cached.sourceFrameCount() <= 0) {
+            return true;
+        }
+        int expectedFrameCount = Math.min(cached.sourceFrameCount(), targetMaxFrames);
+        return cached.frameCount() != expectedFrameCount;
     }
 
     /**
@@ -193,6 +207,7 @@ final class EmojiDownloader {
                     try {
                         boolean needsProcessing = false;
                         BufferedImage existingImg = null;
+                        AnimationCacheEntry cachedAnim = animationCache.get(emojiName);
 
                         boolean urlChanged = cachedUrls.containsKey(emojiName)
                                 && !Objects.equals(cachedUrls.get(emojiName), imageUrl);
@@ -204,9 +219,10 @@ final class EmojiDownloader {
                                 existingImg = ImageIO.read(imagePath.toFile());
                                 if (existingImg == null || existingImg.getWidth() != 32 || existingImg.getHeight() % 32 != 0) {
                                     needsProcessing = true;
-                                } else if (imageUrl.contains(".gif") && (!animationCache.containsKey(emojiName) || existingImg.getHeight() == 32)) {
+                                } else if (imageUrl.contains(".gif") && (cachedAnim == null || existingImg.getHeight() == 32)) {
                                     needsProcessing = true;
-                                } else if (animationCache.containsKey(emojiName) && existingImg.getHeight() != animationCache.get(emojiName).frameCount() * 32) {
+                                } else if (cachedAnim != null && (existingImg.getHeight() != cachedAnim.frameCount() * 32
+                                        || isAnimationCacheStale(cachedAnim, AnimatedImageDecoder.MAX_FRAMES))) {
                                     needsProcessing = true;
                                 }
                             } catch (Exception e) {
@@ -240,6 +256,11 @@ final class EmojiDownloader {
                                         } catch (Exception ignored) {
                                         }
                                     }
+                                } else if (!urlChanged && existingImg != null && existingImg.getWidth() == 32
+                                        && existingImg.getHeight() % 32 == 0 && cachedAnim != null
+                                        && existingImg.getHeight() == cachedAnim.frameCount() * 32) {
+                                    // Keep using valid previously-capped sprite sheet while offline; retry upgrade when online
+                                    currentUrls.put(emojiName, imageUrl);
                                 } else {
                                     throw downloadEx;
                                 }
@@ -290,7 +311,7 @@ final class EmojiDownloader {
         return new Downloads(currentUrls, downloadedEmojis, anyNewImage.get());
     }
 
-    private void loadAnimationCache() {
+    void loadAnimationCache() {
         if (!Files.exists(animationCachePath)) {
             return;
         }
@@ -306,7 +327,7 @@ final class EmojiDownloader {
         }
     }
 
-    private void saveAnimationCache() {
+    void saveAnimationCache() {
         Path temp = animationCachePath.resolveSibling("animations.json.tmp");
         try {
             Files.createDirectories(animationCachePath.getParent());
@@ -371,7 +392,8 @@ final class EmojiDownloader {
         Path tempPath = destination.resolveSibling(destination.getFileName().toString() + "." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
 
         try {
-            List<AnimationFrame> frames = AnimatedImageDecoder.decode(bytes);
+            AnimatedImageDecoder.DecodedAnimation decoded = AnimatedImageDecoder.decodeAnimation(bytes);
+            List<AnimationFrame> frames = decoded.frames();
             if (frames.isEmpty()) {
                 throw new IOException("Failed to decode image data for " + imageUrl);
             }
@@ -381,7 +403,7 @@ final class EmojiDownloader {
                 BufferedImage sheet = AnimatedImageDecoder.stitchVertically(frames);
                 ImageIO.write(sheet, "png", tempPath.toFile());
                 int[] delays = frames.stream().mapToInt(AnimationFrame::delayMs).toArray();
-                result = new AnimationCacheEntry(frames.size(), delays);
+                result = new AnimationCacheEntry(frames.size(), delays, decoded.sourceFrameCount());
             } else {
                 ImageIO.write(frames.get(0).image(), "png", tempPath.toFile());
                 result = null;
@@ -397,4 +419,3 @@ final class EmojiDownloader {
         }
     }
 }
-

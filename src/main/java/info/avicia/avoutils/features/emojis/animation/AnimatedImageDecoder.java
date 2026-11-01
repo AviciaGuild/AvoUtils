@@ -15,13 +15,20 @@ import java.util.List;
 public final class AnimatedImageDecoder {
 
     public static final int TARGET_SIZE = 32;
-    public static final int MAX_FRAMES = 30;
+    public static final int MAX_FRAMES = 180;
+
+    public record DecodedAnimation(List<AnimationFrame> frames, int sourceFrameCount) {
+    }
 
     private AnimatedImageDecoder() {}
 
     public static List<AnimationFrame> decode(byte[] data) throws IOException {
+        return decodeAnimation(data).frames();
+    }
+
+    public static DecodedAnimation decodeAnimation(byte[] data) throws IOException {
         if (data == null || data.length == 0) {
-            return List.of();
+            return new DecodedAnimation(List.of(), 0);
         }
 
         List<AnimationFrame> rawFrames;
@@ -34,13 +41,15 @@ public final class AnimatedImageDecoder {
             if (img != null) {
                 rawFrames = List.of(new AnimationFrame(img, 100));
             } else {
-                return List.of();
+                return new DecodedAnimation(List.of(), 0);
             }
         }
 
         if (rawFrames.isEmpty()) {
-            return List.of();
+            return new DecodedAnimation(List.of(), 0);
         }
+
+        int sourceFrameCount = rawFrames.size();
 
         // Apply frame limit downsampling if necessary
         List<AnimationFrame> cappedFrames = capFrames(rawFrames, MAX_FRAMES);
@@ -51,7 +60,7 @@ public final class AnimatedImageDecoder {
             scaledFrames.add(new AnimationFrame(scaleToTarget(frame.image(), TARGET_SIZE), frame.delayMs()));
         }
 
-        return scaledFrames;
+        return new DecodedAnimation(scaledFrames, sourceFrameCount);
     }
 
     /**
@@ -132,7 +141,7 @@ public final class AnimatedImageDecoder {
         return modified;
     }
 
-    private static List<AnimationFrame> capFrames(List<AnimationFrame> frames, int max) {
+    static List<AnimationFrame> capFrames(List<AnimationFrame> frames, int max) {
         if (frames == null || frames.isEmpty() || max <= 0) {
             return List.of();
         }
@@ -140,15 +149,16 @@ public final class AnimatedImageDecoder {
             return frames;
         }
 
+        int totalFrames = frames.size();
         List<AnimationFrame> sampled = new ArrayList<>(max);
-        double step = (double) frames.size() / max;
         for (int i = 0; i < max; i++) {
-            int index = (int) Math.round(i * step);
-            if (index >= frames.size()) index = frames.size() - 1;
-            AnimationFrame f = frames.get(index);
-            // Multiply delay according to sample step so total animation duration stays accurate
-            int adjustedDelay = (int) Math.round(f.delayMs() * step);
-            sampled.add(new AnimationFrame(f.image(), adjustedDelay));
+            int start = (int) ((long) i * totalFrames / max);
+            int end = (int) ((long) (i + 1) * totalFrames / max);
+            int bucketDelay = 0;
+            for (int j = start; j < end; j++) {
+                bucketDelay += Math.max(10, frames.get(j).delayMs());
+            }
+            sampled.add(new AnimationFrame(frames.get(start).image(), bucketDelay));
         }
         return sampled;
     }

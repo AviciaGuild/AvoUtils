@@ -131,4 +131,55 @@ class AnimatedImageDecoderTest {
         alreadyNormalized.setRGB(25, 32 + 5, 0xFF00FF00);
         assertFalse(AnimatedImageDecoder.normalizeFrameAdvances(alreadyNormalized, 2));
     }
+
+    @Test
+    void capFramesKeepsLongAnimationsSmoothAndPreservesExactTotalDuration() {
+        BufferedImage img = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
+
+        // 171 frames at 30ms (~5.13s, like :agajam:) fits completely within MAX_FRAMES without dropping frames
+        List<AnimationFrame> agajam171 = new ArrayList<>(171);
+        for (int i = 0; i < 171; i++) {
+            agajam171.add(new AnimationFrame(img, 30));
+        }
+        List<AnimationFrame> uncapped = AnimatedImageDecoder.capFrames(agajam171, AnimatedImageDecoder.MAX_FRAMES);
+        assertEquals(171, uncapped.size());
+        assertTrue(uncapped.stream().allMatch(f -> f.delayMs() == 30));
+
+        // 256 frames at 20ms (5.12s) downsamples to MAX_FRAMES while preserving exact 5120ms duration
+        List<AnimationFrame> agajam256 = new ArrayList<>(256);
+        for (int i = 0; i < 256; i++) {
+            agajam256.add(new AnimationFrame(img, 20));
+        }
+        List<AnimationFrame> sampled = AnimatedImageDecoder.capFrames(agajam256, AnimatedImageDecoder.MAX_FRAMES);
+        assertEquals(AnimatedImageDecoder.MAX_FRAMES, sampled.size());
+        int totalDuration = sampled.stream().mapToInt(AnimationFrame::delayMs).sum();
+        assertEquals(256 * 20, totalDuration);
+        assertTrue(sampled.stream().allMatch(f -> f.delayMs() <= 40),
+                "Downsampled 5.12s animation should keep frame delays <= 40ms (>= 25 FPS)");
+    }
+
+    @Test
+    void capFramesPreservesPauseFramesAcrossVariableDelays() {
+        BufferedImage img = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
+        // 6 frames where odd (dropped) index 3 is a 500ms pause; capping to 3 buckets [0,2), [2,4), [4,6)
+        List<AnimationFrame> variable = List.of(
+                new AnimationFrame(img, 20),
+                new AnimationFrame(img, 20),
+                new AnimationFrame(img, 20),
+                new AnimationFrame(img, 500),
+                new AnimationFrame(img, 20),
+                new AnimationFrame(img, 20)
+        );
+
+        List<AnimationFrame> capped = AnimatedImageDecoder.capFrames(variable, 3);
+        assertEquals(3, capped.size());
+        assertEquals(40, capped.get(0).delayMs());
+        assertEquals(520, capped.get(1).delayMs());
+        assertEquals(40, capped.get(2).delayMs());
+        assertEquals(600, capped.stream().mapToInt(AnimationFrame::delayMs).sum());
+
+        assertTrue(AnimatedImageDecoder.capFrames(null, 10).isEmpty());
+        assertTrue(AnimatedImageDecoder.capFrames(List.of(), 10).isEmpty());
+        assertTrue(AnimatedImageDecoder.capFrames(variable, 0).isEmpty());
+    }
 }

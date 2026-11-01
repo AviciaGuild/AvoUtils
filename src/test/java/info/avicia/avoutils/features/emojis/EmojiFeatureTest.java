@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.features.emojis.EmojiDownloader.AnimationCacheEntry;
+import info.avicia.avoutils.features.emojis.animation.AnimatedImageDecoder;
 import info.avicia.avoutils.features.emojis.animation.AnimationMeta;
 import info.avicia.avoutils.features.emojis.models.FontConfig;
 import info.avicia.avoutils.features.emojis.models.FontProvider;
@@ -17,6 +19,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,5 +189,61 @@ class EmojiFeatureTest {
         assertTrue(matches.contains(":star:"));
         // Assert :fire: is only present once
         assertEquals(1, matches.stream().filter(s -> s.equals(":fire:")).count());
+    }
+
+    @Test
+    void animationCacheStalenessUsesSourceFrameCountWithoutMagicCapNumbers() throws IOException {
+        Path animJsonPath = tempDir.resolve("assets/avoutils/animations.json");
+        Files.createDirectories(animJsonPath.getParent());
+
+        // Legacy animations.json format (before sourceFrameCount existed)
+        String legacyJson = """
+                {
+                  "agajam": {
+                    "frameCount": 30,
+                    "frameDelays": [171, 171, 171]
+                  }
+                }
+                """;
+        Files.writeString(animJsonPath, legacyJson, StandardCharsets.UTF_8);
+
+        EmojiDownloader downloader = new EmojiDownloader(tempDir);
+        downloader.loadAnimationCache();
+
+        AnimationCacheEntry legacyAgajam = downloader.animationCache().get("agajam");
+        assertNotNull(legacyAgajam);
+        assertEquals(0, legacyAgajam.sourceFrameCount());
+        // Missing sourceFrameCount -> stale so it refreshes once and records true sourceFrameCount
+        assertTrue(EmojiDownloader.isAnimationCacheStale(legacyAgajam, AnimatedImageDecoder.MAX_FRAMES));
+
+        // Uncapped 30-frame emote (sourceFrameCount = 30, frameCount = 30):
+        // stays valid even if targetMaxFrames increases or decreases above 30
+        int[] delays30 = new int[30];
+        Arrays.fill(delays30, 20);
+        downloader.animationCache().put("pandawave", new AnimationCacheEntry(30, delays30, 30));
+
+        // Capped 256-frame emote (sourceFrameCount = 256, frameCount = 180):
+        // valid at 180, stale if cap changes up (e.g. 240) or down (e.g. 120)
+        int[] delays180 = new int[180];
+        Arrays.fill(delays180, 28);
+        downloader.animationCache().put("agajam", new AnimationCacheEntry(180, delays180, 256));
+        downloader.saveAnimationCache();
+
+        EmojiDownloader reloaded = new EmojiDownloader(tempDir);
+        reloaded.loadAnimationCache();
+
+        AnimationCacheEntry pandawave = reloaded.animationCache().get("pandawave");
+        AnimationCacheEntry agajam = reloaded.animationCache().get("agajam");
+        assertNotNull(pandawave);
+        assertNotNull(agajam);
+
+        assertFalse(EmojiDownloader.isAnimationCacheStale(pandawave, 180));
+        assertFalse(EmojiDownloader.isAnimationCacheStale(pandawave, 300));
+        assertTrue(EmojiDownloader.isAnimationCacheStale(pandawave, 20));
+
+        assertFalse(EmojiDownloader.isAnimationCacheStale(agajam, 180));
+        assertTrue(EmojiDownloader.isAnimationCacheStale(agajam, 240));
+        assertTrue(EmojiDownloader.isAnimationCacheStale(agajam, 120));
+        assertFalse(EmojiDownloader.isAnimationCacheStale(null, 180));
     }
 }
