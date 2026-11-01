@@ -1,18 +1,14 @@
 package info.avicia.avoutils.features.partyfinder.api;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.api.ApiException;
+import info.avicia.avoutils.core.api.AvoApiClient;
 import info.avicia.avoutils.core.config.ModConfig;
-import info.avicia.avoutils.core.auth.AvoAuthService;
 
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -21,72 +17,25 @@ import java.util.function.Function;
  * HTTP client for the pfinder API
  */
 public class PartyFinderClient {
-    private static final Gson GSON = new GsonBuilder()
-            .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-            .create();
+    private static final Gson GSON = AvoApiClient.GSON;
 
-    private final ModConfig config;
-    private final HttpClient httpClient;
+    private final AvoApiClient api;
 
     public PartyFinderClient(ModConfig config) {
-        this(config, HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build());
+        this(new AvoApiClient(config));
     }
 
     PartyFinderClient(ModConfig config, HttpClient httpClient) {
-        this.config = config;
-        this.httpClient = httpClient;
+        this(new AvoApiClient(config, httpClient));
     }
 
-    // ── Auth ──────────────────────────────────────────────────────────────
-
-    private HttpRequest.Builder baseRequest(String path, String token) {
-        String url = config.getApiBaseUrl() + path;
-        return HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(15));
+    private PartyFinderClient(AvoApiClient api) {
+        this.api = api;
     }
 
-    public CompletableFuture<String> getSessionToken() {
-        return AvoAuthService.getInstance().getSessionToken();
-    }
-
-    private HttpRequest buildRequest(String path, String token, String method, HttpRequest.BodyPublisher bodyPublisher) {
-        HttpRequest.Builder builder = baseRequest(path, token);
-        if (method.equals("GET")) {
-            builder.GET();
-        } else if (method.equals("DELETE")) {
-            builder.DELETE();
-        } else {
-            builder.method(method, bodyPublisher);
-        }
-        return builder.build();
-    }
-
-    private <T> CompletableFuture<T> executeAuthenticated(
-            String path,
-            String method,
-            HttpRequest.BodyPublisher bodyPublisher,
-            Function<HttpResponse<String>, T> parser
-    ) {
-        return getSessionToken().thenCompose(token -> {
-            HttpRequest request = buildRequest(path, token, method, bodyPublisher);
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenCompose(response -> {
-                        if (response.statusCode() == 401) {
-                            // Token is invalid/expired; reset token and retry once
-                            AvoAuthService.getInstance().invalidateToken();
-                            return getSessionToken().thenCompose(newToken -> {
-                                HttpRequest retryRequest = buildRequest(path, newToken, method, bodyPublisher);
-                                return httpClient.sendAsync(retryRequest, HttpResponse.BodyHandlers.ofString());
-                            });
-                        }
-                        return CompletableFuture.completedFuture(response);
-                    });
-        }).thenApply(parser);
+    private <T> CompletableFuture<T> executeAuthenticated(String path, String method, JsonObject body,
+                                                          Function<HttpResponse<String>, T> parser) {
+        return api.send(method, path, body != null ? GSON.toJson(body) : null).thenApply(parser);
     }
 
     private ApiResponse parseResponse(HttpResponse<String> response) {
@@ -103,15 +52,9 @@ public class PartyFinderClient {
     private void throwOnError(HttpResponse<String> response, String actionName, String defaultMessagePrefix) {
         if (response.statusCode() != 200) {
             AvoUtilsMod.LOGGER.warn("[AvoUtils] [PartyFinder] {} failed: HTTP {}", actionName, response.statusCode());
-            String errorMessage = defaultMessagePrefix + " (HTTP " + response.statusCode() + ").";
-            try {
-                ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-                if (apiResp != null && apiResp.error != null) {
-                    errorMessage = apiResp.error;
-                }
-            } catch (Exception ignored) {
-            }
-            throw new RuntimeException(errorMessage);
+            String error = AvoApiClient.errorMessage(response.body());
+            throw new ApiException(response.statusCode(),
+                    error != null ? error : defaultMessagePrefix + " (HTTP " + response.statusCode() + ").");
         }
     }
 
@@ -155,7 +98,7 @@ public class PartyFinderClient {
         body.addProperty("reserved_slots", reservedSlots);
         body.addProperty("ping", ping);
 
-        return executeAuthenticated("/api/parties", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
+        return executeAuthenticated("/api/parties", "POST", body, this::parseResponse);
     }
 
     /**
@@ -171,7 +114,7 @@ public class PartyFinderClient {
         else body.addProperty("note", "");
         body.addProperty("ping", ping);
 
-        return executeAuthenticated("/api/parties/" + partyId + "/edit", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
+        return executeAuthenticated("/api/parties/" + partyId + "/edit", "POST", body, this::parseResponse);
     }
 
     /**
@@ -181,14 +124,14 @@ public class PartyFinderClient {
         JsonObject body = new JsonObject();
         body.addProperty("role", role);
 
-        return executeAuthenticated("/api/parties/" + partyId + "/join", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
+        return executeAuthenticated("/api/parties/" + partyId + "/join", "POST", body, this::parseResponse);
     }
 
     /**
      * POST /api/parties/{id}/leave
      */
     public CompletableFuture<ApiResponse> leaveParty(long partyId) {
-        return executeAuthenticated("/api/parties/" + partyId + "/leave", "POST", HttpRequest.BodyPublishers.noBody(), this::parseResponse);
+        return executeAuthenticated("/api/parties/" + partyId + "/leave", "POST", null, this::parseResponse);
     }
 
     /**
@@ -205,7 +148,7 @@ public class PartyFinderClient {
         JsonObject body = new JsonObject();
         body.addProperty("target", targetName);
 
-        return executeAuthenticated("/api/parties/" + partyId + "/kick", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
+        return executeAuthenticated("/api/parties/" + partyId + "/kick", "POST", body, this::parseResponse);
     }
 
     /**
@@ -216,7 +159,7 @@ public class PartyFinderClient {
         if (name != null) body.addProperty("name", name);
         if (role != null) body.addProperty("role", role);
 
-        return executeAuthenticated("/api/parties/" + partyId + "/reserve", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
+        return executeAuthenticated("/api/parties/" + partyId + "/reserve", "POST", body, this::parseResponse);
     }
 
     /**
@@ -239,6 +182,6 @@ public class PartyFinderClient {
         JsonObject body = new JsonObject();
         body.addProperty("minecraft_name", minecraftName);
 
-        return executeAuthenticated("/api/parties/" + partyId + "/reserve-ingame", "POST", HttpRequest.BodyPublishers.ofString(GSON.toJson(body)), this::parseResponse);
+        return executeAuthenticated("/api/parties/" + partyId + "/reserve-ingame", "POST", body, this::parseResponse);
     }
 }

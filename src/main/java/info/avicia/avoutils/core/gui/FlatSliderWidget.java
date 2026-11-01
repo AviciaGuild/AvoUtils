@@ -82,7 +82,7 @@ public class FlatSliderWidget extends AbstractWidget {
                 dimmed ? 0x0A8A9CFE : UiStyle.BORDER_FAINT);
 
         double range = max - min;
-        double ratio = range == 0 ? 0 : (value - min) / range;
+        double ratio = range == 0 ? 1.0 : (value - min) / range;
         int knobX = x + (int) (ratio * (w - 8));
 
         // Fill track

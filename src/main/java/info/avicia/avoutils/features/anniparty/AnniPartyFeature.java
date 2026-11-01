@@ -2,17 +2,24 @@ package info.avicia.avoutils.features.anniparty;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
+import info.avicia.avoutils.core.command.AvoCommands;
 import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import info.avicia.avoutils.features.partyfinder.PartyFinderFeature;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 /**
  * Registers the Anni party roster feature: the WebSocket listener that keeps the local cached
@@ -37,6 +44,22 @@ public class AnniPartyFeature implements AvoFeature {
 
         // Register a connection demand so that the backend will send us the roster when we connect
         AvoWebSocketManager.getInstance().registerConnectionDemand("anniparty", this::isGuildMember);
+    }
+
+    @Override
+    public void registerCommands(LiteralArgumentBuilder<FabricClientCommandSource> root) {
+        // /avo anni → open anni party screen
+        root.then(literal("anni").executes(context -> {
+            if (!AvoCommands.ensureNetworkingAllowed(context.getSource())) return 1;
+            Minecraft client = Minecraft.getInstance();
+            client.execute(() -> {
+                PartyFinderFeature pfFeature = AvoUtilsMod.getInstance().getFeature(PartyFinderFeature.class);
+                if (pfFeature != null) {
+                    client.setScreen(new AnniPartyScreen(this, pfFeature.getInviteHandler()));
+                }
+            });
+            return 1;
+        }));
     }
 
     @Override

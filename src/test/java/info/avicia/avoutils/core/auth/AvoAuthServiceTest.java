@@ -113,20 +113,4 @@ class AvoAuthServiceTest {
 
         assertNotNull(AvoAuthService.getInstance());
     }
-
-    @Test
-    void extractErrorMessageReadsErrorField() {
-        assertEquals("Bad token", invokeExtractErrorMessage("{\"error\":\"Bad token\"}"));
-    }
-
-    @Test
-    void extractErrorMessageReturnsNullWhenMissing() {
-        assertNull(invokeExtractErrorMessage("{\"message\":\"x\"}"));
-        assertNull(invokeExtractErrorMessage("not json"));
-    }
-
-    private String invokeExtractErrorMessage(String body) {
-        return TestReflection.invokeStatic(AvoAuthService.class, "extractErrorMessage",
-                new Class[]{String.class}, body);
-    }
 }

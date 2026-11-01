@@ -91,7 +91,7 @@ public final class WynnPillUtil {
         sendToPlayer(msg);
     }
 
-    private static void sendToPlayer(Component message) {
+    public static void sendToPlayer(Component message) {
         Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(() -> {

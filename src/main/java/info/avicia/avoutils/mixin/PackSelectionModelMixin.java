@@ -22,7 +22,7 @@ import net.minecraft.server.packs.repository.PackRepository;
  * while ensuring they remain active and preserved when the player adjusts other packs.
  */
 @Mixin(PackSelectionModel.class)
-public class ResourcePackOrganizerMixin {
+public class PackSelectionModelMixin {
 
     @Shadow @Final
     private PackRepository repository;

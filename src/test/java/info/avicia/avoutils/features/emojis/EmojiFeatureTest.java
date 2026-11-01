@@ -34,13 +34,13 @@ class EmojiFeatureTest {
 
     @Test
     void safeNameForLowercasesAndReplacesInvalidCharacters() {
-        assertEquals("hello_world_", EmojiFeature.safeNameFor("Hello World!"));
-        assertEquals("cupboi", EmojiFeature.safeNameFor("CupBoi"));
+        assertEquals("hello_world_", EmojiPackWriter.safeNameFor("Hello World!"));
+        assertEquals("cupboi", EmojiPackWriter.safeNameFor("CupBoi"));
     }
 
     @Test
     void safeNameForKeepsAllowedCharacters() {
-        assertEquals("a.b-c_d", EmojiFeature.safeNameFor("a.b-c_d"));
+        assertEquals("a.b-c_d", EmojiPackWriter.safeNameFor("a.b-c_d"));
     }
 
     @Test
@@ -53,7 +53,7 @@ class EmojiFeatureTest {
             JsonObject version = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8))
                     .getAsJsonObject();
             int expected = version.getAsJsonObject("pack_version").get("resource_major").getAsInt();
-            assertEquals(expected, EmojiFeature.currentPackFormat());
+            assertEquals(expected, EmojiPackWriter.currentPackFormat());
         }
     }
 
@@ -161,12 +161,12 @@ class EmojiFeatureTest {
         urls.put("Avicia", "https://example.com/avicia.png");
         urls.put("party", "https://example.com/party.gif");
 
-        EmojiFeature.EmojiManifest manifest = new EmojiFeature.EmojiManifest("abc123hash", urls);
+        EmojiDownloader.EmojiManifest manifest = new EmojiDownloader.EmojiManifest("abc123hash", urls);
         feature.saveManifestForTesting(manifest);
 
         assertTrue(Files.exists(feature.getManifestPath()));
 
-        EmojiFeature.EmojiManifest loaded = feature.loadManifestForTesting();
+        EmojiDownloader.EmojiManifest loaded = feature.loadManifestForTesting();
         assertNotNull(loaded);
         assertEquals("abc123hash", loaded.hash());
         assertEquals(2, loaded.urls().size());
@@ -179,7 +179,7 @@ class EmojiFeatureTest {
         Set<String> custom = Set.of(":fire:", ":custom_star:");
         Set<String> standard = Set.of(":fire:", ":star:");
 
-        List<String> matches = EmojiFeature.matchShortcodes(custom, standard, ":");
+        List<String> matches = EmojiAutocomplete.matchShortcodes(custom, standard, ":");
         assertEquals(3, matches.size());
         assertTrue(matches.contains(":fire:"));
         assertTrue(matches.contains(":custom_star:"));

@@ -1,0 +1,93 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 4,
+        "\u200c": 0
+      }
+    },
+    {
+      "type": "unihex",
+      "hex_file": "minecraft:font/unifont_jp.zip",
+      "size_overrides": [
+        {
+          "from": "\u3200",
+          "to": "\u9FFF",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\uF900",
+          "to": "\uFAFF",
+          "left": 0,
+          "right": 15
+        }
+      ],
+      "filter": {
+        "jp": true
+      }
+    },
+    {
+      "type": "unihex",
+      "hex_file": "minecraft:font/unifont.zip",
+      "size_overrides": [
+        {
+          "from": "\u3001",
+          "to": "\u30FF",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\u3200",
+          "to": "\u9FFF",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\u1100",
+          "to": "\u11FF",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\u3130",
+          "to": "\u318F",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\uA960",
+          "to": "\uA97F",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\uD7B0",
+          "to": "\uD7FF",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\uAC00",
+          "to": "\uD7AF",
+          "left": 1,
+          "right": 15
+        },
+        {
+          "from": "\uF900",
+          "to": "\uFAFF",
+          "left": 0,
+          "right": 15
+        },
+        {
+          "from": "\uFF01",
+          "to": "\uFF5E",
+          "left": 0,
+          "right": 15
+        }
+      ]
+    }
+  ]
+}
+

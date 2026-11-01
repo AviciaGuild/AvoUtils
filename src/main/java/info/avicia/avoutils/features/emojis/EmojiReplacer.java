@@ -15,7 +15,7 @@ public class EmojiReplacer {
     private static final TextColor EMOJI_COLOR = TextColor.fromRgb(0xFFFFFF);
 
     private static boolean isValidShortcodeChar(char c) {
-        return EmojiFeature.isValidShortcodeChar(c);
+        return EmojiAutocomplete.isValidShortcodeChar(c);
     }
 
     public static Component replace(Component text) {

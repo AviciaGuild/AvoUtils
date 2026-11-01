@@ -4,6 +4,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
+import info.avicia.avoutils.features.emojis.EmojiAutocomplete;
 import info.avicia.avoutils.features.emojis.EmojiFeature;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -21,7 +22,7 @@ import net.minecraft.network.chat.Component;
  * Provides emoji autocomplete suggestions when typing shortcodes in chat.
  */
 @Mixin(CommandSuggestions.class)
-public abstract class ChatInputSuggestorMixin {
+public abstract class CommandSuggestionsMixin {
 
     @Shadow
     EditBox input;
@@ -66,7 +67,7 @@ public abstract class ChatInputSuggestorMixin {
 
         String textBeforeCursor = text.substring(0, cursor);
 
-        EmojiFeature.AutocompletePrefix prefixInfo = EmojiFeature.findAutocompletePrefix(textBeforeCursor);
+        EmojiAutocomplete.AutocompletePrefix prefixInfo = EmojiAutocomplete.findAutocompletePrefix(textBeforeCursor);
         if (prefixInfo == null) {
             return;
         }

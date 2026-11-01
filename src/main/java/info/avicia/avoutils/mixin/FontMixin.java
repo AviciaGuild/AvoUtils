@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * This eliminates horizontal text jitter and prevents following text from moving.
  */
 @Mixin(Font.class)
-public abstract class TextRendererMixin {
+public abstract class FontMixin {
 
     @Shadow
     abstract GlyphSource getGlyphSource(FontDescription font);

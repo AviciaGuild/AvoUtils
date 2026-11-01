@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  * Intercepts chat messages to replace :shortcode: patterns with PUA emoji characters.
  */
 @Mixin(ChatComponent.class)
-public class ChatHudMixin {
+public class ChatComponentMixin {
 
     @ModifyVariable(
             method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V",

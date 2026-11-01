@@ -1,9 +1,8 @@
 package info.avicia.avoutils.core.auth;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonObject;
+import info.avicia.avoutils.core.api.AvoApiClient;
 import info.avicia.avoutils.core.config.ModConfig;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -22,9 +21,7 @@ import net.minecraft.client.User;
  * and caches the session token for backend requests.
  */
 public class AvoAuthService {
-    private static final Gson GSON = new GsonBuilder()
-            .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-            .create();
+    private static final Gson GSON = AvoApiClient.GSON;
 
     private static AvoAuthService instance;
 
@@ -244,7 +241,7 @@ public class AvoAuthService {
                 })
                 .thenApply(response -> {
                     if (response.statusCode() != 200) {
-                        String errorMsg = extractErrorMessage(response.body());
+                        String errorMsg = AvoApiClient.errorMessage(response.body());
                         throw new RuntimeException(errorMsg != null ? errorMsg : "Login failed (HTTP " + response.statusCode() + ")");
                     }
                     AuthApiResponse apiResp = GSON.fromJson(response.body(), AuthApiResponse.class);
@@ -254,17 +251,6 @@ public class AvoAuthService {
                     pendingGuildMember = apiResp.guildMember;
                     return apiResp.token;
                 });
-    }
-
-    private static String extractErrorMessage(String responseBody) {
-        try {
-            JsonObject json = GSON.fromJson(responseBody, JsonObject.class);
-            if (json != null && json.has("error")) {
-                return json.get("error").getAsString();
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
     }
 
     private static class AuthApiResponse {

@@ -18,7 +18,7 @@ import net.minecraft.server.packs.repository.RepositorySource;
  * Adds EmojiResourcePackProvider to the resource pack manager's provider set
  */
 @Mixin(PackRepository.class)
-public class ResourcePackManagerMixin {
+public class PackRepositoryMixin {
 
     @Shadow @Final @Mutable
     private Set<RepositorySource> sources;

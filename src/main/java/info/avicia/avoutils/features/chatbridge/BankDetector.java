@@ -1,6 +1,7 @@
 package info.avicia.avoutils.features.chatbridge;
 
 import info.avicia.avoutils.AvoUtilsMod;
+import info.avicia.avoutils.core.chat.DiscordMarkdown;
 import info.avicia.avoutils.core.util.UsernameResolver;
 import java.util.Locale;
 import java.util.regex.Matcher;

@@ -62,4 +62,41 @@ class UsernameResolverTest {
         // Recipient does NOT have hover text, should fall back to just Krokofant without bleeding
         org.junit.jupiter.api.Assertions.assertEquals("Krokofant", UsernameResolver.resolve(message, "Krokofant"));
     }
+
+    @Test
+    void resolveMatchesNamesAsWholeWords() {
+        Component bobToBobby = Component.empty()
+                .append(TextFixtures.hoverText("Bob", "'s real name is RealBob"))
+                .append(" rewarded a Guild Tome to ")
+                .append(TextFixtures.hoverText("Bobby", "'s real name is RealBobby"));
+        assertEquals("RealBob", UsernameResolver.resolve(bobToBobby, "Bob"));
+        assertEquals("RealBobby", UsernameResolver.resolve(bobToBobby, "Bobby"));
+
+        Component bobbyToBob = Component.empty()
+                .append(TextFixtures.hoverText("Bobby", "'s real name is RealBobby"))
+                .append(" rewarded a Guild Tome to ")
+                .append(TextFixtures.hoverText("Bob", "'s real name is RealBob"));
+        assertEquals("RealBob", UsernameResolver.resolve(bobbyToBob, "Bob"));
+        assertEquals("RealBobby", UsernameResolver.resolve(bobbyToBob, "Bobby"));
+    }
+
+    @Test
+    void resolveDoesNotGiveANicknamedPlayersNameToALongerName() {
+        Component message = Component.empty()
+                .append(TextFixtures.hoverText("Bob", "'s real name is RealBob"))
+                .append(" rewarded a Guild Tome to Bobby");
+        assertEquals("Bobby", UsernameResolver.resolve(message, "Bobby"));
+    }
+
+    @Test
+    void resolveMatchesANameInsideALongerSpan() {
+        Component message = TextFixtures.hoverText("[Chief] Bob", "'s real name is RealBob");
+        assertEquals("RealBob", UsernameResolver.resolve(message, "Bob"));
+    }
+
+    @Test
+    void resolveReadsTheColouredRealUsernameHover() {
+        Component message = TextFixtures.hoverText("§fI Burger", "§fI Burger§7's real username is §fpat_crafter07");
+        assertEquals("pat_crafter07", UsernameResolver.resolve(message, "I Burger"));
+    }
 }

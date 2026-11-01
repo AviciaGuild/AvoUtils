@@ -1,4 +1,4 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.chat;
 
 import org.junit.jupiter.api.Test;
 

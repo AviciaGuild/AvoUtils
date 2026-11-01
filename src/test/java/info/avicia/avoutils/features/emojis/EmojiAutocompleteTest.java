@@ -18,11 +18,11 @@ class EmojiAutocompleteTest {
         Set<String> custom = Set.of(":aga:", ":agabounce:", ":catwat:", ":Avicia:");
         Set<String> standard = Set.of(":apple:", ":agree:");
 
-        List<String> matches = EmojiFeature.matchShortcodes(custom, standard, ":ag");
+        List<String> matches = EmojiAutocomplete.matchShortcodes(custom, standard, ":ag");
         // Custom emojis sorted first (:aga:, :agabounce:), then standard (:agree:)
         assertEquals(List.of(":aga:", ":agabounce:", ":agree:"), matches);
 
-        List<String> upperMatches = EmojiFeature.matchShortcodes(custom, standard, ":AV");
+        List<String> upperMatches = EmojiAutocomplete.matchShortcodes(custom, standard, ":AV");
         assertEquals(List.of(":Avicia:"), upperMatches);
     }
 
@@ -31,9 +31,9 @@ class EmojiAutocompleteTest {
         Set<String> custom = Set.of(":aga:", ":albin:");
         Set<String> standard = Set.of(":smile:");
 
-        assertTrue(EmojiFeature.matchShortcodes(custom, standard, null).isEmpty());
-        assertTrue(EmojiFeature.matchShortcodes(custom, standard, "").isEmpty());
-        assertTrue(EmojiFeature.matchShortcodes(custom, standard, ":xyz").isEmpty());
+        assertTrue(EmojiAutocomplete.matchShortcodes(custom, standard, null).isEmpty());
+        assertTrue(EmojiAutocomplete.matchShortcodes(custom, standard, "").isEmpty());
+        assertTrue(EmojiAutocomplete.matchShortcodes(custom, standard, ":xyz").isEmpty());
     }
 
     @Test
@@ -43,44 +43,44 @@ class EmojiAutocompleteTest {
             custom.add(String.format(":test%02d:", i));
         }
 
-        List<String> matches = EmojiFeature.matchShortcodes(custom, Set.of(), ":test");
+        List<String> matches = EmojiAutocomplete.matchShortcodes(custom, Set.of(), ":test");
         assertEquals(50, matches.size());
     }
 
     @Test
     void findAutocompletePrefixHandlesAdjacentColons() {
         // Direct adjacent colon with letters typed: "::aga"
-        EmojiFeature.AutocompletePrefix doubleColon = EmojiFeature.findAutocompletePrefix("::aga");
+        EmojiAutocomplete.AutocompletePrefix doubleColon = EmojiAutocomplete.findAutocompletePrefix("::aga");
         assertNotNull(doubleColon);
         assertEquals(1, doubleColon.startIndex());
         assertEquals(":aga", doubleColon.prefix());
 
         // Adjacent colon after completed emoji: ":cat::aga"
-        EmojiFeature.AutocompletePrefix afterEmoji = EmojiFeature.findAutocompletePrefix(":cat::aga");
+        EmojiAutocomplete.AutocompletePrefix afterEmoji = EmojiAutocomplete.findAutocompletePrefix(":cat::aga");
         assertNotNull(afterEmoji);
         assertEquals(5, afterEmoji.startIndex());
         assertEquals(":aga", afterEmoji.prefix());
 
         // Adjacent colon in command: "/p ::aga"
-        EmojiFeature.AutocompletePrefix inCommand = EmojiFeature.findAutocompletePrefix("/p ::aga");
+        EmojiAutocomplete.AutocompletePrefix inCommand = EmojiAutocomplete.findAutocompletePrefix("/p ::aga");
         assertNotNull(inCommand);
         assertEquals(4, inCommand.startIndex());
         assertEquals(":aga", inCommand.prefix());
 
         // Double colon with no letters yet: "::"
-        EmojiFeature.AutocompletePrefix doubleColonOnly = EmojiFeature.findAutocompletePrefix("::");
+        EmojiAutocomplete.AutocompletePrefix doubleColonOnly = EmojiAutocomplete.findAutocompletePrefix("::");
         assertNotNull(doubleColonOnly);
         assertEquals(1, doubleColonOnly.startIndex());
         assertEquals(":", doubleColonOnly.prefix());
 
         // Adjacent colon after completed emoji with no letters yet: ":cat::"
-        EmojiFeature.AutocompletePrefix afterEmojiOnly = EmojiFeature.findAutocompletePrefix(":cat::");
+        EmojiAutocomplete.AutocompletePrefix afterEmojiOnly = EmojiAutocomplete.findAutocompletePrefix(":cat::");
         assertNotNull(afterEmojiOnly);
         assertEquals(5, afterEmojiOnly.startIndex());
         assertEquals(":", afterEmojiOnly.prefix());
 
         // Triple colon: ":::"
-        EmojiFeature.AutocompletePrefix tripleColon = EmojiFeature.findAutocompletePrefix(":::");
+        EmojiAutocomplete.AutocompletePrefix tripleColon = EmojiAutocomplete.findAutocompletePrefix(":::");
         assertNotNull(tripleColon);
         assertEquals(2, tripleColon.startIndex());
         assertEquals(":", tripleColon.prefix());
@@ -89,25 +89,25 @@ class EmojiAutocompleteTest {
     @Test
     void findAutocompletePrefixHandlesStandardTyping() {
         // Start of text
-        EmojiFeature.AutocompletePrefix start = EmojiFeature.findAutocompletePrefix(":ag");
+        EmojiAutocomplete.AutocompletePrefix start = EmojiAutocomplete.findAutocompletePrefix(":ag");
         assertNotNull(start);
         assertEquals(0, start.startIndex());
         assertEquals(":ag", start.prefix());
 
         // Start with only colon
-        EmojiFeature.AutocompletePrefix singleColon = EmojiFeature.findAutocompletePrefix(":");
+        EmojiAutocomplete.AutocompletePrefix singleColon = EmojiAutocomplete.findAutocompletePrefix(":");
         assertNotNull(singleColon);
         assertEquals(0, singleColon.startIndex());
         assertEquals(":", singleColon.prefix());
 
         // Space before colon
-        EmojiFeature.AutocompletePrefix afterSpace = EmojiFeature.findAutocompletePrefix("hello :ag");
+        EmojiAutocomplete.AutocompletePrefix afterSpace = EmojiAutocomplete.findAutocompletePrefix("hello :ag");
         assertNotNull(afterSpace);
         assertEquals(6, afterSpace.startIndex());
         assertEquals(":ag", afterSpace.prefix());
 
         // Inside parenthesis
-        EmojiFeature.AutocompletePrefix afterParen = EmojiFeature.findAutocompletePrefix("(:ag");
+        EmojiAutocomplete.AutocompletePrefix afterParen = EmojiAutocomplete.findAutocompletePrefix("(:ag");
         assertNotNull(afterParen);
         assertEquals(1, afterParen.startIndex());
         assertEquals(":ag", afterParen.prefix());
@@ -116,18 +116,18 @@ class EmojiAutocompleteTest {
     @Test
     void findAutocompletePrefixIgnoresNonEmojiAndClosedEmoji() {
         // Closed emoji should not pop up suggestions
-        assertNull(EmojiFeature.findAutocompletePrefix(":cat:"));
+        assertNull(EmojiAutocomplete.findAutocompletePrefix(":cat:"));
 
         // Namespaced identifier (letter immediately before colon)
-        assertNull(EmojiFeature.findAutocompletePrefix("minecraft:stone"));
+        assertNull(EmojiAutocomplete.findAutocompletePrefix("minecraft:stone"));
 
         // URL containing colons and slashes
-        assertNull(EmojiFeature.findAutocompletePrefix("http://website.com"));
+        assertNull(EmojiAutocomplete.findAutocompletePrefix("http://website.com"));
 
         // Text with no colon
-        assertNull(EmojiFeature.findAutocompletePrefix("hello world"));
-        assertNull(EmojiFeature.findAutocompletePrefix(""));
-        assertNull(EmojiFeature.findAutocompletePrefix(null));
+        assertNull(EmojiAutocomplete.findAutocompletePrefix("hello world"));
+        assertNull(EmojiAutocomplete.findAutocompletePrefix(""));
+        assertNull(EmojiAutocomplete.findAutocompletePrefix(null));
     }
 
     @Test
@@ -136,10 +136,10 @@ class EmojiAutocompleteTest {
         Set<String> standard = Set.of(":agree:");
 
         // Simulate typing "::ag"
-        EmojiFeature.AutocompletePrefix prefixInfo = EmojiFeature.findAutocompletePrefix("::ag");
+        EmojiAutocomplete.AutocompletePrefix prefixInfo = EmojiAutocomplete.findAutocompletePrefix("::ag");
         assertNotNull(prefixInfo);
 
-        List<String> matches = EmojiFeature.matchShortcodes(custom, standard, prefixInfo.prefix());
+        List<String> matches = EmojiAutocomplete.matchShortcodes(custom, standard, prefixInfo.prefix());
         assertEquals(List.of(":aga:", ":agabounce:", ":agree:"), matches);
     }
 }

@@ -5,6 +5,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.core.util.ItemUtil;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.util.WynnPillUtil;
@@ -13,13 +14,11 @@ import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemLore;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,7 +30,7 @@ import java.util.regex.Pattern;
  *   Chat deltas: raid rewards (+emeralds/+aspects) and reward grants (-emeralds/-aspects)
  *   Remote snapshots: crowdsourced via AvoBot WebSocket relay
  */
-public class GuildStorageNotifier implements AvoFeature {
+public class GuildStorageFeature implements AvoFeature {
 
     private static final String EVT_GUILD_STORAGE = "guild_storage_snapshot";
     private static final long PUBLISH_INTERVAL_MS = 1_000L;
@@ -107,7 +106,7 @@ public class GuildStorageNotifier implements AvoFeature {
                 config.guildStorageEmeraldThresholdPercent, config.guildStorageAspectThresholdPercent);
     }
 
-    // ── Menu scanning (called from HandledScreenMixin) ──────────────────
+    // ── Menu scanning (called from AbstractContainerScreenMixin) ────────
 
     public void onContainerRender(AbstractContainerMenu handler) {
         if (!isActive() || handler == null) return;
@@ -286,9 +285,7 @@ public class GuildStorageNotifier implements AvoFeature {
 
     static StorageSnapshot parseSnapshot(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        ItemLore lore = stack.get(DataComponents.LORE);
-        if (lore == null || lore.lines().isEmpty()) return null;
-        return parseSnapshotLines(lore.lines().stream().map(Component::getString).toList());
+        return parseSnapshotLines(ItemUtil.loreLines(stack));
     }
 
     static StorageSnapshot parseSnapshotLines(List<String> rawLines) {

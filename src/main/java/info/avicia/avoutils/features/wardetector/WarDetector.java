@@ -5,7 +5,7 @@ import com.wynntils.models.war.type.WarBattleInfo;
 import com.wynntils.models.war.type.WarTowerState;
 import com.wynntils.utils.type.RangedValue;
 import info.avicia.avoutils.AvoUtilsMod;
-import info.avicia.avoutils.features.chatbridge.DiscordMarkdown;
+import info.avicia.avoutils.core.chat.DiscordMarkdown;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
