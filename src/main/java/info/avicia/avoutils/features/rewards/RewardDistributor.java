@@ -133,8 +133,8 @@ public final class RewardDistributor {
 
     /** Ticks between presses. */
     static int pressIntervalTicks(RewardKind kind) {
-        if (kind.equals(RewardKind.TOME)) return 10;
-        if (kind.equals(RewardKind.ASPECT) || kind.equals(RewardKind.EMERALDS)) return 4;
+        if (kind.equals(RewardKind.TOME) || kind.equals(RewardKind.ASPECT)) return 10;
+        if (kind.equals(RewardKind.EMERALDS)) return 5;
         throw new IllegalArgumentException(kind + " is handed out by trading, not by the mod");
     }
 
