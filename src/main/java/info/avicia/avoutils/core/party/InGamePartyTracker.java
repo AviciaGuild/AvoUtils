@@ -2,6 +2,7 @@ package info.avicia.avoutils.core.party;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.PlayerUtil;
+import info.avicia.avoutils.core.util.UsernameResolver;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,9 +25,11 @@ public class InGamePartyTracker {
 
     private final Set<String> lastPartyListMembers = new LinkedHashSet<>();
     private final List<Consumer<List<String>>> partyListListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<String>> memberRemovedListeners = new CopyOnWriteArrayList<>();
 
     private volatile long hiddenPartyListExpireTime = 0;
     private volatile long lastTriggerTime = 0;
+    private volatile boolean pendingPartyListSync = false;
     private volatile boolean inParty = false;
 
     private InGamePartyTracker() {
@@ -101,6 +104,9 @@ public class InGamePartyTracker {
                     synchronized (lastPartyListMembers) {
                         lastPartyListMembers.removeIf(m -> PlayerUtil.namesEqual(m, result.player()));
                     }
+                    if (UsernameResolver.isValid(result.player())) {
+                        notifyMemberRemovedListeners(result.player());
+                    }
                     notifyPartyListListeners();
                 }
                 triggerPartyList();
@@ -110,10 +116,12 @@ public class InGamePartyTracker {
                 inParty = true;
                 if (result.player() != null) {
                     AvoUtilsMod.LOGGER.info("[AvoUtils] Member joined: {}", result.player());
-                    synchronized (lastPartyListMembers) {
-                        lastPartyListMembers.add(result.player());
+                    if (UsernameResolver.isValid(result.player())) {
+                        synchronized (lastPartyListMembers) {
+                            lastPartyListMembers.add(result.player());
+                        }
+                        notifyPartyListListeners();
                     }
-                    notifyPartyListListeners();
                 }
                 triggerPartyList();
                 return shouldHide;
@@ -130,15 +138,31 @@ public class InGamePartyTracker {
         mc.execute(() -> {
             long now = System.currentTimeMillis();
             if (now - lastTriggerTime < MIN_TRIGGER_INTERVAL_MS) {
+                pendingPartyListSync = true;
                 return;
             }
-            lastTriggerTime = now;
-            if (mc.player != null && mc.player.connection != null) {
-                AvoUtilsMod.LOGGER.info("[AvoUtils] Triggering /party list sync");
-                hiddenPartyListExpireTime = now + PARTY_LIST_HIDE_WINDOW_MS;
-                mc.player.connection.sendCommand("party list");
-            }
+            sendPartyListCommand(mc, now);
         });
+    }
+
+    public void tick(Minecraft mc) {
+        if (!pendingPartyListSync || mc == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastTriggerTime >= MIN_TRIGGER_INTERVAL_MS) {
+            sendPartyListCommand(mc, now);
+        }
+    }
+
+    private void sendPartyListCommand(Minecraft mc, long now) {
+        pendingPartyListSync = false;
+        lastTriggerTime = now;
+        if (mc.player != null && mc.player.connection != null) {
+            AvoUtilsMod.LOGGER.info("[AvoUtils] Triggering /party list sync");
+            hiddenPartyListExpireTime = now + PARTY_LIST_HIDE_WINDOW_MS;
+            mc.player.connection.sendCommand("party list");
+        }
     }
 
     public void addPartyListListener(Consumer<List<String>> listener) {
@@ -147,6 +171,14 @@ public class InGamePartyTracker {
 
     public void removePartyListListener(Consumer<List<String>> listener) {
         partyListListeners.remove(listener);
+    }
+
+    public void addMemberRemovedListener(Consumer<String> listener) {
+        memberRemovedListeners.add(listener);
+    }
+
+    public void removeMemberRemovedListener(Consumer<String> listener) {
+        memberRemovedListeners.remove(listener);
     }
 
     /**
@@ -172,6 +204,7 @@ public class InGamePartyTracker {
         inParty = false;
         hiddenPartyListExpireTime = 0;
         lastTriggerTime = 0;
+        pendingPartyListSync = false;
     }
 
     private void notifyPartyListListeners() {
@@ -184,6 +217,16 @@ public class InGamePartyTracker {
                 listener.accept(snapshot);
             } catch (Exception e) {
                 AvoUtilsMod.LOGGER.error("[AvoUtils] Error in party-list listener", e);
+            }
+        }
+    }
+
+    private void notifyMemberRemovedListeners(String player) {
+        for (Consumer<String> listener : memberRemovedListeners) {
+            try {
+                listener.accept(player);
+            } catch (Exception e) {
+                AvoUtilsMod.LOGGER.error("[AvoUtils] Error in member-removed listener", e);
             }
         }
     }

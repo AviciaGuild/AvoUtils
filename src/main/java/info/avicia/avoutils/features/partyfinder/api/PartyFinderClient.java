@@ -89,13 +89,17 @@ public class PartyFinderClient {
      * POST /api/parties
      */
     public CompletableFuture<ApiResponse> createParty(String role, List<String> activities,
-                                                       String region, String note, int reservedSlots, boolean ping) {
+                                                       String region, String note, int reservedSlots,
+                                                       List<String> ingameMembers, boolean ping) {
         JsonObject body = new JsonObject();
         body.addProperty("role", role);
         body.add("activities", GSON.toJsonTree(activities));
         if (region != null) body.addProperty("region", region);
         if (note != null) body.addProperty("note", note);
         body.addProperty("reserved_slots", reservedSlots);
+        if (ingameMembers != null && !ingameMembers.isEmpty()) {
+            body.add("ingame_members", GSON.toJsonTree(ingameMembers));
+        }
         body.addProperty("ping", ping);
 
         return executeAuthenticated("/api/parties", "POST", body, this::parseResponse);
@@ -160,19 +164,6 @@ public class PartyFinderClient {
         if (role != null) body.addProperty("role", role);
 
         return executeAuthenticated("/api/parties/" + partyId + "/reserve", "POST", body, this::parseResponse);
-    }
-
-    /**
-     * GET /api/parties/{id}/members
-     */
-    public CompletableFuture<List<PartyData.MemberData>> getMembers(long partyId) {
-        return executeAuthenticated("/api/parties/" + partyId + "/members", "GET", null, response -> {
-            if (response.statusCode() != 200) {
-                return List.of();
-            }
-            ApiResponse apiResp = GSON.fromJson(response.body(), ApiResponse.class);
-            return apiResp.members != null ? apiResp.members : List.of();
-        });
     }
 
     /**

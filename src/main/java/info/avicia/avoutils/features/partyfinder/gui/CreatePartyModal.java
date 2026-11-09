@@ -5,6 +5,7 @@ import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
 import info.avicia.avoutils.core.gui.UiStyle;
+import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatToggleWidget;
@@ -37,8 +38,6 @@ import info.avicia.avoutils.core.util.ClientThread;
 public class CreatePartyModal extends Screen implements ModalOverlay {
 
     private static final String[] ACTIVITIES = {"NOTG", "NOL", "TCC", "TNA", "WTP"};
-    private static final String[] ROLES = {"DPS", "Healer", "Tank", "Other"};
-    private static final String[] ROLE_VALUES = {"dps", "healer", "tank", "other"};
     private static final String[] REGIONS = {"NA", "EU", "AS"};
 
     private final PartyListScreen parent;
@@ -62,8 +61,6 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
     private final Set<String> selectedRegions = new HashSet<>();
     private EditBox noteField;
     private boolean ping = true;
-    private FlatToggleWidget pingToggle;
-    private FlatSliderWidget reservedSlider;
 
     private String statusMessage = null;
     private int statusColor = 0xFFFFFF;
@@ -150,10 +147,10 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         y = layout.rowTop(Row.ROLE);
         btnX = modalX + modalW - 255;
         roleButtons.clear();
-        for (int i = 0; i < ROLES.length; i++) {
-            final String roleVal = ROLE_VALUES[i];
+        for (int i = 0; i < RoleIconUtil.ROLE_LABELS.length; i++) {
+            final String roleVal = RoleIconUtil.ROLE_VALUES[i];
             String icon = RoleIconUtil.getStyledRolePrefix(roleVal);
-            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 55, 18, Component.literal(icon + " " + ROLES[i]), () -> selectRole(roleVal));
+            FlatButtonWidget btn = new FlatButtonWidget(btnX, y + 8, 55, 18, Component.literal(icon + " " + RoleIconUtil.ROLE_LABELS[i]), () -> selectRole(roleVal));
             switch (roleVal) {
                 case "dps" -> btn.setSelectedColors(0xFFFF4D4D, 0x25FF4D4D, 0xFFFF4D4D);
                 case "healer" -> btn.setSelectedColors(0xFFFF66FF, 0x25FF66FF, 0xFFFF66FF);
@@ -183,7 +180,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         boolean wasFocused = (noteField != null && noteField.isFocused());
         noteField = new EditBox(font, modalX + 16, y + 24, modalW - 32, 10, Component.literal("Note"));
         noteField.setHint(Component.literal("Note (optional)"));
-        noteField.setMaxLength(100);
+        noteField.setMaxLength(200);
         noteField.setBordered(false);
         noteField.setValue(currentNote);
         noteField.setFocused(wasFocused);
@@ -195,20 +192,21 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         // Reserved slots
         if (partyToEdit == null) {
             y = layout.rowTop(Row.RESERVED);
-            int minReserved = countOtherInGameMembers();
+            int minReserved = Math.min(3, otherInGameMembers().size());
             if (reservedSlots < minReserved) {
                 reservedSlots = minReserved;
             }
 
-            reservedSlider = new FlatSliderWidget(modalX + 120, y + 8, modalW - 155, 18, minReserved, 3, reservedSlots, val -> {
+            FlatSliderWidget reservedSlider = new FlatSliderWidget(modalX + 120, y + 8, modalW - 155, 18, minReserved, 3, reservedSlots, val -> {
                 reservedSlots = val;
             });
+            reservedSlider.active = minReserved < 3;
             addBody(reservedSlider);
         }
 
         // Ping toggle
         y = layout.rowTop(Row.PING);
-        pingToggle = new FlatToggleWidget(modalX + modalW - 50, y + 8, 30, 16, ping, val -> {
+        FlatToggleWidget pingToggle = new FlatToggleWidget(modalX + modalW - 50, y + 8, 30, 16, ping, val -> {
             ping = val;
         });
         addBody(pingToggle);
@@ -259,6 +257,12 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         }
     }
 
+    public void onInGamePartyChanged() {
+        if (partyToEdit == null && !submitting) {
+            rebuildWidgets();
+        }
+    }
+
     private void submit() {
         if (submitting) return;
 
@@ -268,14 +272,15 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         }
 
         // Validate party size if creating
+        List<String> otherMembers = List.of();
         if (partyToEdit == null) {
-            int otherCount = countOtherInGameMembers();
-            if (otherCount >= 4) {
+            otherMembers = otherInGameMembers();
+            if (otherMembers.size() >= 4) {
                 setStatus("Your in-game party has too many players (max 4)!", 0xFFFF5555);
                 return;
             }
-            if (reservedSlots < otherCount) {
-                reservedSlots = otherCount;
+            if (reservedSlots < otherMembers.size()) {
+                reservedSlots = otherMembers.size();
             }
         }
 
@@ -293,6 +298,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
         String note = noteField.getValue().trim().isEmpty() ? null : noteField.getValue().trim();
 
         if (partyToEdit != null) {
+            long[] updatedPartyId = {partyToEdit.partyId};
             apiClient.editParty(
                     partyToEdit.partyId,
                     new ArrayList<>(selectedActivities),
@@ -300,18 +306,21 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                     note,
                     ping
             ).thenCompose(resp -> {
-                if (resp.ok && !selectedRole.equalsIgnoreCase(initialRole)) {
-                    return apiClient.joinParty(partyToEdit.partyId, selectedRole);
-                } else {
+                if (!resp.ok) {
                     return CompletableFuture.completedFuture(resp);
                 }
+                if (resp.data != null && resp.data.partyId != null) {
+                    updatedPartyId[0] = resp.data.partyId;
+                }
+                if (!selectedRole.equalsIgnoreCase(initialRole)) {
+                    return apiClient.joinParty(updatedPartyId[0], selectedRole);
+                }
+                return CompletableFuture.completedFuture(resp);
             }).thenAccept(resp -> {
                 ClientThread.run(() -> {
                     submitting = false;
+                    parent.getPartySyncer().updateTrackedPartyId(updatedPartyId[0]);
                     if (resp.ok) {
-                        if (resp.data != null && resp.data.partyId != null) {
-                            parent.getPartySyncer().setTrackedPartyId(resp.data.partyId);
-                        }
                         parent.closeModal();
                     } else {
                         setStatus(resp.error != null ? resp.error : "Failed to edit party.", 0xFFFF5555);
@@ -325,30 +334,22 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
                 return null;
             });
         } else {
+            List<String> initialInGameMembers = List.copyOf(otherMembers);
+            int extraReservedSlots = Math.max(0, reservedSlots - initialInGameMembers.size());
             apiClient.createParty(
                     selectedRole,
                     new ArrayList<>(selectedActivities),
                     region,
                     note,
-                    reservedSlots,
+                    extraReservedSlots,
+                    initialInGameMembers,
                     ping
             ).thenAccept(resp -> {
                 ClientThread.run(() -> {
                     submitting = false;
                     if (resp.ok) {
                         if (resp.data != null && resp.data.partyId != null) {
-                            long newPartyId = resp.data.partyId;
-                            parent.getPartySyncer().setTrackedPartyId(newPartyId);
-                            // Pre-reserve slots for all other in-game party members
-                            for (String memberName : parent.getPartySyncer().getLastPartyListMembers()) {
-                                if (!PlayerUtil.isSelf(memberName)) {
-                                    apiClient.reserveIngame(newPartyId, memberName).thenAccept(reserveResp -> {
-                                        if (reserveResp.ok) {
-                                            parent.getPartySyncer().addKnownMembers(List.of(memberName));
-                                        }
-                                    }).exceptionally(reserveEx -> null);
-                                }
-                            }
+                            parent.getPartySyncer().trackParty(resp.data.partyId, initialInGameMembers);
                         }
                         parent.closeModal();
                     } else {
@@ -382,13 +383,15 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
     // ── Rendering ────────────────────────────────────────────────────────
 
-    /** Returns the number of in-game party members who are not the local player. */
-    private int countOtherInGameMembers() {
-        int count = 0;
-        for (String name : parent.getPartySyncer().getLastPartyListMembers()) {
-            if (!PlayerUtil.isSelf(name)) count++;
+    /** Returns the in-game party members who are not the local player. */
+    private List<String> otherInGameMembers() {
+        List<String> others = new ArrayList<>();
+        for (String name : InGamePartyTracker.getInstance().getLastPartyListMembers()) {
+            if (name != null && !name.isBlank() && !PlayerUtil.isSelf(name)) {
+                others.add(name);
+            }
         }
-        return count;
+        return others;
     }
 
     @Override
@@ -431,7 +434,7 @@ public class CreatePartyModal extends Screen implements ModalOverlay {
 
         // Highlight selected role
         for (int i = 0; i < roleButtons.size(); i++) {
-            roleButtons.get(i).setSelected(ROLE_VALUES[i].equals(selectedRole));
+            roleButtons.get(i).setSelected(RoleIconUtil.ROLE_VALUES[i].equals(selectedRole));
         }
 
         bodyViewport.renderTracked(context, mouseX, mouseY, delta);

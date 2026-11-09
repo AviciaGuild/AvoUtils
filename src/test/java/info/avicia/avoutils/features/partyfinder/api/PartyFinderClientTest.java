@@ -116,6 +116,63 @@ class PartyFinderClientTest {
         }
     }
 
+    @Test
+    void createPartySerializesIngameMembersAndReservedSlots() {
+        HttpClient httpClient = mock(HttpClient.class);
+        PartyFinderClient injectedClient = new PartyFinderClient(new ModConfig(), httpClient);
+
+        try (MockedStatic<AvoAuthService> auth = mockStatic(AvoAuthService.class)) {
+            AvoAuthService authService = mock(AvoAuthService.class);
+            auth.when(AvoAuthService::getInstance).thenReturn(authService);
+            when(authService.getSessionToken()).thenReturn(CompletableFuture.completedFuture("tok"));
+
+            @SuppressWarnings("unchecked")
+            HttpResponse<String> response = (HttpResponse<String>) mock(HttpResponse.class);
+            when(response.statusCode()).thenReturn(200);
+            when(response.body()).thenReturn("{\"ok\":true,\"data\":{\"party_id\":42}}");
+
+            java.util.concurrent.atomic.AtomicReference<String> capturedBody = new java.util.concurrent.atomic.AtomicReference<>();
+            org.mockito.Mockito.doAnswer(invocation -> {
+                HttpRequest req = invocation.getArgument(0);
+                req.bodyPublisher().ifPresent(pub -> {
+                    java.nio.ByteBuffer[] holder = new java.nio.ByteBuffer[1];
+                    pub.subscribe(new java.util.concurrent.Flow.Subscriber<>() {
+                        @Override
+                        public void onSubscribe(java.util.concurrent.Flow.Subscription s) {
+                            s.request(Long.MAX_VALUE);
+                        }
+
+                        @Override
+                        public void onNext(java.nio.ByteBuffer item) {
+                            holder[0] = item;
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {}
+
+                        @Override
+                        public void onComplete() {}
+                    });
+                    if (holder[0] != null) {
+                        byte[] bytes = new byte[holder[0].remaining()];
+                        holder[0].get(bytes);
+                        capturedBody.set(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                });
+                return CompletableFuture.completedFuture(response);
+            }).when(httpClient).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+
+            ApiResponse resp = injectedClient.createParty(
+                    "dps", List.of("NOTG"), "NA", "chill", 1, List.of("Alice", "Bob"), true).join();
+
+            assertTrue(resp.ok);
+            assertEquals(42L, resp.data.partyId);
+            String json = capturedBody.get();
+            assertTrue(json.contains("\"reserved_slots\":1"));
+            assertTrue(json.contains("\"ingame_members\":[\"Alice\",\"Bob\"]"));
+        }
+    }
+
     private ApiResponse parseResponse(HttpResponse<String> response) throws Exception {
         Method method = PartyFinderClient.class.getDeclaredMethod("parseResponse", HttpResponse.class);
         method.setAccessible(true);

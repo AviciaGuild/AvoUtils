@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.partyfinder.gui;
 
+import info.avicia.avoutils.features.partyfinder.api.ApiResponse;
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.RoleIconUtil;
@@ -14,11 +15,9 @@ import info.avicia.avoutils.core.gui.UiStyle;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -49,9 +48,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     private final ScrollViewport bodyViewport = new ScrollViewport();
 
     // Current player info
-    private String playerName;
     private boolean isLeader = false;
-    private boolean isInParty = false;
 
     private String statusMessage = null;
     private int statusColor = 0xFFFFFF;
@@ -66,6 +63,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
     private List<FormattedCharSequence> wrappedStatus = null;
 
     private final Consumer<JsonObject> partyUpdateListener;
+    private boolean closed = false;
 
     public PartyDetailModal(PartyListScreen parent, PartyFinderClient apiClient,
                             InviteHandler inviteHandler,
@@ -76,10 +74,11 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         this.inviteHandler = inviteHandler;
         this.party = party;
         this.partyUpdateListener = json -> {
-            if (json.has("party_id") && json.get("party_id").getAsLong() == this.party.partyId) {
+            if (!closed && json.has("party_id") && json.get("party_id").getAsLong() == this.party.partyId) {
                 refreshPartyState();
             }
         };
+        AvoWebSocketManager.getInstance().registerListener("party_updated", partyUpdateListener);
         refreshPartyState();
     }
 
@@ -97,32 +96,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         modalX = (width - modalW) / 2;
         modalY = (height - modalH) / 2;
 
-        // Register WebSocket listener
-        AvoWebSocketManager.getInstance().unregisterListener("party_updated", partyUpdateListener);
-        AvoWebSocketManager.getInstance().registerListener("party_updated", partyUpdateListener);
-
         // Determine player state
-        playerName = PlayerUtil.selfName();
-        isLeader = false;
-        isInParty = false;
-
-        // Check if player is in the party (by name)
-        if (party.members != null) {
-            for (PartyData.MemberData member : party.members.values()) {
-                if (member != null && PlayerUtil.isSelf(member.name)) {
-                    isInParty = true;
-                    if (PlayerUtil.namesEqual(member.name, party.leaderName)) {
-                        isLeader = true;
-                    }
-                    break;
-                }
-            }
-        }
-        // Also check leader name directly
-        if (PlayerUtil.isSelf(party.leaderName)) {
-            isLeader = true;
-            isInParty = true;
-        }
+        isLeader = PlayerUtil.isSelf(party.leaderName);
+        boolean isInParty = isLeader || (party.members != null
+                && party.members.values().stream().anyMatch(m -> m != null && PlayerUtil.isSelf(m.name)));
 
         // Center the buttons at the bottom:
         int totalButtonsWidth = 0;
@@ -165,23 +142,25 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
             // Role change buttons
             btnX += 65;
-            for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
-                final String r = role;
-                String icon = RoleIconUtil.getStyledRolePrefix(r);
-                addRenderableWidget(new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal(icon + " " + role), () -> changeRole(r.toLowerCase(Locale.ROOT))));
-                btnX += 65;
-            }
+            addRoleButtons(btnX, btnY, this::changeRole);
         } else if (!party.isFull) {
             // Join buttons
-            for (String role : new String[]{"DPS", "Healer", "Tank", "Other"}) {
-                final String r = role;
-                String icon = RoleIconUtil.getStyledRolePrefix(r);
-                addRenderableWidget(new FlatButtonWidget(btnX, btnY, 60, 20, Component.literal(icon + " " + role), () -> joinParty(r.toLowerCase(Locale.ROOT))));
-                btnX += 65;
-            }
+            addRoleButtons(btnX, btnY, this::joinParty);
         }
         updateWrappedNote();
         updateWrappedStatus();
+    }
+
+    private void addRoleButtons(int startX, int btnY, Consumer<String> onSelect) {
+        int btnX = startX;
+        for (int i = 0; i < RoleIconUtil.ROLE_LABELS.length; i++) {
+            String label = RoleIconUtil.ROLE_LABELS[i];
+            String roleValue = RoleIconUtil.ROLE_VALUES[i];
+            String icon = RoleIconUtil.getStyledRolePrefix(roleValue);
+            addRenderableWidget(new FlatButtonWidget(btnX, btnY, 60, 20,
+                    Component.literal(icon + " " + label), () -> onSelect.accept(roleValue)));
+            btnX += 65;
+        }
     }
 
     private void updateWrappedStatus() {
@@ -204,103 +183,61 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     // ── Actions ──────────────────────────────────────────────────────────
 
+    private void runAction(CompletableFuture<ApiResponse> future, String fallbackError, Consumer<ApiResponse> onSuccess) {
+        future.thenAccept(resp -> ClientThread.run(() -> {
+            if (closed) {
+                return;
+            }
+            if (resp.ok) {
+                onSuccess.accept(resp);
+            } else {
+                setStatus(resp.error != null ? resp.error : fallbackError, 0xFFFF5555);
+            }
+        })).exceptionally(ex -> {
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            ClientThread.run(() -> {
+                if (!closed) {
+                    setStatus("Network error: " + cause.getMessage(), 0xFFFF5555);
+                }
+            });
+            return null;
+        });
+    }
+
     private void inviteAll() {
-        if (party.members == null) return;
-        List<String> memberNames = party.members.values().stream()
-                .filter(Objects::nonNull)
-                .map(m -> m.name)
-                .filter(Objects::nonNull)
-                .toList();
-        List<String> names = inviteHandler.inviteAll(memberNames, playerName,
+        List<String> memberNames = party.memberNames();
+        if (memberNames.isEmpty()) return;
+        List<String> names = inviteHandler.inviteAll(memberNames, PlayerUtil.selfName(),
                 InGamePartyTracker.getInstance().getLastPartyListMembers());
         setStatus("Inviting " + names.size() + " players...", 0xFF55FF55);
     }
 
     private void reserveSlot() {
-        apiClient.reserveSlot(party.partyId, null, null).thenAccept(resp -> {
-            ClientThread.run(() -> {
-                if (resp.ok) {
-                    setStatus("Slot reserved!", 0xFF55FF55);
-                    refreshPartyState();
-                } else {
-                    setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
-                }
-            });
-        }).exceptionally(ex -> {
-            ClientThread.run(() -> {
-                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
-            });
-            return null;
+        runAction(apiClient.reserveSlot(party.partyId, null, null), "Failed.", resp -> {
+            setStatus("Slot reserved!", 0xFF55FF55);
+            refreshPartyState();
         });
     }
 
     private void disbandParty() {
-        apiClient.disbandParty(party.partyId).thenAccept(resp -> {
-            ClientThread.run(() -> {
-                if (resp.ok) {
-                    parent.closeModal();
-                } else {
-                    setStatus(resp.error != null ? resp.error : "Failed to disband.", 0xFFFF5555);
-                }
-            });
-        }).exceptionally(ex -> {
-            ClientThread.run(() -> {
-                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
-            });
-            return null;
-        });
+        runAction(apiClient.disbandParty(party.partyId), "Failed to disband.", resp -> parent.closeModal());
     }
 
     private void leaveParty() {
-        apiClient.leaveParty(party.partyId).thenAccept(resp -> {
-            ClientThread.run(() -> {
-                if (resp.ok) {
-                    parent.closeModal();
-                } else {
-                    setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
-                }
-            });
-        }).exceptionally(ex -> {
-            ClientThread.run(() -> {
-                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
-            });
-            return null;
-        });
+        runAction(apiClient.leaveParty(party.partyId), "Failed.", resp -> parent.closeModal());
     }
 
     private void joinParty(String role) {
-        apiClient.joinParty(party.partyId, role).thenAccept(resp -> {
-            ClientThread.run(() -> {
-                if (resp.ok) {
-                    setStatus(resp.message != null ? resp.message : "Joined!", 0xFF55FF55);
-                    refreshPartyState();
-                } else {
-                    setStatus(resp.error != null ? resp.error : "Failed to join.", 0xFFFF5555);
-                }
-            });
-        }).exceptionally(ex -> {
-            ClientThread.run(() -> {
-                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
-            });
-            return null;
+        runAction(apiClient.joinParty(party.partyId, role), "Failed to join.", resp -> {
+            setStatus(resp.message != null ? resp.message : "Joined!", 0xFF55FF55);
+            refreshPartyState();
         });
     }
 
     private void changeRole(String role) {
-        apiClient.joinParty(party.partyId, role).thenAccept(resp -> {
-            ClientThread.run(() -> {
-                if (resp.ok) {
-                    setStatus(resp.message != null ? resp.message : "Role changed!", 0xFF55FF55);
-                    refreshPartyState();
-                } else {
-                    setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
-                }
-            });
-        }).exceptionally(ex -> {
-            ClientThread.run(() -> {
-                setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
-            });
-            return null;
+        runAction(apiClient.joinParty(party.partyId, role), "Failed.", resp -> {
+            setStatus(resp.message != null ? resp.message : "Role changed!", 0xFF55FF55);
+            refreshPartyState();
         });
     }
 
@@ -310,28 +247,17 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 return;
             }
             ClientThread.run(() -> {
-                this.party.memberCount = p.memberCount;
-                this.party.maxSize = p.maxSize;
-                this.party.isFull = p.isFull;
-                if (this.party.members == null) {
-                    this.party.members = new HashMap<>();
-                } else {
-                    this.party.members.clear();
+                if (closed) {
+                    return;
                 }
-                if (p.members != null) {
-                    this.party.members.putAll(p.members);
-                }
-                this.party.region = p.region;
-                this.party.note = p.note;
-                this.party.activities = p.activities;
-                this.party.leaderName = p.leaderName;
-                this.party.leaderRole = p.leaderRole;
-                this.party.creatorId = p.creatorId;
+                this.party.copyFrom(p);
                 this.rebuildWidgets();
             });
         }).exceptionally(ex -> {
             ClientThread.run(() -> {
-                parent.closeModal();
+                if (!closed) {
+                    parent.closeModal();
+                }
             });
             return null;
         });
@@ -339,6 +265,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
 
     @Override
     public void onCloseModal() {
+        closed = true;
         AvoWebSocketManager.getInstance().unregisterListener("party_updated", partyUpdateListener);
     }
 
@@ -355,8 +282,7 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         CompatibilityHelper.drawModalFrame(context, modalX, modalY, modalW, modalH);
 
         // Title
-        String title = String.join(" / ", party.activities);
-        context.drawCenteredString(font, Component.literal("§b§l" + title), width / 2, modalY + 8, 0xFFFFFFFF);
+        context.drawCenteredString(font, Component.literal("§b§l" + party.activitiesLabel()), width / 2, modalY + 8, 0xFFFFFFFF);
 
         // Metadata panel card (leader, region, note)
         int topPadding = 8;
@@ -429,7 +355,6 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
         context.fill(modalX + 8, listY, modalX + modalW - 8, listY + listH, UiStyle.CARD_BACKGROUND);
 
         // Left accent bar
-        accentColor = party.isFull ? UiStyle.ACCENT_RED : UiStyle.ACCENT_GREEN;
         context.fill(modalX + 8, listY + 1, modalX + 10, listY + listH - 1, accentColor);
 
         for (int i = 0; i < sortedMembers.size(); i++) {
@@ -512,20 +437,10 @@ public class PartyDetailModal extends Screen implements ModalOverlay {
                 int kickX = modalX + modalW - 24;
                 if (!PlayerUtil.namesEqual(member.name, party.leaderName)
                         && isKickButtonHovered(mouseX, mouseY, kickX, row.y)) {
-                    apiClient.kickMember(party.partyId, member.name).thenAccept(resp -> {
-                        ClientThread.run(() -> {
-                            if (resp.ok) {
-                                setStatus("Kicked " + member.name, 0xFF55FF55);
-                                refreshPartyState();
-                            } else {
-                                setStatus(resp.error != null ? resp.error : "Failed.", 0xFFFF5555);
-                            }
-                        });
-                    }).exceptionally(ex -> {
-                        ClientThread.run(() -> {
-                            setStatus("Network error: " + (ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage()), 0xFFFF5555);
-                        });
-                        return null;
+                    String kickedName = member.name;
+                    runAction(apiClient.kickMember(party.partyId, kickedName), "Failed.", resp -> {
+                        setStatus("Kicked " + kickedName, 0xFF55FF55);
+                        refreshPartyState();
                     });
                     return true;
                 }

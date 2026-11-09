@@ -26,6 +26,7 @@ class InGamePartyTrackerTest {
         TestReflection.set(tracker, "inParty", false);
         TestReflection.set(tracker, "hiddenPartyListExpireTime", 0L);
         TestReflection.set(tracker, "lastTriggerTime", 0L);
+        TestReflection.set(tracker, "pendingPartyListSync", false);
         Set<String> members = TestReflection.get(tracker, "lastPartyListMembers");
         members.clear();
     }
@@ -143,6 +144,62 @@ class InGamePartyTrackerTest {
             tracker.onChatMessage("avo ignis war dps has been kicked from the party!");
             long triggerTime = TestReflection.get(tracker, "lastTriggerTime");
             assertTrue(triggerTime > 0);
+        }
+    }
+
+    @Test
+    void kickAndLeaveNotifyMemberRemovedListener() {
+        java.util.List<String> removed = new java.util.ArrayList<>();
+        java.util.function.Consumer<String> listener = removed::add;
+        tracker.addMemberRemovedListener(listener);
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
+
+            tracker.onChatMessage("LargeMug has been kicked from the party!");
+            tracker.onChatMessage("CupBoi has left the party!");
+            // Unresolved multi-word nickname should not notify memberRemovedListener directly
+            tracker.onChatMessage("avo ignis war dps has been kicked from the party!");
+
+            assertEquals(java.util.List.of("LargeMug", "CupBoi"), removed);
+        } finally {
+            tracker.removeMemberRemovedListener(listener);
+        }
+    }
+
+    @Test
+    void joinWithUnresolvedNicknameDoesNotPolluteMembers() {
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
+
+            tracker.onChatMessage("avo ignis war dps has joined your party, say hello!");
+            assertTrue(tracker.isInParty());
+            assertTrue(tracker.getLastPartyListMembers().isEmpty());
+        }
+    }
+
+    @Test
+    void debouncedTriggerSchedulesPendingSyncFlushedOnTick() {
+        try (MockedStatic<Minecraft> mc = mockStatic(Minecraft.class)) {
+            Minecraft client = mock(Minecraft.class);
+            mc.when(Minecraft::getInstance).thenReturn(client);
+            org.mockito.Mockito.doAnswer(invocation -> {
+                ((Runnable) invocation.getArgument(0)).run();
+                return null;
+            }).when(client).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
+
+            tracker.triggerPartyList();
+            assertFalse((Boolean) TestReflection.get(tracker, "pendingPartyListSync"));
+
+            // Rapid second trigger within cooldown schedules a trailing sync
+            tracker.triggerPartyList();
+            assertTrue((Boolean) TestReflection.get(tracker, "pendingPartyListSync"));
+
+            // Simulate cooldown elapsed and tick
+            TestReflection.set(tracker, "lastTriggerTime", System.currentTimeMillis() - 2000L);
+            tracker.tick(client);
+            assertFalse((Boolean) TestReflection.get(tracker, "pendingPartyListSync"));
         }
     }
 }

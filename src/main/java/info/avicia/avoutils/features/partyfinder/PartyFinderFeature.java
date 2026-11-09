@@ -24,7 +24,6 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.lit
  * Wrapper for all pfinder systems
  */
 public class PartyFinderFeature implements AvoFeature {
-    private ModConfig config;
     private PartyFinderClient apiClient;
     private PartyFinderPartySyncer partySyncer;
     private InviteHandler inviteHandler;
@@ -32,13 +31,12 @@ public class PartyFinderFeature implements AvoFeature {
 
     @Override
     public void initialize(ModConfig config) {
-        this.config = config;
-
         // Initialize API client
         apiClient = new PartyFinderClient(config);
 
         // Initialize handlers
         partySyncer = new PartyFinderPartySyncer(apiClient);
+        partySyncer.registerWebSocketListeners();
         inviteHandler = new InviteHandler();
         notificationHandler = new PartyFinderNotificationHandler(config);
         notificationHandler.register();

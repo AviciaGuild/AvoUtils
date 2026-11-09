@@ -4,6 +4,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
 import info.avicia.avoutils.features.partyfinder.handler.PartyFinderPartySyncer;
+import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.party.InviteHandler;
 import info.avicia.avoutils.core.gui.CompatibilityHelper;
 import info.avicia.avoutils.core.gui.FlatButtonWidget;
@@ -18,9 +19,7 @@ import info.avicia.avoutils.core.util.ClientThread;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Consumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -43,16 +42,18 @@ public class PartyListScreen extends ScrollableListScreen {
     private final InviteHandler inviteHandler;
 
     private List<PartyData> parties = new ArrayList<>();
-    private boolean loading = true;
+    private boolean initialLoading = true;
+    private boolean fetchInFlight = false;
+    private boolean fetchQueued = false;
+    private boolean initialized = false;
+    private boolean closed = false;
     private String errorMessage = null;
 
     private FlatButtonWidget createPartyButton;
     private FlatButtonWidget viewPartyButton;
     private FlatButtonWidget inviteAllButton;
 
-    private final Consumer<JsonObject> partyListListener = json -> {
-        fetchParties();
-    };
+    private final Consumer<JsonObject> partyListListener = json -> fetchParties();
 
     private static final int ROW_HEIGHT = 42;
     private static final int LIST_TOP = 50;
@@ -60,10 +61,6 @@ public class PartyListScreen extends ScrollableListScreen {
 
     private Screen activeModal = null;
     private String joinTargetLeaderName;
-
-    public PartyListScreen(PartyFinderClient apiClient, PartyFinderPartySyncer partySyncer, InviteHandler inviteHandler) {
-        this(apiClient, partySyncer, inviteHandler, null);
-    }
 
     public PartyListScreen(PartyFinderClient apiClient, PartyFinderPartySyncer partySyncer,
                            InviteHandler inviteHandler, String joinTargetLeaderName) {
@@ -86,11 +83,11 @@ public class PartyListScreen extends ScrollableListScreen {
         createPartyButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 120, buttonY, 120, 20, Component.literal("Create Party"), () -> openCreateModal()).withIcon(UiIcons.PLUS));
         createPartyButton.visible = true;
 
-        // View Party button (when party owned)
+        // View Party button (when in an active party)
         viewPartyButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 80, buttonY, 80, 20, Component.literal("View Party"), () -> {
-            PartyData ownedParty = getOwnedParty();
-            if (ownedParty != null) {
-                openDetailModal(ownedParty);
+            PartyData activeParty = getActiveParty();
+            if (activeParty != null) {
+                openDetailModal(activeParty);
             }
         }));
         viewPartyButton.visible = false;
@@ -98,85 +95,60 @@ public class PartyListScreen extends ScrollableListScreen {
         // Invite All button (when party owned)
         inviteAllButton = addRenderableWidget(new FlatButtonWidget(width - SIDE_PADDING - 155, buttonY, 70, 20, Component.literal("Invite All"), () -> {
             PartyData ownedParty = getOwnedParty();
-            if (ownedParty != null && ownedParty.members != null) {
-                List<String> memberNames = ownedParty.members.values().stream()
-                        .filter(Objects::nonNull)
-                        .map(m -> m.name)
-                        .filter(Objects::nonNull)
-                        .toList();
-                inviteHandler.inviteAll(memberNames, PlayerUtil.selfName(), partySyncer.getLastPartyListMembers());
+            if (ownedParty != null) {
+                inviteHandler.inviteAll(ownedParty.memberNames(), PlayerUtil.selfName(), InGamePartyTracker.getInstance().getLastPartyListMembers());
             }
         }));
         inviteAllButton.visible = false;
 
-        // Initialize button visibilities from cached state to prevent flicker on window resize
-        PartyData initialOwned = getOwnedParty();
-        if (initialOwned != null) {
-            createPartyButton.visible = false;
-            viewPartyButton.visible = true;
-            inviteAllButton.visible = true;
-        }
+        updateButtonVisibility();
+        applyScroll(parties.size() * ROW_HEIGHT, LIST_TOP, 0);
 
         // Re-initialize active modal if present on resize
         if (activeModal instanceof ModalOverlay modal) {
             modal.initModal(minecraft, width, height);
         }
 
-        // Fetch parties on open
-        fetchParties();
-
         // Register WebSocket listener
         AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
         AvoWebSocketManager.getInstance().registerListener("party_list_updated", partyListListener);
 
-        // Run `/party list` automatically to sync in-game party members
-        partySyncer.triggerPartyList();
+        if (!initialized) {
+            initialized = true;
+            fetchParties();
+            InGamePartyTracker.getInstance().triggerPartyList();
+        }
     }
 
     // ── Data fetching ────────────────────────────────────────────────────
 
     private void fetchParties() {
-        loading = true;
+        if (closed) {
+            return;
+        }
+        if (fetchInFlight) {
+            fetchQueued = true;
+            return;
+        }
+        fetchInFlight = true;
+        if (errorMessage != null && parties.isEmpty()) {
+            initialLoading = true;
+        }
         errorMessage = null;
+
         apiClient.listParties().thenAccept(result -> {
             ClientThread.run(() -> {
+                fetchInFlight = false;
+                if (closed) {
+                    return;
+                }
                 parties = result;
-                loading = false;
+                initialLoading = false;
+                applyScroll(parties.size() * ROW_HEIGHT, LIST_TOP, 0);
 
-                // Track if we are leading any active party
-                String selfName = PlayerUtil.selfName();
-                boolean isLeadingAny = false;
-                PartyData ownedParty = null;
-                for (PartyData p : result) {
-                    if (PlayerUtil.isSelf(p.leaderName)) {
-                        partySyncer.setTrackedPartyId(p.partyId);
-                        if (p.members != null) {
-                            List<String> memberNames = p.members.values().stream()
-                                    .filter(Objects::nonNull)
-                                    .map(m -> m.name)
-                                    .filter(Objects::nonNull)
-                                    .toList();
-                            partySyncer.addKnownMembers(memberNames);
-                        }
-                        isLeadingAny = true;
-                        ownedParty = p;
-                        break;
-                    }
-                }
-                if (!isLeadingAny) {
-                    partySyncer.clearTracking();
-                }
-
-                // Update button visibilities
-                if (ownedParty != null) {
-                    createPartyButton.visible = false;
-                    viewPartyButton.visible = true;
-                    inviteAllButton.visible = true;
-                } else {
-                    createPartyButton.visible = true;
-                    viewPartyButton.visible = false;
-                    inviteAllButton.visible = false;
-                }
+                PartyData ownedParty = getOwnedParty();
+                partySyncer.syncFromOwnedParty(ownedParty);
+                updateButtonVisibility();
 
                 // Auto-open detail modal for join target
                 if (joinTargetLeaderName != null && activeModal == null) {
@@ -188,16 +160,44 @@ public class PartyListScreen extends ScrollableListScreen {
                         }
                     }
                 }
+
+                if (fetchQueued) {
+                    fetchQueued = false;
+                    fetchParties();
+                }
             });
         }).exceptionally(ex -> {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
             AvoUtilsMod.LOGGER.warn("[AvoUtils] [PartyFinder] Failed to fetch parties: {}", cause.getMessage());
             ClientThread.run(() -> {
-                errorMessage = cause.getMessage() != null ? cause.getMessage() : "Failed to load parties.";
-                loading = false;
+                fetchInFlight = false;
+                if (closed) {
+                    return;
+                }
+                initialLoading = false;
+                if (parties.isEmpty()) {
+                    errorMessage = cause.getMessage() != null ? cause.getMessage() : "Failed to load parties.";
+                }
+                if (fetchQueued) {
+                    fetchQueued = false;
+                    fetchParties();
+                }
             });
             return null;
         });
+    }
+
+    private void updateButtonVisibility() {
+        PartyData ownedParty = getOwnedParty();
+        PartyData activeParty = ownedParty != null ? ownedParty : getJoinedParty();
+        if (createPartyButton != null) createPartyButton.visible = activeParty == null;
+        if (viewPartyButton != null) viewPartyButton.visible = activeParty != null;
+        if (inviteAllButton != null) inviteAllButton.visible = ownedParty != null;
+    }
+
+    private PartyData getActiveParty() {
+        PartyData ownedParty = getOwnedParty();
+        return ownedParty != null ? ownedParty : getJoinedParty();
     }
 
     private PartyData getOwnedParty() {
@@ -209,53 +209,66 @@ public class PartyListScreen extends ScrollableListScreen {
         return null;
     }
 
+    private PartyData getJoinedParty() {
+        for (PartyData p : parties) {
+            if (p.members == null) continue;
+            for (PartyData.MemberData m : p.members.values()) {
+                if (m != null && !m.isReserved && PlayerUtil.isSelf(m.name)) {
+                    return p;
+                }
+            }
+        }
+        return null;
+    }
+
     // ── Modal management ─────────────────────────────────────────────────
 
     public void openDetailModal(PartyData party) {
         PartyDetailModal modal = new PartyDetailModal(this, apiClient, inviteHandler, party);
         modal.initModal(minecraft, width, height);
-        activeModal = modal;
+        setActiveModal(modal);
     }
 
     private void openCreateModal() {
         CreatePartyModal modal = new CreatePartyModal(this, apiClient);
         modal.initModal(minecraft, width, height);
-        activeModal = modal;
+        setActiveModal(modal);
     }
 
     public void openEditModal(PartyData party) {
         CreatePartyModal modal = new CreatePartyModal(this, apiClient, party);
         modal.initModal(minecraft, width, height);
-        activeModal = modal;
+        setActiveModal(modal);
     }
 
     public void setActiveModal(Screen modal) {
+        if (this.activeModal != modal && this.activeModal instanceof ModalOverlay overlay) {
+            overlay.onCloseModal();
+        }
         this.activeModal = modal;
     }
 
     public void closeModal() {
-        if (activeModal instanceof ModalOverlay overlay) {
-            overlay.onCloseModal();
-        }
-        activeModal = null;
+        setActiveModal(null);
         fetchParties();
+    }
+
+    private void cleanup() {
+        closed = true;
+        fetchQueued = false;
+        AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
+        setActiveModal(null);
     }
 
     @Override
     public void onClose() {
-        AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
-        if (activeModal instanceof ModalOverlay overlay) {
-            overlay.onCloseModal();
-        }
+        cleanup();
         super.onClose();
     }
 
     @Override
     public void removed() {
-        AvoWebSocketManager.getInstance().unregisterListener("party_list_updated", partyListListener);
-        if (activeModal instanceof ModalOverlay overlay) {
-            overlay.onCloseModal();
-        }
+        cleanup();
         super.removed();
     }
 
@@ -270,7 +283,7 @@ public class PartyListScreen extends ScrollableListScreen {
 
         if (errorMessage != null) {
             CompatibilityHelper.drawCenteredMessage(context, font, width, height, "§c" + errorMessage);
-        } else if (loading) {
+        } else if (initialLoading) {
             CompatibilityHelper.drawCenteredMessage(context, font, width, height, "§7Loading active parties...");
         } else if (parties.isEmpty()) {
             CompatibilityHelper.drawCenteredMessage(context, font, width, height, "§7No active parties. Create one to get started!");
@@ -318,8 +331,7 @@ public class PartyListScreen extends ScrollableListScreen {
             int leftTextX = SIDE_PADDING + 12;
 
             // Activity label
-            String activities = String.join(" / ", party.activities);
-            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§b§l" + activities), leftTextX, y + 7, 0xFFFFFFFF);
+            CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§b§l" + party.activitiesLabel()), leftTextX, y + 7, 0xFFFFFFFF);
 
             // Leader name
             CompatibilityHelper.drawTextWithShadow(context, font, Component.literal("§7Leader: §f" + party.leaderName), leftTextX, y + 21, 0xFFFFFFFF);
@@ -364,7 +376,7 @@ public class PartyListScreen extends ScrollableListScreen {
         }
 
         // Check if a party row was clicked
-        if (button == InputConstants.MOUSE_BUTTON_LEFT && errorMessage == null && !loading && !parties.isEmpty()) {
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && errorMessage == null && !initialLoading && !parties.isEmpty()) {
             for (int i = 0; i < parties.size(); i++) {
                 int y = LIST_TOP + (i * ROW_HEIGHT) - scrollOffset;
                 if (isRowHovered(mouseX, mouseY, y)) {
@@ -440,10 +452,9 @@ public class PartyListScreen extends ScrollableListScreen {
         return super.charTyped(charInput);
     }
 
-    public void onPartyListUpdated() {
-        fetchParties();
-        if (activeModal instanceof PartyDetailModal detailModal) {
-            detailModal.refreshPartyState();
+    public void onInGamePartyChanged() {
+        if (activeModal instanceof CreatePartyModal createModal) {
+            createModal.onInGamePartyChanged();
         }
     }
 

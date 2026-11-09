@@ -4,15 +4,15 @@ import info.avicia.avoutils.core.util.PlayerUtil;
 import info.avicia.avoutils.features.partyfinder.api.ApiResponse;
 import info.avicia.avoutils.features.partyfinder.api.PartyData;
 import info.avicia.avoutils.features.partyfinder.api.PartyFinderClient;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.Minecraft;
@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,11 @@ class PartyFinderPartySyncerTest {
     void setUp() {
         apiClient = mock(PartyFinderClient.class);
         syncer = new PartyFinderPartySyncer(apiClient);
+    }
+
+    @AfterEach
+    void tearDown() {
+        syncer.unregister();
     }
 
     @SuppressWarnings("unchecked")
@@ -96,7 +102,7 @@ class PartyFinderPartySyncerTest {
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
             playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
 
-            syncer.setTrackedPartyId(999L);
+            syncer.trackParty(999L, List.of());
             syncer.addKnownMembers(List.of("Alice", "<RESERVED>"));
 
             // In-game list only has Leader (Alice is not in-game yet, <RESERVED> is not in-game)
@@ -122,7 +128,7 @@ class PartyFinderPartySyncerTest {
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
             playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
 
-            syncer.setTrackedPartyId(999L);
+            syncer.trackParty(999L, List.of());
             ApiResponse okResp = new ApiResponse();
             okResp.ok = true;
             when(apiClient.reserveIngame(anyLong(), anyString())).thenReturn(CompletableFuture.completedFuture(okResp));
@@ -150,7 +156,7 @@ class PartyFinderPartySyncerTest {
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
             playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
 
-            syncer.setTrackedPartyId(999L);
+            syncer.trackParty(999L, List.of());
             ApiResponse okResp = new ApiResponse();
             okResp.ok = true;
             when(apiClient.reserveIngame(anyLong(), anyString())).thenReturn(CompletableFuture.completedFuture(okResp));
@@ -177,7 +183,7 @@ class PartyFinderPartySyncerTest {
             playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
             playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
 
-            syncer.setTrackedPartyId(999L);
+            syncer.trackParty(999L, List.of());
             ApiResponse okResp = new ApiResponse();
             okResp.ok = true;
             when(apiClient.reserveIngame(anyLong(), anyString())).thenReturn(CompletableFuture.completedFuture(okResp));
@@ -198,6 +204,119 @@ class PartyFinderPartySyncerTest {
             // Verify inGameSeenMembers was restored on failure
             Set<String> seen = getInGameSeenMembers();
             assertTrue(seen.contains("bob"));
+        }
+    }
+
+    @Test
+    void trackPartySeedsPreExistingInGameMembersForAutoKick() throws Exception {
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
+             MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
+
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
+            playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
+
+            ApiResponse okResp = new ApiResponse();
+            okResp.ok = true;
+            when(apiClient.kickMember(anyLong(), anyString())).thenReturn(CompletableFuture.completedFuture(okResp));
+
+            // Party created while Bob was already in the in-game party
+            syncer.trackParty(999L, List.of("Bob"));
+
+            // Bob is kicked in-game, leaving only Leader in /party list
+            invokeOnPartyListParsed(List.of("Leader"));
+
+            verify(apiClient).kickMember(999L, "bob");
+        }
+    }
+
+    @Test
+    void onMemberRemovedKicksMemberInTwoPersonPartyAndDeduplicatesInFlightKick() throws Exception {
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
+             MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
+
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
+            playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
+
+            CompletableFuture<ApiResponse> pendingKick = new CompletableFuture<>();
+            when(apiClient.kickMember(anyLong(), anyString())).thenReturn(pendingKick);
+
+            syncer.trackParty(999L, List.of("Bob"));
+
+            // Explicit kick chat message arrives (works even for a 2-person party)
+            syncer.onMemberRemoved("Bob");
+            // Concurrent /party list arrives before kick completes
+            invokeOnPartyListParsed(List.of("Leader"));
+
+            verify(apiClient, times(1)).kickMember(999L, "Bob");
+            verify(apiClient, never()).kickMember(999L, "bob");
+
+            ApiResponse okResp = new ApiResponse();
+            okResp.ok = true;
+            pendingKick.complete(okResp);
+        }
+    }
+
+    @Test
+    void updateTrackedPartyIdPreservesTrackedMembersAcrossActivityEdits() throws Exception {
+        try (MockedStatic<Minecraft> mcStatic = mockStatic(Minecraft.class);
+             MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
+
+            mcStatic.when(Minecraft::getInstance).thenReturn(null);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
+            playerUtilStatic.when(() -> PlayerUtil.namesEqual(anyString(), anyString())).thenCallRealMethod();
+
+            ApiResponse okResp = new ApiResponse();
+            okResp.ok = true;
+            when(apiClient.kickMember(anyLong(), anyString())).thenReturn(CompletableFuture.completedFuture(okResp));
+
+            syncer.trackParty(100L, List.of("Bob"));
+            syncer.updateTrackedPartyId(200L);
+
+            invokeOnPartyListParsed(List.of("Leader"));
+
+            verify(apiClient).kickMember(200L, "bob");
+        }
+    }
+
+    @Test
+    void syncFromOwnedPartyReconcilesDiscordLeaves() throws Exception {
+        try (MockedStatic<PlayerUtil> playerUtilStatic = mockStatic(PlayerUtil.class)) {
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Leader")).thenReturn(true);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Alice")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.isSelf("Bob")).thenReturn(false);
+            playerUtilStatic.when(() -> PlayerUtil.normalizeName(anyString())).thenCallRealMethod();
+
+            syncer.trackParty(500L, List.of("Alice", "Bob"));
+            assertTrue(getKnownDiscordMembers().contains("alice"));
+
+            // Alice left on Discord; updated snapshot only has Leader and Bob
+            PartyData updated = new PartyData();
+            updated.partyId = 500L;
+            updated.leaderName = "Leader";
+            updated.members = new LinkedHashMap<>();
+            PartyData.MemberData leader = new PartyData.MemberData();
+            leader.name = "Leader";
+            PartyData.MemberData bob = new PartyData.MemberData();
+            bob.name = "Bob";
+            updated.members.put("user:1", leader);
+            updated.members.put("user:2", bob);
+
+            syncer.syncFromOwnedParty(updated);
+
+            assertFalse(getKnownDiscordMembers().contains("alice"));
+            assertFalse(getInGameSeenMembers().contains("alice"));
+            assertTrue(getKnownDiscordMembers().contains("bob"));
         }
     }
 }

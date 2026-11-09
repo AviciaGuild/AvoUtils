@@ -5,6 +5,9 @@ package info.avicia.avoutils.features.partyfinder;
  */
 public final class RoleIconUtil {
 
+    public static final String[] ROLE_LABELS = {"DPS", "Healer", "Tank", "Other"};
+    public static final String[] ROLE_VALUES = {"dps", "healer", "tank", "other"};
+
     private RoleIconUtil() {
     }
 

@@ -190,5 +190,15 @@ class PartyMessageParserTest {
         org.junit.jupiter.api.Assertions.assertNotNull(leavePeriod);
         assertEquals(PartyMessageParser.Event.LEAVE, leavePeriod.event());
         assertEquals("CupBoi", leavePeriod.player());
+
+        PartyMessageParser.Result kickYour = PartyMessageParser.parse("CupBoi has been kicked from your party.");
+        org.junit.jupiter.api.Assertions.assertNotNull(kickYour);
+        assertEquals(PartyMessageParser.Event.KICK, kickYour.event());
+        assertEquals("CupBoi", kickYour.player());
+
+        PartyMessageParser.Result kickNoPunct = PartyMessageParser.parse("CupBoi has been kicked from the party");
+        org.junit.jupiter.api.Assertions.assertNotNull(kickNoPunct);
+        assertEquals(PartyMessageParser.Event.KICK, kickNoPunct.event());
+        assertEquals("CupBoi", kickNoPunct.player());
     }
 }

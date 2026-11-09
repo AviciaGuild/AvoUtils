@@ -53,7 +53,7 @@ public final class PartyMessageParser {
     private static final Pattern PARTY_JOIN_PATTERN = Pattern.compile(
             "^([^:\n]+?) has joined (?:your party, say hello!|the party[.!]*)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PARTY_KICK_PATTERN = Pattern.compile(
-            "^([^:\n]+?) has been kicked from the party!$", Pattern.CASE_INSENSITIVE);
+            "^([^:\n]+?) has been kicked from (?:your|the) party[.!]*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PARTY_LEAVE_PATTERN = Pattern.compile(
             "^([^:\n]+?) has left the party[.!]*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern NOT_IN_PARTY_PATTERN = Pattern.compile(

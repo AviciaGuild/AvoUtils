@@ -17,6 +17,7 @@ import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +62,7 @@ public class AvoUtilsMod implements ClientModInitializer {
         // Initialize server policy tracking
         WynncraftServerPolicy.initialize();
         WynncraftServerPolicy.addScopeChangeListener(this::onServerScopeChanged);
+        ClientTickEvents.END_CLIENT_TICK.register(InGamePartyTracker.getInstance()::tick);
 
         // Register commands
         AvoCommands.register(features);
