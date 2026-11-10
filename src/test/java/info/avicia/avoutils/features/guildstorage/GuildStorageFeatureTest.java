@@ -180,6 +180,30 @@ class GuildStorageFeatureTest {
         });
     }
 
+    @Test
+    void onSystemChatAppliesRaidAndRewardDeltasIndependentlyOfChatBridge() {
+        withMockedAuth(true, authService -> {
+            ModConfig config = new ModConfig();
+            config.chatBridgeEnabled = false;
+            GuildStorageFeature notifier = seed(new GuildStorageFeature(), config);
+
+            notifier.onSystemChat(info.avicia.avoutils.testutil.TextFixtures.coloredText(
+                    "Steve finished NOL and claimed 5x Emeralds, 3x Aspects and +100000m Guild Experience",
+                    0x55FFFF));
+            assertEquals(15L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
+            assertEquals(23L, (Long) TestReflection.get(notifier, "aspectCurrent"));
+
+            notifier.onSystemChat(info.avicia.avoutils.testutil.TextFixtures.coloredText(
+                    "Steve rewarded 4 Emeralds to Alex", 0x55FFFF));
+            assertEquals(11L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
+
+            notifier.onSystemChat(info.avicia.avoutils.testutil.TextFixtures.coloredText(
+                    "Steve rewarded a Guild Tome to Alex", 0x55FFFF));
+            assertEquals(11L, (Long) TestReflection.get(notifier, "emeraldCurrent"));
+            assertEquals(23L, (Long) TestReflection.get(notifier, "aspectCurrent"));
+        });
+    }
+
     private static void invokeApplyRemoteSnapshot(GuildStorageFeature notifier,
                                                   long emCur, long emMax, long asCur, long asMax) {
         TestReflection.invoke(notifier, "applyRemoteSnapshot", 

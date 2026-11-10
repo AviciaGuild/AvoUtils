@@ -5,46 +5,47 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
 import info.avicia.avoutils.core.chat.GuildChat;
+import info.avicia.avoutils.core.chat.RaidDetector;
 import info.avicia.avoutils.core.chat.RewardDetector;
 import info.avicia.avoutils.core.config.ModConfig;
-import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
-import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
+import info.avicia.avoutils.core.util.Deduplicator;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
-import info.avicia.avoutils.core.util.UsernameResolver;
 import info.avicia.avoutils.core.util.WynnPillUtil;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
+import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
 /**
- * Chat bridge feature that relays messages between in-game guild chat and Discord.
+ * Coordinates the chat bridge between in-game Wynncraft chat/events and Discord.
  */
 public class ChatBridgeFeature implements AvoFeature {
-    private static final Pattern CHAT_PATTERN = Pattern.compile(
-            "^(?:<\\d+>\\s*)?([a-zA-Z0-9_][a-zA-Z0-9_ ]*[a-zA-Z0-9_]|[a-zA-Z0-9_]{3,16})\\s*:\\s*(.*)$",
-            Pattern.DOTALL);
-    private static final Pattern EMOJI_SHORTCODE_PATTERN = Pattern.compile(":[a-zA-Z0-9_+\\-]+:");
 
-    private ModConfig config;
-
-    private static final String AVATAR_URL_BASE = "https://mc-heads.net/avatar/";
-    private static final String BANK_CHEST_AVATAR_URL = "https://wynncraft.wiki.gg/images/UnidentifiedMythicBox.png";
-    private static final String AVO_ICON_URL = "https://raw.githubusercontent.com/AviciaGuild/AvoUtils/refs/heads/main/src/main/resources/assets/avoutils/icon.png";
+    private static final String BANK_CHEST_AVATAR_URL =
+            "https://wynncraft.wiki.gg/images/UnidentifiedMythicBox.png";
+    private static final String AVO_ICON_URL =
+            "https://raw.githubusercontent.com/AviciaGuild/AvoUtils/refs/heads/main/src/main/resources/assets/avoutils/icon.png";
 
     private static final long CHAT_DEDUPE_MS = 250;
     private static final long EVENT_DEDUPE_MS = 5_000;
-    private final Deduplicator chatDeduper = new Deduplicator(CHAT_DEDUPE_MS);
-    private final Deduplicator raidDeduper = new Deduplicator(EVENT_DEDUPE_MS);
 
     private static final String EVT_DISCORD_CHAT = "discord_chat";
+    private static final String EVT_BRIDGE_STATUS = "bridge_status";
     private static final String EVT_GUILD_CHAT = "guild_chat";
     private static final String EVT_GUILD_BANK = "guild_bank_event";
     private static final String EVT_GUILD_RAID = "guild_raid_completion";
     private static final String EVT_GUILD_REWARD = "guild_reward";
-    private static final String EVT_BRIDGE_STATUS = "bridge_status";
+    private static final String EVT_GUILD_TERRITORY = "guild_territory_event";
+    private static final String EVT_GUILD_ALLY = "guild_ally_event";
+    private static final String EVT_GUILD_MEMBER = "guild_member_event";
+
+    private ModConfig config;
+    private final Deduplicator chatDeduper = new Deduplicator(CHAT_DEDUPE_MS);
+    private final Deduplicator eventDeduper = new Deduplicator(EVENT_DEDUPE_MS);
+    private final TerritoryEventDetector territoryDetector = new TerritoryEventDetector();
 
     public boolean isGuildMember() {
         return AvoAuthService.getInstance().isGuildMember();
@@ -66,93 +67,112 @@ public class ChatBridgeFeature implements AvoFeature {
             AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] User is not a guild member. Chat bridge disabled.");
         }
 
-        // Register listener for Discord chat events
-        AvoWebSocketManager.getInstance().registerListener(EVT_DISCORD_CHAT, json -> {
-            if (!isBridgeActive()) return;
-            if (json.has("username") && json.has("message")) {
-                String username = json.get("username").getAsString();
-                String message = json.get("message").getAsString();
-                if (Minecraft.getInstance().player != null) {
-                    MutableComponent prefix = WynnPillUtil.createPrefixedPill("AvoBridge", false);
-                    MutableComponent formatted = prefix
-                            .append(Component.literal(username).withStyle(ChatFormatting.DARK_AQUA))
-                            .append(Component.literal(": ").withStyle(ChatFormatting.DARK_AQUA))
-                            .append(Component.literal(message).withStyle(ChatFormatting.AQUA));
-                    Minecraft.getInstance().player.displayClientMessage(formatted, false);
-                }
-            }
-        });
+        AvoWebSocketManager ws = AvoWebSocketManager.getInstance();
+        ws.registerListener(EVT_DISCORD_CHAT, this::onDiscordChat);
+        ws.registerListener(EVT_BRIDGE_STATUS, this::onBridgeStatus);
+        ws.registerConnectionDemand("chatbridge", this::isBridgeActive);
 
-        // Register listener for bridge_status events (backend pushes guild membership changes)
-        AvoWebSocketManager.getInstance().registerListener(EVT_BRIDGE_STATUS, json -> {
-            if (json.has("guild_member")) {
-                boolean guildMember = json.get("guild_member").getAsBoolean();
-                AvoAuthService.getInstance().setCachedGuildMember(guildMember);
-                AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] Guild membership updated via bridge_status: {}", guildMember);
-            }
-        });
-
-        // Register connection demand lease (only if user has it enabled and is a guild member)
-        AvoWebSocketManager.getInstance().registerConnectionDemand("chatbridge", this::isBridgeActive);
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> territoryDetector.reset());
 
         AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] Initialized.");
     }
 
-    /** Called when a system message is received. */
+    @Override
+    public void onServerScopeChanged(Scope newScope) {
+        if (newScope != Scope.MAIN) {
+            territoryDetector.reset();
+        }
+    }
+
+    /** Called when a system chat packet is received. */
     public void onSystemChat(Component message) {
-        if (message == null) return;
-        if (!AvoWebSocketManager.getInstance().isConnected()) return;
-        if (!isBridgeActive()) return;
+        if (message == null || !isBridgeActive() || !AvoWebSocketManager.getInstance().isConnected()) {
+            return;
+        }
+
+        // ── Territory war alerts (§c / 0xFF5555) ──────────────────────
+        if (GuildChat.isTerritoryAlert(message)) {
+            String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
+            TerritoryEventDetector.Result territory = territoryDetector.tryDetect(cleaned);
+            if (territory != null) {
+                sendDedupedEvent(EVT_GUILD_TERRITORY, "Territory Alert", territory.formattedMessage(), AVO_ICON_URL);
+            }
+            return;
+        }
+
+        // ── Guild chat & announcements (§b / 0x55FFFF) ────────────────
+        if (!GuildChat.isGuildChat(message)) {
+            return;
+        }
 
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
-        AvoUtilsMod mod = AvoUtilsMod.getInstance();
-        GuildStorageFeature storage = mod != null ? mod.getFeature(GuildStorageFeature.class) : null;
-
-        if (!GuildChat.isGuildChat(message)) return;
-
-        // ── Raid completions ──────────────────────────────────────────
-        RaidDetector.RaidResult raidResult = RaidDetector.tryDetect(cleaned, message);
-        if (raidResult != null && !raidDeduper.isDuplicate(raidResult.formattedMessage())) {
-            sendEvent(EVT_GUILD_RAID, "Raid Complete", raidResult.formattedMessage(), AVO_ICON_URL);
-            if (storage != null) {
-                storage.onRaidDelta(raidResult.emeralds(), raidResult.aspects());
-            }
-        }
-
-        // ── Reward grants ─────────────────────────────────────────────
-        RewardDetector.RewardResult rewardResult = RewardDetector.tryDetect(cleaned, message);
-        if (rewardResult != null) {
-            sendEvent(EVT_GUILD_REWARD, "Guild Rewards", rewardResult.formattedMessage(), AVO_ICON_URL);
-            if (storage != null && rewardResult.tomeCount() == 0) {
-                storage.onRewardDelta(-rewardResult.emeraldAmount(), -rewardResult.aspectAmount());
-            }
-        }
-
-        // ── Guild chat messages ───────────────────────────────────────
-        Matcher matcher = CHAT_PATTERN.matcher(cleaned);
-        if (!matcher.find()) {
-            BankDetector.Result bankResult = BankDetector.tryDetect(cleaned, message);
-            if (bankResult != null) {
-                sendEvent(EVT_GUILD_BANK, bankResult.displayName(), bankResult.formattedMessage(), BANK_CHEST_AVATAR_URL);
-            }
+        if (cleaned.isEmpty()) {
             return;
         }
 
-        String displayedName = matcher.group(1).trim();
-        String content = matcher.group(2).trim();
-        if (content.isEmpty()) return;
-
-        String realUsername = UsernameResolver.resolve(message, displayedName);
-        if (realUsername == null) {
-            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge] Could not resolve username from '{}'", displayedName);
+        RaidDetector.RaidResult raid = RaidDetector.tryDetect(cleaned, message);
+        if (raid != null) {
+            sendDedupedEvent(EVT_GUILD_RAID, "Raid Complete", raid.formattedMessage(), AVO_ICON_URL);
             return;
         }
 
-        String dedupContent = EMOJI_SHORTCODE_PATTERN.matcher(content)
-                .replaceAll("").replaceAll("\\s+", " ").trim();
-        String dedupKey = realUsername + "\u0000" + dedupContent;
-        if (!chatDeduper.isDuplicate(dedupKey)) {
-            sendEvent(EVT_GUILD_CHAT, realUsername, content, AVATAR_URL_BASE + realUsername + "/128");
+        RewardDetector.RewardResult reward = RewardDetector.tryDetect(cleaned, message);
+        if (reward != null) {
+            sendEvent(EVT_GUILD_REWARD, "Guild Rewards", reward.formattedMessage(), AVO_ICON_URL);
+            return;
+        }
+
+        BankDetector.Result bank = BankDetector.tryDetect(cleaned, message);
+        if (bank != null) {
+            sendEvent(EVT_GUILD_BANK, bank.displayName(), bank.formattedMessage(), BANK_CHEST_AVATAR_URL);
+            return;
+        }
+
+        AllyDetector.Result ally = AllyDetector.tryDetect(cleaned, message);
+        if (ally != null) {
+            sendDedupedEvent(EVT_GUILD_ALLY, "Guild Diplomacy", ally.formattedMessage(), AVO_ICON_URL);
+            return;
+        }
+
+        GuildMemberDetector.Result member = GuildMemberDetector.tryDetect(cleaned, message);
+        if (member != null) {
+            sendDedupedEvent(EVT_GUILD_MEMBER, "Guild Members", member.formattedMessage(), AVO_ICON_URL);
+            return;
+        }
+
+        GuildChatDetector.Result chat = GuildChatDetector.tryDetect(cleaned, message);
+        if (chat != null && !chatDeduper.isDuplicate(chat.dedupKey())) {
+            sendEvent(EVT_GUILD_CHAT, chat.username(), chat.content(), chat.avatarUrl());
+        }
+    }
+
+    private void onDiscordChat(JsonObject json) {
+        if (!isBridgeActive() || !json.has("username") || !json.has("message")) {
+            return;
+        }
+        if (Minecraft.getInstance().player == null) {
+            return;
+        }
+        String username = json.get("username").getAsString();
+        String message = json.get("message").getAsString();
+        MutableComponent formatted = WynnPillUtil.createPrefixedPill("AvoBridge", false)
+                .append(Component.literal(username).withStyle(ChatFormatting.DARK_AQUA))
+                .append(Component.literal(": ").withStyle(ChatFormatting.DARK_AQUA))
+                .append(Component.literal(message).withStyle(ChatFormatting.AQUA));
+        Minecraft.getInstance().player.displayClientMessage(formatted, false);
+    }
+
+    private void onBridgeStatus(JsonObject json) {
+        if (json.has("guild_member")) {
+            boolean guildMember = json.get("guild_member").getAsBoolean();
+            AvoAuthService.getInstance().setCachedGuildMember(guildMember);
+            AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge] Guild membership updated via bridge_status: {}", guildMember);
+        }
+    }
+
+    private void sendDedupedEvent(String eventType, String username, String message, String avatarUrl) {
+        if (!eventDeduper.isDuplicate(eventType + "\u0000" + message)) {
+            sendEvent(eventType, username, message, avatarUrl);
         }
     }
 

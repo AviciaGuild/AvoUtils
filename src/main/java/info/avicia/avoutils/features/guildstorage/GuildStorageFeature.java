@@ -4,7 +4,11 @@ import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
 import info.avicia.avoutils.core.auth.AvoAuthService;
+import info.avicia.avoutils.core.chat.GuildChat;
+import info.avicia.avoutils.core.chat.RaidDetector;
+import info.avicia.avoutils.core.chat.RewardDetector;
 import info.avicia.avoutils.core.config.ModConfig;
+import info.avicia.avoutils.core.util.Deduplicator;
 import info.avicia.avoutils.core.util.ItemUtil;
 import info.avicia.avoutils.core.util.PacketTextNormalizer;
 import info.avicia.avoutils.core.util.PlayerUtil;
@@ -35,6 +39,7 @@ public class GuildStorageFeature implements AvoFeature {
     private static final String EVT_GUILD_STORAGE = "guild_storage_snapshot";
     private static final long PUBLISH_INTERVAL_MS = 1_000L;
     private static final long LOCAL_AUTHORITY_WINDOW_MS = 5_000L;
+    private static final long RAID_DEDUPE_MS = 5_000L;
 
     // ── Menu lore patterns ──────────────────────────────────────────────
     private static final Pattern EMERALDS_PATTERN =
@@ -44,6 +49,7 @@ public class GuildStorageFeature implements AvoFeature {
     private static final String REWARDS_UNAVAILABLE = "rewards are unavailable";
 
     private ModConfig config;
+    private final Deduplicator raidDeduper = new Deduplicator(RAID_DEDUPE_MS);
 
     // ── Tracked state ───────────────────────────────────────────────────
     private long emeraldCurrent = -1;
@@ -120,7 +126,28 @@ public class GuildStorageFeature implements AvoFeature {
                 snapshot.aspectCurrent, snapshot.aspectMax);
     }
 
-    // ── Chat delta consumers (called from ChatBridgeFeature) ────────────
+    // ── Chat delta consumers ────────────────────────────────────────────
+
+    public void onSystemChat(Component message) {
+        if (message == null || !isActive() || !isSeeded()) return;
+        if (!GuildChat.isGuildChat(message)) return;
+
+        String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
+        if (cleaned.isEmpty()) return;
+
+        RaidDetector.RaidResult raid = RaidDetector.tryDetect(cleaned, message);
+        if (raid != null) {
+            if (!raidDeduper.isDuplicate(raid.formattedMessage())) {
+                onRaidDelta(raid.emeralds(), raid.aspects());
+            }
+            return;
+        }
+
+        RewardDetector.RewardResult reward = RewardDetector.tryDetect(cleaned, message);
+        if (reward != null && reward.tomeCount() == 0) {
+            onRewardDelta(-reward.emeraldAmount(), -reward.aspectAmount());
+        }
+    }
 
     public void onRaidDelta(int emeralds, int aspects) {
         if (!isActive() || !isSeeded()) return;

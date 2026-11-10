@@ -111,4 +111,3 @@ public final class UsernameResolver {
         return matcher.find() ? matcher.group(1) : null;
     }
 }
-

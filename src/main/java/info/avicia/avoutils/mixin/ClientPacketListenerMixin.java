@@ -4,6 +4,7 @@ import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.party.InGamePartyTracker;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.features.chatbridge.ChatBridgeFeature;
+import info.avicia.avoutils.features.guildstorage.GuildStorageFeature;
 import info.avicia.avoutils.features.rewards.RewardsFeature;
 import info.avicia.avoutils.features.wardetector.WarDetectorFeature;
 import net.minecraft.client.Minecraft;
@@ -38,6 +39,10 @@ public class ClientPacketListenerMixin {
                 ChatBridgeFeature cb = AvoUtilsMod.getInstance().getFeature(ChatBridgeFeature.class);
                 if (cb != null) {
                     cb.onSystemChat(packet.content());
+                }
+                GuildStorageFeature storage = AvoUtilsMod.getInstance().getFeature(GuildStorageFeature.class);
+                if (storage != null) {
+                    storage.onSystemChat(packet.content());
                 }
                 WarDetectorFeature war = AvoUtilsMod.getInstance().getFeature(WarDetectorFeature.class);
                 if (war != null) {

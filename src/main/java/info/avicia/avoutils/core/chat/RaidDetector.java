@@ -1,7 +1,6 @@
-package info.avicia.avoutils.features.chatbridge;
+package info.avicia.avoutils.core.chat;
 
 import info.avicia.avoutils.AvoUtilsMod;
-import info.avicia.avoutils.core.chat.DiscordMarkdown;
 import info.avicia.avoutils.core.util.UsernameResolver;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -17,7 +16,7 @@ import net.minecraft.network.chat.Component;
  * Detects raid completions from system chat and returns structured data
  * for both Discord relay and storage delta tracking.
  */
-final class RaidDetector {
+public final class RaidDetector {
 
     private static final Pattern RAID_FINISH_PATTERN = Pattern.compile(
             "^(.+?) finished ([\\w ']+?) "
@@ -30,9 +29,12 @@ final class RaidDetector {
     private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{3,16}");
     private static final Pattern COMMA_SPACING_PATTERN = Pattern.compile("\\s*,\\s*");
 
-    record RaidResult(String formattedMessage, int emeralds, int aspects) {}
+    private RaidDetector() {
+    }
 
-    static RaidResult tryDetect(String cleaned, Component message) {
+    public record RaidResult(String formattedMessage, int emeralds, int aspects) {}
+
+    public static RaidResult tryDetect(String cleaned, Component message) {
         if (cleaned == null || !isRaidCandidateText(cleaned)) return null;
         cleaned = cleaned.replace(",and ", ", and ");
 
@@ -44,13 +46,13 @@ final class RaidDetector {
 
         List<String> displayedNames = parseDisplayedNames(namesPart);
         if (displayedNames.size() > 4) {
-            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge/Raid] Too many displayed names, dropping: {}", namesPart);
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [RaidDetector] Too many displayed names, dropping: {}", namesPart);
             return null;
         }
 
         List<String> partyMembers = resolvePartyMembers(displayedNames, message);
         if (partyMembers.isEmpty()) {
-            AvoUtilsMod.LOGGER.warn("[AvoUtils] [ChatBridge/Raid] No valid usernames found");
+            AvoUtilsMod.LOGGER.warn("[AvoUtils] [RaidDetector] No valid usernames found");
             return null;
         }
 
@@ -79,7 +81,6 @@ final class RaidDetector {
         if (sr > 0) parts.add("+" + sr + " SR");
         if (!parts.isEmpty()) sb.append(" — ").append(String.join(", ", parts));
 
-        AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/Raid] Detected: raid='{}'", raidName);
         return new RaidResult(sb.toString(), emeralds, aspects);
     }
 
@@ -111,7 +112,10 @@ final class RaidDetector {
 
     private static String formatPlayerList(List<String> members) {
         if (members.size() == 1) return DiscordMarkdown.escapeUsername(members.get(0));
-        if (members.size() == 2) return DiscordMarkdown.escapeUsername(members.get(0)) + " and " + DiscordMarkdown.escapeUsername(members.get(1));
+        if (members.size() == 2) {
+            return DiscordMarkdown.escapeUsername(members.get(0)) + " and "
+                    + DiscordMarkdown.escapeUsername(members.get(1));
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < members.size(); i++) {
             if (i > 0) sb.append(i == members.size() - 1 ? ", and " : ", ");

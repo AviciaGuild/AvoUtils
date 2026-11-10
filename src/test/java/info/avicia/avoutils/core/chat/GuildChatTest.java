@@ -27,4 +27,11 @@ class GuildChatTest {
         assertFalse(GuildChat.isGuildChat(TextFixtures.coloredText("hi", 0xFF0000)));
         assertFalse(GuildChat.isGuildChat(Component.literal("hi")));
     }
+
+    @Test
+    void leadingTerritoryRedColorIsDetected() {
+        assertTrue(GuildChat.isTerritoryAlert(TextFixtures.coloredText("[SEQ] has taken control of Detlas!", 0xFF5555)));
+        assertFalse(GuildChat.isTerritoryAlert(TextFixtures.coloredText("hi", GUILD_CHAT_COLOR)));
+        assertFalse(GuildChat.isTerritoryAlert(Component.literal("hi")));
+    }
 }

@@ -51,4 +51,12 @@ class BankDetectorTest {
     void returnsNullForNullCleaned() {
         assertNull(BankDetector.tryDetect(null, Component.literal("")));
     }
+
+    @Test
+    void ignoresPlayerChatMentioningBankDeposit() {
+        Component chat = Component.empty()
+                .append(info.avicia.avoutils.testutil.TextFixtures.hoverText("Steve", "'s real name is RealSteve"))
+                .append(": I deposited 5 Emeralds to the Guild Bank (General)");
+        assertNull(BankDetector.tryDetect("Steve: I deposited 5 Emeralds to the Guild Bank (General)", chat));
+    }
 }

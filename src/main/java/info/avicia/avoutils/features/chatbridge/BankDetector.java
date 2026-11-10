@@ -39,6 +39,7 @@ final class BankDetector {
         }
 
         String displayedPlayer = matcher.group(1).trim();
+        if (displayedPlayer.contains(":")) return null;
         String action = matcher.group(2).toLowerCase(Locale.ROOT);
         String itemBlock = matcher.group(3).trim();
         if (displayedPlayer.isEmpty() || itemBlock.isEmpty()) return null;
