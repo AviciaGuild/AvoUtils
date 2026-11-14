@@ -1,13 +1,13 @@
 package info.avicia.avoutils.core.chat;
 
+import info.avicia.avoutils.testutil.TextFixtures;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import net.minecraft.network.chat.Component;
 
 class RewardDetectorTest {
 
@@ -17,8 +17,11 @@ class RewardDetectorTest {
                 RewardDetector.tryDetect("Steve rewarded 1,000 Emeralds to Alex", Component.literal(""));
 
         assertNotNull(result);
+        assertEquals("Steve", result.sender());
+        assertEquals("Alex", result.recipient());
         assertEquals(1000L, result.emeraldAmount());
-        assertEquals("**Steve** rewarded **1,000 Emeralds** to **Alex**", result.formattedMessage());
+        assertEquals(0L, result.aspectAmount());
+        assertEquals(0L, result.tomeCount());
     }
 
     @Test
@@ -28,7 +31,6 @@ class RewardDetectorTest {
 
         assertNotNull(result);
         assertEquals(1L, result.aspectAmount());
-        assertEquals("**Steve** rewarded **1 Aspect** to **Alex**", result.formattedMessage());
     }
 
     @Test
@@ -38,7 +40,6 @@ class RewardDetectorTest {
 
         assertNotNull(result);
         assertEquals(2L, result.aspectAmount());
-        assertTrue(result.formattedMessage().contains("**2 Aspects**"));
     }
 
     @Test
@@ -48,16 +49,6 @@ class RewardDetectorTest {
 
         assertNotNull(result);
         assertEquals(1L, result.tomeCount());
-        assertEquals("**Steve** rewarded **1 Guild Tome** to **Alex**", result.formattedMessage());
-    }
-
-    @Test
-    void escapesUnderscoresInNames() {
-        RewardDetector.RewardResult result =
-                RewardDetector.tryDetect("Steve_Bob rewarded 5 Emeralds to Alex", Component.literal(""));
-
-        assertNotNull(result);
-        assertEquals("**Steve\\_Bob** rewarded **5 Emeralds** to **Alex**", result.formattedMessage());
     }
 
     @Test
@@ -86,17 +77,16 @@ class RewardDetectorTest {
 
     @Test
     void detectsEmeraldRewardWithHoverText() {
-        // Correctly mock the Wynncraft Text component where the sender has hover text but the recipient does not
-        net.minecraft.network.chat.MutableComponent message = net.minecraft.network.chat.Component.empty()
-                .append(info.avicia.avoutils.testutil.TextFixtures.hoverText("Steve", "'s real name is NotSteve"))
+        MutableComponent message = Component.empty()
+                .append(TextFixtures.hoverText("Steve", "'s real name is NotSteve"))
                 .append(" rewarded 1,000 Emeralds to Alex");
-                
+
         RewardDetector.RewardResult result =
                 RewardDetector.tryDetect("Steve rewarded 1,000 Emeralds to Alex", message);
 
-        org.junit.jupiter.api.Assertions.assertNotNull(result);
-        org.junit.jupiter.api.Assertions.assertEquals(1000L, result.emeraldAmount());
-        // Verify that the sender resolved to NotSteve, but the recipient correctly stayed Alex
-        org.junit.jupiter.api.Assertions.assertEquals("**NotSteve** rewarded **1,000 Emeralds** to **Alex**", result.formattedMessage());
+        assertNotNull(result);
+        assertEquals("NotSteve", result.sender());
+        assertEquals("Alex", result.recipient());
+        assertEquals(1000L, result.emeraldAmount());
     }
 }

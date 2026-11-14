@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Detects guild reward grants (Emeralds, Aspects, Guild Tomes) from system
- * chat and returns data for both Discord relay and storage delta tracking.
+ * chat and returns structured data for both gateway relay and storage delta tracking.
  */
 public final class RewardDetector {
 
@@ -16,8 +16,10 @@ public final class RewardDetector {
             "^(?<sender>.+?)\\s+rewarded\\s+(?:(?<emeraldAmount>[\\d, ]+)\\s+Emeralds?|(?<aspectAmount>an?|[\\d, ]+)\\s+Aspects?|(?<tomeAmount>an?|[\\d, ]+)\\s+Guild Tomes?)\\s+to\\s+(?<recipient>.+)$",
             Pattern.CASE_INSENSITIVE);
 
-    /** {@code sender} and {@code recipient} are the resolved usernames; {@code formattedMessage} escapes them for Discord. */
-    public record RewardResult(String formattedMessage, String sender, String recipient,
+    private RewardDetector() {
+    }
+
+    public record RewardResult(String sender, String recipient,
                                long emeraldAmount, long aspectAmount, long tomeCount) {}
 
     public static RewardResult tryDetect(String cleaned, Component message) {
@@ -34,40 +36,37 @@ public final class RewardDetector {
         if (sender == null) sender = senderDisplay;
         String recipient = UsernameResolver.resolve(message, recipientDisplay);
         if (recipient == null) recipient = recipientDisplay;
-        String escapedSender = DiscordMarkdown.escapeUsername(sender);
-        String escapedRecipient = DiscordMarkdown.escapeUsername(recipient);
 
         String emeraldAmount = m.group("emeraldAmount");
         if (emeraldAmount != null) {
             long amount = parseNumber(emeraldAmount);
-            String formatted = "**" + escapedSender + "** rewarded **" + String.format(Locale.US, "%,d", amount)
-                    + " Emeralds** to **" + escapedRecipient + "**";
-            return new RewardResult(formatted, sender, recipient, amount, 0, 0);
+            if (amount <= 0) return null;
+            return new RewardResult(sender, recipient, amount, 0, 0);
         }
 
         String aspectAmount = m.group("aspectAmount");
         if (aspectAmount != null) {
             long amount = parseArticleAmount(aspectAmount);
             if (amount <= 0) return null;
-            String formatted = "**" + escapedSender + "** rewarded **" + amount + " Aspect"
-                    + (amount != 1 ? "s" : "") + "** to **" + escapedRecipient + "**";
-            return new RewardResult(formatted, sender, recipient, 0, amount, 0);
+            return new RewardResult(sender, recipient, 0, amount, 0);
         }
 
         String tomeAmount = m.group("tomeAmount");
         if (tomeAmount != null) {
             long amount = parseArticleAmount(tomeAmount);
             if (amount <= 0) return null;
-            String formatted = "**" + escapedSender + "** rewarded **" + amount + " Guild Tome"
-                    + (amount != 1 ? "s" : "") + "** to **" + escapedRecipient + "**";
-            return new RewardResult(formatted, sender, recipient, 0, 0, amount);
+            return new RewardResult(sender, recipient, 0, 0, amount);
         }
 
         return null;
     }
 
     private static long parseNumber(String raw) {
-        return Long.parseLong(raw.replace(",", "").replace(" ", "").trim());
+        try {
+            return Long.parseLong(raw.replace(",", "").replace(" ", "").trim());
+        } catch (NumberFormatException e) {
+            return -1L;
+        }
     }
 
     private static long parseArticleAmount(String raw) {

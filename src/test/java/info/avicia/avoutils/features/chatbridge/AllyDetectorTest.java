@@ -13,16 +13,20 @@ class AllyDetectorTest {
     @Test
     void detectsIncomingAllyRequestWithHoverAndDirectUsername() {
         Component rawPacket = Component.empty()
-                .append(TextFixtures.hoverText("Player", "Player's real username is LargeMug"))
+                .append(TextFixtures.hoverText("Player", "Player's real username is Large_Mug"))
                 .append(" from list is requesting to be allied");
-        AllyDetector.Result res1 = AllyDetector.tryDetect("Player from list is requesting to be allied", rawPacket, null);
+        AllyDetector.Result res1 = AllyDetector.tryDetect("Player from list is requesting to be allied", rawPacket);
         assertNotNull(res1);
-        assertEquals("**LargeMug** from **list** is requesting to be allied", res1.formattedMessage());
+        assertEquals(AllyDetector.Action.INCOMING_REQUEST, res1.action());
+        assertEquals("Large_Mug", res1.actor());
+        assertEquals("list", res1.guild());
 
         AllyDetector.Result res2 = AllyDetector.tryDetect(
-                "LargeMug from list is requesting to be allied", Component.literal(""), null);
+                "LargeMug from list is requesting to be allied", Component.literal(""));
         assertNotNull(res2);
-        assertEquals("**LargeMug** from **list** is requesting to be allied", res2.formattedMessage());
+        assertEquals(AllyDetector.Action.INCOMING_REQUEST, res2.action());
+        assertEquals("LargeMug", res2.actor());
+        assertEquals("list", res2.guild());
     }
 
     @Test
@@ -31,74 +35,92 @@ class AllyDetectorTest {
                 .append(TextFixtures.hoverText("Player", "Player's real username is CupBoi"))
                 .append(" sent Silk Road a request to be allied");
         AllyDetector.Result res = AllyDetector.tryDetect(
-                "Player sent Silk Road a request to be allied", rawPacket, null);
+                "Player sent Silk Road a request to be allied", rawPacket);
         assertNotNull(res);
-        assertEquals("**CupBoi** sent **Silk Road** a request to be allied", res.formattedMessage());
+        assertEquals(AllyDetector.Action.OUTGOING_REQUEST, res.action());
+        assertEquals("CupBoi", res.actor());
+        assertEquals("Silk Road", res.guild());
     }
 
     @Test
     void detectsTheirRejectionAndOurRejection() {
         AllyDetector.Result theirs = AllyDetector.tryDetect(
-                "Silk Road rejected the alliance request", Component.literal(""), null);
+                "Silk Road rejected the alliance request", Component.literal(""));
         assertNotNull(theirs);
-        assertEquals("**Silk Road** rejected the alliance request", theirs.formattedMessage());
+        assertEquals(AllyDetector.Action.THEIR_REJECT, theirs.action());
+        assertNull(theirs.actor());
+        assertEquals("Silk Road", theirs.guild());
 
         Component oursComp = Component.empty()
                 .append(TextFixtures.hoverText("avo ignis war dps", "'s real name is CupBoi"))
                 .append(" rejected list alliance request");
         AllyDetector.Result ours = AllyDetector.tryDetect(
-                "avo ignis war dps rejected list alliance request", oursComp, null);
+                "avo ignis war dps rejected list alliance request", oursComp);
         assertNotNull(ours);
-        assertEquals("**CupBoi** rejected **list**'s alliance request", ours.formattedMessage());
+        assertEquals(AllyDetector.Action.OUR_REJECT, ours.action());
+        assertEquals("CupBoi", ours.actor());
+        assertEquals("list", ours.guild());
     }
 
     @Test
     void detectsWithdrawnAllianceRequests() {
         AllyDetector.Result ours = AllyDetector.tryDetect(
-                "CupBoi withdrew Another Guild alliance request", Component.literal(""), null);
+                "CupBoi withdrew Another Guild alliance request", Component.literal(""));
         assertNotNull(ours);
-        assertEquals("**CupBoi** withdrew **Another Guild**'s alliance request", ours.formattedMessage());
+        assertEquals(AllyDetector.Action.OUR_WITHDRAW, ours.action());
+        assertEquals("CupBoi", ours.actor());
+        assertEquals("Another Guild", ours.guild());
 
         AllyDetector.Result theirs = AllyDetector.tryDetect(
-                "Another Guild withdrew the alliance request", Component.literal(""), null);
+                "Another Guild withdrew the alliance request", Component.literal(""));
         assertNotNull(theirs);
-        assertEquals("**Another Guild** withdrew the alliance request", theirs.formattedMessage());
+        assertEquals(AllyDetector.Action.THEIR_WITHDRAW, theirs.action());
+        assertNull(theirs.actor());
+        assertEquals("Another Guild", theirs.guild());
     }
 
     @Test
     void detectsAllianceFormedOnlyWhenInvolvingAvicia() {
         AllyDetector.Result formed1 = AllyDetector.tryDetect(
-                "Avicia formed an alliance with Silk Road", Component.literal(""), null);
+                "Avicia formed an alliance with Silk Road", Component.literal(""));
         assertNotNull(formed1);
-        assertEquals("**Avicia** formed an alliance with **Silk Road**", formed1.formattedMessage());
+        assertEquals(AllyDetector.Action.OUR_FORM, formed1.action());
+        assertNull(formed1.actor());
+        assertEquals("Silk Road", formed1.guild());
 
         AllyDetector.Result formed2 = AllyDetector.tryDetect(
-                "Silk Road formed an alliance with Avicia", Component.literal(""), null);
+                "Silk Road formed an alliance with Avicia", Component.literal(""));
         assertNotNull(formed2);
-        assertEquals("**Silk Road** formed an alliance with **Avicia**", formed2.formattedMessage());
+        assertEquals(AllyDetector.Action.THEIR_FORM, formed2.action());
+        assertNull(formed2.actor());
+        assertEquals("Silk Road", formed2.guild());
 
         assertNull(AllyDetector.tryDetect(
-                "Tannslee formed an alliance with Radiant Roses", Component.literal(""), null));
+                "Tannslee formed an alliance with Radiant Roses", Component.literal("")));
     }
 
     @Test
     void detectsAllianceRevokedFromBothDirections() {
         AllyDetector.Result otherRevoked = AllyDetector.tryDetect(
-                "Anime Lovers revoked the alliance with Avicia", Component.literal(""), null);
+                "Anime Lovers revoked the alliance with Avicia", Component.literal(""));
         assertNotNull(otherRevoked);
-        assertEquals("**Anime Lovers** revoked the alliance with **Avicia**", otherRevoked.formattedMessage());
+        assertEquals(AllyDetector.Action.THEIR_REVOKE, otherRevoked.action());
+        assertNull(otherRevoked.actor());
+        assertEquals("Anime Lovers", otherRevoked.guild());
 
         AllyDetector.Result ourRevoked = AllyDetector.tryDetect(
-                "GaztheCat revoked the alliance with Chiefs Of Corkus", Component.literal(""), null);
+                "GaztheCat revoked the alliance with Chiefs Of Corkus", Component.literal(""));
         assertNotNull(ourRevoked);
-        assertEquals("**GaztheCat** revoked the alliance with **Chiefs Of Corkus**", ourRevoked.formattedMessage());
+        assertEquals(AllyDetector.Action.OUR_REVOKE, ourRevoked.action());
+        assertEquals("GaztheCat", ourRevoked.actor());
+        assertEquals("Chiefs Of Corkus", ourRevoked.guild());
     }
 
     @Test
     void rejectsPlayerAuthoredChatSpoofing() {
         assertNull(AllyDetector.tryDetect(
-                "Frieren: Avicia formed an alliance with Silk Road", Component.literal(""), null));
+                "Frieren: Avicia formed an alliance with Silk Road", Component.literal("")));
         assertNull(AllyDetector.tryDetect(
-                "Frieren -> You: Silk Road rejected the alliance request", Component.literal(""), null));
+                "Frieren -> You: Silk Road rejected the alliance request", Component.literal("")));
     }
 }

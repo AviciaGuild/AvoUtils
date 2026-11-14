@@ -2,10 +2,8 @@ package info.avicia.avoutils.core.chat;
 
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.util.UsernameResolver;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,7 +12,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Detects raid completions from system chat and returns structured data
- * for both Discord relay and storage delta tracking.
+ * for both gateway relay and storage delta tracking.
  */
 public final class RaidDetector {
 
@@ -26,13 +24,31 @@ public final class RaidDetector {
     private static final Pattern RAID_REWARD_PATTERN =
             Pattern.compile("(?i)(?:(\\d+)x|no) (Emeralds?|Aspects?)");
 
-    private static final Pattern USERNAME_PATTERN = Pattern.compile("[a-zA-Z0-9_]{3,16}");
     private static final Pattern COMMA_SPACING_PATTERN = Pattern.compile("\\s*,\\s*");
 
     private RaidDetector() {
     }
 
-    public record RaidResult(String formattedMessage, int emeralds, int aspects) {}
+    public record RaidResult(
+            List<String> players,
+            String raidName,
+            int emeralds,
+            int aspects,
+            double guildXp,
+            int seasonalRating) {
+        public RaidResult {
+            players = players == null ? List.of() : List.copyOf(players);
+        }
+
+        public String dedupKey() {
+            return String.join(",", players)
+                    + "\u0000" + raidName
+                    + "\u0000" + aspects
+                    + "\u0000" + emeralds
+                    + "\u0000" + guildXp
+                    + "\u0000" + seasonalRating;
+        }
+    }
 
     public static RaidResult tryDetect(String cleaned, Component message) {
         if (cleaned == null || !isRaidCandidateText(cleaned)) return null;
@@ -56,32 +72,28 @@ public final class RaidDetector {
             return null;
         }
 
-        String raidName = matcher.group(2);
-        int aspects = 0, emeralds = 0;
-        String rewardClause = matcher.group(3);
-        if (rewardClause != null && !rewardClause.isBlank()) {
-            Matcher rewardMatcher = RAID_REWARD_PATTERN.matcher(rewardClause);
-            while (rewardMatcher.find()) {
-                int amount = rewardMatcher.group(1) != null ? Integer.parseInt(rewardMatcher.group(1)) : 0;
-                if (rewardMatcher.group(2).regionMatches(true, 0, "aspect", 0, 6)) aspects += amount;
-                else emeralds += amount;
+        String raidName = matcher.group(2).trim();
+        int aspects = 0;
+        int emeralds = 0;
+        double guildXp;
+        int sr;
+        try {
+            String rewardClause = matcher.group(3);
+            if (rewardClause != null && !rewardClause.isBlank()) {
+                Matcher rewardMatcher = RAID_REWARD_PATTERN.matcher(rewardClause);
+                while (rewardMatcher.find()) {
+                    int amount = rewardMatcher.group(1) != null ? Integer.parseInt(rewardMatcher.group(1)) : 0;
+                    if (rewardMatcher.group(2).regionMatches(true, 0, "aspect", 0, 6)) aspects += amount;
+                    else emeralds += amount;
+                }
             }
+            guildXp = Double.parseDouble(matcher.group(4)) / 1000.0;
+            sr = matcher.group(5) != null ? Integer.parseInt(matcher.group(5)) : 0;
+        } catch (NumberFormatException e) {
+            return null;
         }
 
-        double guildExp = Double.parseDouble(matcher.group(4)) / 1000.0;
-        int sr = matcher.group(5) != null ? Integer.parseInt(matcher.group(5)) : 0;
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("**").append(formatPlayerList(partyMembers)).append("** finished **").append(raidName).append("**");
-
-        List<String> parts = new ArrayList<>();
-        if (aspects > 0) parts.add(aspects + "x Aspects");
-        if (emeralds > 0) parts.add(emeralds + "x Emeralds");
-        parts.add(String.format(Locale.US, "+%.3fm Guild XP", guildExp));
-        if (sr > 0) parts.add("+" + sr + " SR");
-        if (!parts.isEmpty()) sb.append(" — ").append(String.join(", ", parts));
-
-        return new RaidResult(sb.toString(), emeralds, aspects);
+        return new RaidResult(partyMembers, raidName, emeralds, aspects, guildXp, sr);
     }
 
     private static boolean isRaidCandidateText(String cleaned) {
@@ -99,28 +111,11 @@ public final class RaidDetector {
         Set<String> resolved = new LinkedHashSet<>();
         for (String displayedName : displayedNames) {
             if (displayedName.isBlank()) continue;
-
             String real = UsernameResolver.resolve(message, displayedName);
             if (real != null) {
                 resolved.add(real);
-            } else if (USERNAME_PATTERN.matcher(displayedName).matches()) {
-                resolved.add(displayedName);
             }
         }
         return List.copyOf(resolved);
-    }
-
-    private static String formatPlayerList(List<String> members) {
-        if (members.size() == 1) return DiscordMarkdown.escapeUsername(members.get(0));
-        if (members.size() == 2) {
-            return DiscordMarkdown.escapeUsername(members.get(0)) + " and "
-                    + DiscordMarkdown.escapeUsername(members.get(1));
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < members.size(); i++) {
-            if (i > 0) sb.append(i == members.size() - 1 ? ", and " : ", ");
-            sb.append(DiscordMarkdown.escapeUsername(members.get(i)));
-        }
-        return sb.toString();
     }
 }

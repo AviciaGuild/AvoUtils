@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.wardetector;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
@@ -18,9 +19,17 @@ import net.minecraft.network.chat.Component;
  */
 public class WarDetectorFeature implements AvoFeature {
 
-    private static final String AVO_ICON_URL =
-            "https://raw.githubusercontent.com/AviciaGuild/AvoUtils/refs/heads/main/src/main/resources/assets/avoutils/icon.png";
     private static final String EVT_GUILD_WAR = "guild_war_result";
+
+    private final WarDetector detector;
+
+    public WarDetectorFeature() {
+        this(new WarDetector());
+    }
+
+    WarDetectorFeature(WarDetector detector) {
+        this.detector = detector;
+    }
 
     public boolean isGuildMember() {
         return AvoAuthService.getInstance().isGuildMember();
@@ -31,12 +40,12 @@ public class WarDetectorFeature implements AvoFeature {
         // Continuous client tick for war tracking while on Wynncraft
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             if (isGuildMember() && WynncraftServerPolicy.isOnWynncraft()) {
-                WarDetector.tick();
+                detector.tick();
             }
         });
 
         // Reset war tracking state on disconnect
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> WarDetector.reset());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> detector.reset());
 
         // Register connection demand lease for verified guild members
         AvoWebSocketManager.getInstance().registerConnectionDemand("wardetector", this::isGuildMember);
@@ -48,11 +57,11 @@ public class WarDetectorFeature implements AvoFeature {
      * Called when a system chat packet is received.
      */
     public void onSystemChat(Component message) {
-        if (message == null || !isGuildMember()) return;
+        if (message == null || !detector.isTrackingWar() || !isGuildMember()) return;
         if (!AvoWebSocketManager.getInstance().isConnected()) return;
 
         String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
-        WarDetector.WarResult warResult = WarDetector.tryDetectOutcome(cleaned);
+        WarDetector.WarResult warResult = detector.tryDetectOutcome(cleaned);
         if (warResult != null) {
             sendWarEvent(warResult);
         }
@@ -60,13 +69,23 @@ public class WarDetectorFeature implements AvoFeature {
 
     private void sendWarEvent(WarDetector.WarResult warResult) {
         JsonObject payload = new JsonObject();
-        payload.addProperty("username", "War Result");
-        payload.addProperty("message", warResult.formattedMessage());
-        payload.addProperty("avatar_url", AVO_ICON_URL);
         payload.addProperty("territory", warResult.territory());
         payload.addProperty("outcome", warResult.outcome());
-        payload.addProperty("stats", warResult.stats());
-        payload.addProperty("warrers", warResult.warrers());
+
+        WarDetector.TowerStats stats = warResult.tower();
+        JsonObject tower = new JsonObject();
+        tower.addProperty("hp", stats.health());
+        tower.addProperty("defense", stats.defense());
+        tower.addProperty("damage_low", stats.damageLow());
+        tower.addProperty("damage_high", stats.damageHigh());
+        tower.addProperty("attack_speed", stats.attackSpeed());
+        payload.add("tower", tower);
+
+        JsonArray warrers = new JsonArray();
+        for (String warrer : warResult.warrers()) {
+            warrers.add(warrer);
+        }
+        payload.add("warrers", warrers);
         payload.addProperty("duration_seconds", warResult.durationSeconds());
         payload.addProperty("dps", warResult.dps());
         AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_WAR, payload);
@@ -75,7 +94,7 @@ public class WarDetectorFeature implements AvoFeature {
     @Override
     public void onServerScopeChanged(Scope newScope) {
         if (newScope != Scope.MAIN) {
-            WarDetector.reset();
+            detector.reset();
         }
     }
 }

@@ -15,7 +15,9 @@ class TerritoryEventDetectorTest {
                 detector.tryDetect("[SEQ] has taken control of Overtaken Outpost!");
 
         assertNotNull(result);
-        assertEquals("**[SEQ]** has taken control of **Overtaken Outpost**!", result.formattedMessage());
+        assertEquals(TerritoryEventDetector.Action.CAPTURE, result.action());
+        assertEquals("Overtaken Outpost", result.territory());
+        assertEquals("SEQ", result.guildTag());
     }
 
     @Test
@@ -35,8 +37,9 @@ class TerritoryEventDetectorTest {
         TerritoryEventDetector.Result result = detector.tryDetect("[Nia] has lost the war!");
 
         assertNotNull(result);
-        assertEquals("Successfully defended **Shineridge Orc Camp** — **[Nia]** has lost the war!",
-                result.formattedMessage());
+        assertEquals(TerritoryEventDetector.Action.DEFENSE, result.action());
+        assertEquals("Shineridge Orc Camp", result.territory());
+        assertEquals("Nia", result.guildTag());
     }
 
     @Test
@@ -50,8 +53,9 @@ class TerritoryEventDetectorTest {
                 detector.tryDetect("Your guild has successfully defended Shineridge Orc Camp.");
 
         assertNotNull(result);
-        assertEquals("Successfully defended **Shineridge Orc Camp** — **[Nia]** has lost the war!",
-                result.formattedMessage());
+        assertEquals(TerritoryEventDetector.Action.DEFENSE, result.action());
+        assertEquals("Shineridge Orc Camp", result.territory());
+        assertEquals("Nia", result.guildTag());
     }
 
     @Test
@@ -61,8 +65,9 @@ class TerritoryEventDetectorTest {
                 "Your guild has successfully defended Shineridge Orc Camp. [Nia] has lost the war!");
 
         assertNotNull(result);
-        assertEquals("Successfully defended **Shineridge Orc Camp** — **[Nia]** has lost the war!",
-                result.formattedMessage());
+        assertEquals(TerritoryEventDetector.Action.DEFENSE, result.action());
+        assertEquals("Shineridge Orc Camp", result.territory());
+        assertEquals("Nia", result.guildTag());
     }
 
     @Test

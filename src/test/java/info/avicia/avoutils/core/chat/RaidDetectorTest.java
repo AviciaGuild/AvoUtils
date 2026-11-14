@@ -1,13 +1,12 @@
 package info.avicia.avoutils.core.chat;
 
+import java.util.List;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import net.minecraft.network.chat.Component;
 
 class RaidDetectorTest {
 
@@ -17,24 +16,26 @@ class RaidDetectorTest {
         RaidDetector.RaidResult result = RaidDetector.tryDetect(cleaned, Component.literal(""));
 
         assertNotNull(result);
+        assertEquals(List.of("Steve"), result.players());
+        assertEquals("Nest of the Grootslangs", result.raidName());
         assertEquals(0, result.emeralds());
         assertEquals(0, result.aspects());
-        assertTrue(result.formattedMessage().contains("**Steve** finished **Nest of the Grootslangs**"));
-        assertTrue(result.formattedMessage().contains("+100.000m Guild XP"));
+        assertEquals(100.0, result.guildXp(), 1e-6);
+        assertEquals(0, result.seasonalRating());
     }
 
     @Test
     void detectsMultiPlayerRaidWithAspectsAndSr() {
-        String cleaned = "Steve, Alex and Bob finished NOL and claimed 12x Aspects, and +123456m Guild Experience, and +3 Seasonal Rating";
+        String cleaned = "Steve_1, Alex and Bob finished NOL and claimed 12x Aspects, and +123456m Guild Experience, and +3 Seasonal Rating";
         RaidDetector.RaidResult result = RaidDetector.tryDetect(cleaned, Component.literal(""));
 
         assertNotNull(result);
+        assertEquals(List.of("Steve_1", "Alex", "Bob"), result.players());
+        assertEquals("NOL", result.raidName());
         assertEquals(12, result.aspects());
         assertEquals(0, result.emeralds());
-        assertTrue(result.formattedMessage().contains("**Steve, Alex, and Bob** finished **NOL**"));
-        assertTrue(result.formattedMessage().contains("12x Aspects"));
-        assertTrue(result.formattedMessage().contains("+123.456m Guild XP"));
-        assertTrue(result.formattedMessage().contains("+3 SR"));
+        assertEquals(123.456, result.guildXp(), 1e-6);
+        assertEquals(3, result.seasonalRating());
     }
 
     @Test
@@ -43,6 +44,7 @@ class RaidDetectorTest {
         RaidDetector.RaidResult result = RaidDetector.tryDetect(cleaned, Component.literal(""));
 
         assertNotNull(result);
+        assertEquals(List.of("Steve", "Alex"), result.players());
         assertEquals(2, result.aspects());
         assertEquals(3, result.emeralds());
     }

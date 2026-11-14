@@ -17,7 +17,6 @@ class GuildChatDetectorTest {
         assertNotNull(direct);
         assertEquals("Steve", direct.username());
         assertEquals("hello guild :wave:", direct.content());
-        assertEquals("https://mc-heads.net/avatar/Steve/128", direct.avatarUrl());
         assertEquals("Steve\u0000hello guild", direct.dedupKey());
 
         Component nickComp = Component.empty()

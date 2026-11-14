@@ -16,7 +16,6 @@ final class GuildChatDetector {
             "^(?:<\\d+>\\s*)?([a-zA-Z0-9_][a-zA-Z0-9_ ]*[a-zA-Z0-9_]|[a-zA-Z0-9_]{3,16})\\s*:\\s*(.*)$",
             Pattern.DOTALL);
     private static final Pattern EMOJI_SHORTCODE_PATTERN = Pattern.compile(":[a-zA-Z0-9_+\\-]+:");
-    private static final String AVATAR_URL_BASE = "https://mc-heads.net/avatar/";
 
     private GuildChatDetector() {
     }
@@ -48,10 +47,9 @@ final class GuildChatDetector {
                 .replaceAll("\\s+", " ")
                 .trim();
         String dedupKey = realUsername + "\u0000" + dedupContent;
-        String avatarUrl = AVATAR_URL_BASE + realUsername + "/128";
 
-        return new Result(realUsername, content, avatarUrl, dedupKey);
+        return new Result(realUsername, content, dedupKey);
     }
 
-    record Result(String username, String content, String avatarUrl, String dedupKey) {}
+    record Result(String username, String content, String dedupKey) {}
 }

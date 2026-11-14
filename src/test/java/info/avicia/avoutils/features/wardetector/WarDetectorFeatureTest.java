@@ -7,15 +7,16 @@ import info.avicia.avoutils.core.config.ModConfig;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy;
 import info.avicia.avoutils.core.util.WynncraftServerPolicy.Scope;
 import info.avicia.avoutils.core.websocket.AvoWebSocketManager;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
-import java.lang.reflect.Field;
-import java.util.function.Consumer;
-import net.minecraft.network.chat.Component;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,9 +32,7 @@ import static org.mockito.Mockito.when;
 class WarDetectorFeatureTest {
 
     @BeforeEach
-    @AfterEach
-    void cleanState() {
-        WarDetector.reset();
+    void setupPolicy() {
         WynncraftServerPolicy.setScopeOverride(() -> Scope.MAIN);
     }
 
@@ -116,24 +115,49 @@ class WarDetectorFeatureTest {
     }
 
     @Test
-    void onServerScopeChangedResetsWarDetectorWhenLeavingMain() throws Exception {
-        setStaticField("activeBattleId", "Detlas:1000");
-        WarDetectorFeature feature = new WarDetectorFeature();
+    void onSystemChatDispatchesStructuredWarPayloadWhenActiveWarCompletes() {
+        withMockedServices(true, true, manager -> {
+            WarDetector detector = new WarDetector(() -> false, () -> List.of("LocalUser", "The_PixelChicken"), () -> "LocalUser");
+            WarDetector.TowerState start = new WarDetector.TowerState(200_000L, 50.0, 1_000, 1_500, 2.0, 1_000L);
+            WarDetector.TowerState end = new WarDetector.TowerState(0L, 50.0, 1_000, 1_500, 2.0, 11_000L);
+            detector.updateState(1_000L, new WarDetector.BattleSnapshot("Detlas", start, end));
+
+            WarDetectorFeature feature = new WarDetectorFeature(detector);
+            feature.onSystemChat(Component.literal("Territory Captured! Captured \"Detlas\""));
+
+            ArgumentCaptor<JsonObject> payloadCaptor = ArgumentCaptor.forClass(JsonObject.class);
+            verify(manager).sendEvent(eq("guild_war_result"), payloadCaptor.capture());
+
+            JsonObject payload = payloadCaptor.getValue();
+            assertEquals("Detlas", payload.get("territory").getAsString());
+            assertEquals("Captured", payload.get("outcome").getAsString());
+            JsonObject tower = payload.getAsJsonObject("tower");
+            assertEquals(200_000L, tower.get("hp").getAsLong());
+            assertEquals(50.0, tower.get("defense").getAsDouble());
+            assertEquals(1_000, tower.get("damage_low").getAsInt());
+            assertEquals(1_500, tower.get("damage_high").getAsInt());
+            assertEquals(2.0, tower.get("attack_speed").getAsDouble());
+            assertEquals(2, payload.getAsJsonArray("warrers").size());
+            assertEquals("LocalUser", payload.getAsJsonArray("warrers").get(0).getAsString());
+            assertEquals("The_PixelChicken", payload.getAsJsonArray("warrers").get(1).getAsString());
+            assertFalse(payload.has("message"));
+            assertFalse(payload.has("stats"));
+            assertEquals(10L, payload.get("duration_seconds").getAsLong());
+            assertEquals(40_000L, payload.get("dps").getAsLong());
+        });
+    }
+
+    @Test
+    void onServerScopeChangedResetsWarDetectorWhenLeavingMain() {
+        WarDetector detector = new WarDetector(() -> false, () -> List.of("LocalUser"), () -> "LocalUser");
+        WarDetector.TowerState state = new WarDetector.TowerState(100_000L, 0.0, 500, 800, 1.5, 1_000L);
+        detector.updateState(1_000L, new WarDetector.BattleSnapshot("Detlas", state, state));
+        WarDetectorFeature feature = new WarDetectorFeature(detector);
 
         feature.onServerScopeChanged(Scope.MAIN);
-        assertEquals("Detlas:1000", WarDetector.getActiveBattleId());
+        assertEquals("Detlas", detector.getActiveTerritory());
 
         feature.onServerScopeChanged(Scope.BETA);
-        assertNull(WarDetector.getActiveBattleId());
-    }
-
-    private static void setStaticField(String fieldName, Object value) throws Exception {
-        Field field = WarDetector.class.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(null, value);
-    }
-
-    private static void assertEquals(Object expected, Object actual) {
-        org.junit.jupiter.api.Assertions.assertEquals(expected, actual);
+        assertNull(detector.getActiveTerritory());
     }
 }

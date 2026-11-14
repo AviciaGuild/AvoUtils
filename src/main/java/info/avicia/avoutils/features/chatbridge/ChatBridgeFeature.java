@@ -1,5 +1,6 @@
 package info.avicia.avoutils.features.chatbridge;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import info.avicia.avoutils.AvoUtilsMod;
 import info.avicia.avoutils.core.AvoFeature;
@@ -20,14 +21,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
 /**
- * Coordinates the chat bridge between in-game Wynncraft chat/events and Discord.
+ * Coordinates the chat bridge between in-game Wynncraft chat/events and the Avicia gateway.
  */
 public class ChatBridgeFeature implements AvoFeature {
-
-    private static final String BANK_CHEST_AVATAR_URL =
-            "https://wynncraft.wiki.gg/images/UnidentifiedMythicBox.png";
-    private static final String AVO_ICON_URL =
-            "https://raw.githubusercontent.com/AviciaGuild/AvoUtils/refs/heads/main/src/main/resources/assets/avoutils/icon.png";
 
     private static final long CHAT_DEDUPE_MS = 250;
     private static final long EVENT_DEDUPE_MS = 5_000;
@@ -95,7 +91,11 @@ public class ChatBridgeFeature implements AvoFeature {
             String cleaned = PacketTextNormalizer.normalizeForParsing(message.getString());
             TerritoryEventDetector.Result territory = territoryDetector.tryDetect(cleaned);
             if (territory != null) {
-                sendDedupedEvent(EVT_GUILD_TERRITORY, "Territory Alert", territory.formattedMessage(), AVO_ICON_URL);
+                JsonObject payload = new JsonObject();
+                payload.addProperty("action", territory.action().wireName());
+                payload.addProperty("territory", territory.territory());
+                payload.addProperty("guild_tag", territory.guildTag());
+                sendDedupedPayload(EVT_GUILD_TERRITORY, territory.dedupKey(), payload);
             }
             return;
         }
@@ -112,37 +112,82 @@ public class ChatBridgeFeature implements AvoFeature {
 
         RaidDetector.RaidResult raid = RaidDetector.tryDetect(cleaned, message);
         if (raid != null) {
-            sendDedupedEvent(EVT_GUILD_RAID, "Raid Complete", raid.formattedMessage(), AVO_ICON_URL);
+            JsonObject payload = new JsonObject();
+            JsonArray players = new JsonArray();
+            for (String player : raid.players()) {
+                players.add(player);
+            }
+            payload.add("players", players);
+            payload.addProperty("raid", raid.raidName());
+            payload.addProperty("aspects", raid.aspects());
+            payload.addProperty("emeralds", raid.emeralds());
+            payload.addProperty("guild_xp", raid.guildXp());
+            payload.addProperty("sr", raid.seasonalRating());
+            sendDedupedPayload(EVT_GUILD_RAID, raid.dedupKey(), payload);
             return;
         }
 
         RewardDetector.RewardResult reward = RewardDetector.tryDetect(cleaned, message);
         if (reward != null) {
-            sendEvent(EVT_GUILD_REWARD, "Guild Rewards", reward.formattedMessage(), AVO_ICON_URL);
+            JsonObject payload = new JsonObject();
+            payload.addProperty("sender", reward.sender());
+            payload.addProperty("recipient", reward.recipient());
+            payload.addProperty("emeralds", reward.emeraldAmount());
+            payload.addProperty("aspects", reward.aspectAmount());
+            payload.addProperty("tomes", reward.tomeCount());
+            AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_REWARD, payload);
             return;
         }
 
         BankDetector.Result bank = BankDetector.tryDetect(cleaned, message);
         if (bank != null) {
-            sendEvent(EVT_GUILD_BANK, bank.displayName(), bank.formattedMessage(), BANK_CHEST_AVATAR_URL);
+            JsonObject payload = new JsonObject();
+            payload.addProperty("player", bank.player());
+            payload.addProperty("action", bank.action());
+            payload.addProperty("item", bank.item());
+            if (bank.tier() != null) {
+                payload.addProperty("tier", bank.tier());
+            }
+            AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_BANK, payload);
             return;
         }
 
         AllyDetector.Result ally = AllyDetector.tryDetect(cleaned, message);
         if (ally != null) {
-            sendDedupedEvent(EVT_GUILD_ALLY, "Guild Diplomacy", ally.formattedMessage(), AVO_ICON_URL);
+            JsonObject payload = new JsonObject();
+            payload.addProperty("action", ally.action().wireName());
+            if (ally.actor() != null) {
+                payload.addProperty("actor", ally.actor());
+            }
+            payload.addProperty("guild", ally.guild());
+            sendDedupedPayload(EVT_GUILD_ALLY, ally.dedupKey(), payload);
             return;
         }
 
         GuildMemberDetector.Result member = GuildMemberDetector.tryDetect(cleaned, message);
         if (member != null) {
-            sendDedupedEvent(EVT_GUILD_MEMBER, "Guild Members", member.formattedMessage(), AVO_ICON_URL);
+            JsonObject payload = new JsonObject();
+            payload.addProperty("action", member.action().wireName());
+            if (member.actor() != null) {
+                payload.addProperty("actor", member.actor());
+            }
+            payload.addProperty("target", member.target());
+            if (member.oldRank() != null) {
+                payload.addProperty("old_rank", member.oldRank());
+            }
+            if (member.newRank() != null) {
+                payload.addProperty("new_rank", member.newRank());
+            }
+            sendDedupedPayload(EVT_GUILD_MEMBER, member.dedupKey(), payload);
             return;
         }
 
         GuildChatDetector.Result chat = GuildChatDetector.tryDetect(cleaned, message);
         if (chat != null && !chatDeduper.isDuplicate(chat.dedupKey())) {
-            sendEvent(EVT_GUILD_CHAT, chat.username(), chat.content(), chat.avatarUrl());
+            JsonObject payload = new JsonObject();
+            payload.addProperty("username", chat.username());
+            payload.addProperty("message", chat.content());
+            AvoWebSocketManager.getInstance().sendEvent(EVT_GUILD_CHAT, payload);
         }
     }
 
@@ -170,17 +215,9 @@ public class ChatBridgeFeature implements AvoFeature {
         }
     }
 
-    private void sendDedupedEvent(String eventType, String username, String message, String avatarUrl) {
-        if (!eventDeduper.isDuplicate(eventType + "\u0000" + message)) {
-            sendEvent(eventType, username, message, avatarUrl);
+    private void sendDedupedPayload(String eventType, String dedupKey, JsonObject payload) {
+        if (!eventDeduper.isDuplicate(eventType + "\u0000" + dedupKey)) {
+            AvoWebSocketManager.getInstance().sendEvent(eventType, payload);
         }
-    }
-
-    private void sendEvent(String eventType, String username, String message, String avatarUrl) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("username", username);
-        payload.addProperty("message", message);
-        payload.addProperty("avatar_url", avatarUrl);
-        AvoWebSocketManager.getInstance().sendEvent(eventType, payload);
     }
 }

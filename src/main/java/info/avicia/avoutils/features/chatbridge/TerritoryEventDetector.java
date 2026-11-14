@@ -14,6 +14,21 @@ final class TerritoryEventDetector {
 
     static final long DEFENSE_PAIR_WINDOW_MS = 5_000L;
 
+    enum Action {
+        CAPTURE("capture"),
+        DEFENSE("defense");
+
+        private final String wireName;
+
+        Action(String wireName) {
+            this.wireName = wireName;
+        }
+
+        String wireName() {
+            return wireName;
+        }
+    }
+
     private static final Pattern ENEMY_CAPTURE_PATTERN = Pattern.compile(
             "^\\[(?<tag>[A-Za-z0-9]{3,4})]\\s+has taken control of\\s+(?<territory>[^:\\[\\]]+?)[!.]*$",
             Pattern.CASE_INSENSITIVE);
@@ -66,9 +81,8 @@ final class TerritoryEventDetector {
                 String tag = capture.group("tag").trim();
                 String territory = capture.group("territory").trim();
                 if (!territory.isEmpty() && !isOwnGuild(tag)) {
-                    String formatted = "**[" + tag + "]** has taken control of **" + territory + "**!";
                     AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/Territory] Enemy capture: [{}] -> {}", tag, territory);
-                    return new Result(formatted);
+                    return new Result(Action.CAPTURE, territory, tag);
                 }
             }
             return null;
@@ -151,15 +165,17 @@ final class TerritoryEventDetector {
     }
 
     private static Result buildDefenseResult(String territory, String attackerTag) {
-        String formatted = "Successfully defended **" + territory
-                + "** — **[" + attackerTag + "]** has lost the war!";
         AvoUtilsMod.LOGGER.info("[AvoUtils] [ChatBridge/Territory] Defended {} against [{}]", territory, attackerTag);
-        return new Result(formatted);
+        return new Result(Action.DEFENSE, territory, attackerTag);
     }
 
     private static boolean isOwnGuild(String tag) {
         return "AVO".equalsIgnoreCase(tag) || "Avicia".equalsIgnoreCase(tag);
     }
 
-    record Result(String formattedMessage) {}
+    record Result(Action action, String territory, String guildTag) {
+        String dedupKey() {
+            return action.wireName() + "\u0000" + territory + "\u0000" + guildTag;
+        }
+    }
 }

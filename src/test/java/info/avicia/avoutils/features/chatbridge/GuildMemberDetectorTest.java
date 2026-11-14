@@ -29,87 +29,103 @@ class GuildMemberDetectorTest {
 
         GuildMemberDetector.Result promo = GuildMemberDetector.tryDetect(
                 "hardcoremaxxer has set Target Nickname guild rank from Recruiter to Captain",
-                promoComp, "Observer");
+                promoComp);
         assertNotNull(promo);
-        assertEquals("**ActualAccount** promoted **NotReyz** from **Recruiter** to **Captain**",
-                promo.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.PROMOTE, promo.action());
+        assertEquals("ActualAccount", promo.actor());
+        assertEquals("NotReyz", promo.target());
+        assertEquals("Recruiter", promo.oldRank());
+        assertEquals("Captain", promo.newRank());
 
         GuildMemberDetector.Result demote = GuildMemberDetector.tryDetect(
-                "[Guild] You has set NotReyz guild rank from Chief to Recruit.",
-                Component.literal("[Guild] You has set NotReyz guild rank from Chief to Recruit."),
-                "ActualAccount");
+                "ActualAccount has set NotReyz guild rank from Chief to Recruit.",
+                guildComponent("ActualAccount has set NotReyz guild rank from Chief to Recruit."));
         assertNotNull(demote);
-        assertEquals("**ActualAccount** demoted **NotReyz** from **Chief** to **Recruit**",
-                demote.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.DEMOTE, demote.action());
+        assertEquals("ActualAccount", demote.actor());
+        assertEquals("NotReyz", demote.target());
+        assertEquals("Chief", demote.oldRank());
+        assertEquals("Recruit", demote.newRank());
 
         assertNull(GuildMemberDetector.tryDetect(
                 "ActualAccount has set NotReyz guild rank from Strategist to Strategist",
-                guildComponent("ActualAccount has set NotReyz guild rank from Strategist to Strategist"),
-                "Observer"));
+                guildComponent("ActualAccount has set NotReyz guild rank from Strategist to Strategist")));
     }
 
     @Test
-    void detectsJoinLeaveAndKick() {
+    void detectsJoinLeaveAndKickWithRawUnescapedIgn() {
         GuildMemberDetector.Result join = GuildMemberDetector.tryDetect(
                 "New_Member has joined the guild, say hello!",
-                guildComponent("New_Member has joined the guild, say hello!"), "Observer");
+                guildComponent("New_Member has joined the guild, say hello!"));
         assertNotNull(join);
-        assertEquals("**New\\_Member** has joined the guild!", join.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.JOIN, join.action());
+        assertNull(join.actor());
+        assertEquals("New_Member", join.target());
 
         GuildMemberDetector.Result leave = GuildMemberDetector.tryDetect(
                 "OldMember has left the guild.",
-                guildComponent("OldMember has left the guild."), "Observer");
+                guildComponent("OldMember has left the guild."));
         assertNotNull(leave);
-        assertEquals("**OldMember** has left the guild", leave.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.LEAVE, leave.action());
+        assertEquals("OldMember", leave.target());
 
         Component kickComp = Component.empty()
                 .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(GUILD_COLOR)))
                 .append(TextFixtures.hoverText("catboy", "catboy's real username is FadeDave"))
                 .append(" has kicked Slacker from the guild");
         GuildMemberDetector.Result kick = GuildMemberDetector.tryDetect(
-                "catboy has kicked Slacker from the guild", kickComp, "Observer");
+                "catboy has kicked Slacker from the guild", kickComp);
         assertNotNull(kick);
-        assertEquals("**FadeDave** kicked **Slacker** from the guild", kick.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.KICK, kick.action());
+        assertEquals("FadeDave", kick.actor());
+        assertEquals("Slacker", kick.target());
 
         GuildMemberDetector.Result passiveKick = GuildMemberDetector.tryDetect(
                 "Slacker has been kicked from the guild by FadeDave.",
-                guildComponent("Slacker has been kicked from the guild by FadeDave."), "Observer");
+                guildComponent("Slacker has been kicked from the guild by FadeDave."));
         assertNotNull(passiveKick);
-        assertEquals("**FadeDave** kicked **Slacker** from the guild", passiveKick.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.KICK, passiveKick.action());
+        assertEquals("FadeDave", passiveKick.actor());
+        assertEquals("Slacker", passiveKick.target());
     }
 
     @Test
     void detectsInviteAndUninviteVariants() {
         GuildMemberDetector.Result inv1 = GuildMemberDetector.tryDetect(
                 "Officer has invited Recruit to the guild",
-                guildComponent("Officer has invited Recruit to the guild"), "Observer");
+                guildComponent("Officer has invited Recruit to the guild"));
         assertNotNull(inv1);
-        assertEquals("**Officer** invited **Recruit** to the guild", inv1.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.INVITE, inv1.action());
+        assertEquals("Officer", inv1.actor());
+        assertEquals("Recruit", inv1.target());
 
         Component inv2Comp = Component.empty()
                 .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(GUILD_COLOR)))
                 .append(TextFixtures.hoverText("Commander Lilacs", "Commander Lilacs's real username is RealLilacs"))
                 .append(" invited NewMember to your guild!");
         GuildMemberDetector.Result inv2 = GuildMemberDetector.tryDetect(
-                "Commander Lilacs invited NewMember to your guild!", inv2Comp, "Observer");
+                "Commander Lilacs invited NewMember to your guild!", inv2Comp);
         assertNotNull(inv2);
-        assertEquals("**RealLilacs** invited **NewMember** to the guild", inv2.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.INVITE, inv2.action());
+        assertEquals("RealLilacs", inv2.actor());
+        assertEquals("NewMember", inv2.target());
 
         GuildMemberDetector.Result uninv = GuildMemberDetector.tryDetect(
-                "[Guild] You have successfully uninvited NewMember from the guild",
-                Component.literal("[Guild] You have successfully uninvited NewMember from the guild"),
-                "GaztheCat");
+                "GaztheCat uninvited NewMember from the guild",
+                guildComponent("GaztheCat uninvited NewMember from the guild"));
         assertNotNull(uninv);
-        assertEquals("**GaztheCat** uninvited **NewMember** from the guild", uninv.formattedMessage());
+        assertEquals(GuildMemberDetector.Action.UNINVITE, uninv.action());
+        assertEquals("GaztheCat", uninv.actor());
+        assertEquals("NewMember", uninv.target());
     }
 
     @Test
-    void rejectsPlayerChatAndUnresolvedLocalActor() {
+    void rejectsPlayerChatAndUnresolvableNickname() {
         assertNull(GuildMemberDetector.tryDetect(
                 "FadeDave: did anyone see who left the guild",
-                guildComponent("FadeDave: did anyone see who left the guild"), "Observer"));
+                guildComponent("FadeDave: did anyone see who left the guild")));
         assertNull(GuildMemberDetector.tryDetect(
-                "[Guild] You invited NewMember to the guild",
-                Component.literal("[Guild] You invited NewMember to the guild"), null));
+                "unresolvable nickname invited NewMember to the guild",
+                Component.literal("unresolvable nickname invited NewMember to the guild")));
     }
 }

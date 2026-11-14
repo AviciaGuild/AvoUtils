@@ -137,7 +137,7 @@ public class GuildStorageFeature implements AvoFeature {
 
         RaidDetector.RaidResult raid = RaidDetector.tryDetect(cleaned, message);
         if (raid != null) {
-            if (!raidDeduper.isDuplicate(raid.formattedMessage())) {
+            if (!raidDeduper.isDuplicate(raid.dedupKey())) {
                 onRaidDelta(raid.emeralds(), raid.aspects());
             }
             return;
